@@ -1,12 +1,22 @@
 import { forwardRef, useState } from "react";
-import { Edges, Html, RoundedBox } from "@react-three/drei";
+import { Billboard, Edges, Html, Line, RoundedBox } from "@react-three/drei";
 import { Color, DoubleSide, type Group } from "three";
 import { ArrowDownToLine, Clock } from "lucide-react";
 import type { DeviceMeta } from "@/hooks/useDeviceMeta";
 import { fmtKw } from "@/lib/format";
 import { DEVICE_STATE_LABEL } from "@/lib/theme";
 import type { HubDeviceReading } from "@/types";
-import { ACCENT, APPLIANCE, APPLIANCE_BY_CATEGORY, INK, OFF_TINT, STATE_HEX } from "./palette";
+import {
+  ACCENT,
+  APPLIANCE,
+  APPLIANCE_BY_CATEGORY,
+  HELD_AMBER,
+  INK,
+  OFF_TINT,
+  REDUCED_TEAL,
+  RUNNING_LED,
+  STATE_HEX,
+} from "./palette";
 import type { PlacedDevice } from "./plan";
 import { Ink, Toon } from "./toon";
 
@@ -25,7 +35,7 @@ export interface DeviceProps {
 
 /** Bright colors for things that should bloom (meshBasicMaterial with toneMapped off). */
 const glow = (hex: string, k: number) => new Color(hex).multiplyScalar(Math.min(k, 2.5));
-const OFF_GREY = "#64748b";
+const OFF_GREY = OFF_TINT;
 
 /** One piece of equipment: body, type details, status light, and glow that follows its live load. */
 export const Device3D = forwardRef<Group, DeviceProps>(function Device3D(
@@ -40,18 +50,21 @@ export const Device3D = forwardRef<Group, DeviceProps>(function Device3D(
   const running = state !== "off" && state !== "waiting" && power > 0;
   // Visual intensity only (never shown as a number): how hard the unit is working right now.
   const load = running && meta.device.rated_kw > 0 ? Math.min(1, power / meta.device.rated_kw) : 0;
-  const accent = state === "reduced" ? STATE_HEX.reduced : ACCENT[meta.category];
+  const accent = state === "reduced" ? REDUCED_TEAL : ACCENT[meta.category];
   const pastel = APPLIANCE[type] ?? APPLIANCE_BY_CATEGORY[meta.category];
   const [hovered, setHovered] = useState(false);
-  const isActive = !!state && state !== "off" && power > 0;
-  const isAlert = state === "reduced" || state === "waiting";
-  // Running vs not must read at a glance: lit status pad + full pastel when on, faded toward grey when idle or off.
+  const isRunning = state === "on" || state === "running_job";
+  const isReduced = state === "reduced";
+  const isWaiting = state === "waiting";
+  // The body tells the operating state; intervention colours are reserved for reduced and held equipment.
   const statusColor = state ? STATE_HEX[state] : OFF_GREY;
-  const lit = isActive || isAlert;
-  const bodyColor = lit || selected ? pastel : new Color(pastel).lerp(new Color(OFF_TINT), 0.6).getStyle();
-  // Toon shading flattens light, so emissive stays a faint tint (state is carried by the LED, pad and ring).
-  const emissive = selected ? "#ffffff" : lit ? statusColor : "#000000";
-  const emissiveIntensity = selected ? 0.12 : lit ? 0.06 + load * 0.08 : 0;
+  const bodyColor = state == null || state === "off"
+    ? OFF_TINT
+    : isWaiting
+      ? new Color(pastel).lerp(new Color(OFF_TINT), 0.68).getStyle()
+      : pastel;
+  const outlineColor = isReduced ? REDUCED_TEAL : isWaiting ? HELD_AMBER : INK;
+  const ledColor = isReduced ? REDUCED_TEAL : RUNNING_LED;
 
   return (
     <group
@@ -76,35 +89,23 @@ export const Device3D = forwardRef<Group, DeviceProps>(function Device3D(
       {type === "water_heater" ? (
         <mesh position={[0, h / 2, 0]} castShadow receiveShadow>
           <cylinderGeometry args={[Math.min(w, d) * 0.45, Math.min(w, d) * 0.45, h, 32]} />
-          <Toon color={bodyColor} emissive={emissive} emissiveIntensity={emissiveIntensity} />
-          <Ink />
+          <Toon color={bodyColor} emissive={selected ? "#ffffff" : "#000000"} emissiveIntensity={selected ? 0.1 : 0} />
+          <Ink color={outlineColor} thickness={isReduced || isWaiting ? 3.2 : 2.2} />
         </mesh>
       ) : (
         <RoundedBox args={[w, h, d]} radius={Math.min(0.07, w / 6, d / 6)} smoothness={3} position={[0, h / 2, 0]} castShadow receiveShadow>
-          <Toon color={bodyColor} emissive={emissive} emissiveIntensity={emissiveIntensity} />
-          <Ink />
+          <Toon color={bodyColor} emissive={selected ? "#ffffff" : "#000000"} emissiveIntensity={selected ? 0.1 : 0} />
+          <Ink color={outlineColor} thickness={isReduced || isWaiting ? 3.2 : 2.2} />
         </RoundedBox>
       )}
 
       <Details type={type} w={w} d={d} h={h} load={load} accent={accent} state={state ?? "unknown"} category={meta.category} />
 
-      {/* A quiet, readable glow: only active or selected appliances draw attention. */}
-      {type !== "water_heater" && (
-        <mesh position={[0, h + 0.004, 0]} rotation-x={-Math.PI / 2}>
-          <planeGeometry args={[w * 0.92, d * 0.92]} />
-          <meshBasicMaterial
-            color={accent}
-            transparent
-            opacity={selected ? 0.5 : isActive ? 0.18 + load * 0.28 : isAlert ? 0.12 : 0.06}
-            toneMapped={false}
-            depthWrite={false}
-          />
-        </mesh>
+      {(isRunning || isReduced) && <StatusLed position={[w / 2 - 0.13, h + 0.07, d / 2 - 0.13]} color={ledColor} />}
+      {(isReduced || isWaiting) && (
+        <StateRing radius={Math.max(w, d) * 0.72 + 0.25} color={statusColor} dashed={isWaiting} />
       )}
-
-      <StatusLed position={[w / 2 - 0.13, h + 0.07, d / 2 - 0.13]} color={statusColor} active={lit} />
-      {lit && <StatusPad w={w} d={d} color={statusColor} />}
-      {isAlert && <StateRing radius={Math.max(w, d) * 0.72 + 0.25} color={statusColor} />}
+      {isWaiting && <ClockBadge position={[0, h + 0.55, 0]} />}
 
       {selected && (
         <mesh position={[0, h / 2, 0]}>
@@ -159,11 +160,25 @@ function Details({
     case "fryer":
       return (
         <>
+          <mesh position={[0, h + 0.012, 0]} rotation-x={-Math.PI / 2}>
+            <planeGeometry args={[w * 0.88, d * 0.72]} />
+            <Toon color="#5B3A32" />
+          </mesh>
           {[-w / 4, w / 4].map((x) => (
-            <mesh key={x} position={[x, h + 0.01, -d * 0.04]} rotation-x={-Math.PI / 2}>
-              <planeGeometry args={[w * 0.36, d * 0.6]} />
-              <meshBasicMaterial color={glow(accent, 0.25 + load * 3.2)} toneMapped={false} />
-            </mesh>
+            <group key={x} position={[x, h + 0.035, -d * 0.03]}>
+              <mesh rotation-x={-Math.PI / 2}>
+                <planeGeometry args={[w * 0.32, d * 0.54]} />
+                <meshBasicMaterial color={glow("#FF9F1C", 0.2 + load * 2.8)} toneMapped={false} />
+              </mesh>
+              <mesh position={[0, 0.055, 0]}>
+                <boxGeometry args={[w * 0.34, 0.08, d * 0.56]} />
+                <Toon color="#F4F1DE" wireframe />
+              </mesh>
+              <mesh position={[0, 0.24, d * 0.38]} rotation-x={-0.42}>
+                <boxGeometry args={[0.055, 0.38, 0.055]} />
+                <Toon color="#5F5A55" />
+              </mesh>
+            </group>
           ))}
         </>
       );
@@ -174,10 +189,12 @@ function Details({
             <planeGeometry args={[w * 0.84, d * 0.72]} />
             <Toon color="#1c1f27" roughness={0.6} />
           </mesh>
-          {[-0.3, -0.1, 0.1, 0.3].map((u) => (
-            <mesh key={u} position={[u * w, h + 0.02, 0]}>
-              <boxGeometry args={[0.035, 0.02, d * 0.64]} />
-              <meshBasicMaterial color={glow(accent, 0.2 + load * 3.5)} toneMapped={false} />
+          {[
+            [-0.23, -0.2], [0.23, -0.2], [-0.23, 0.2], [0.23, 0.2],
+          ].map(([x, z], i) => (
+            <mesh key={i} position={[x * w, h + 0.024, z * d]} rotation-x={-Math.PI / 2}>
+              <ringGeometry args={[Math.min(w, d) * 0.09, Math.min(w, d) * 0.145, 24]} />
+              <meshBasicMaterial color={glow("#FF6B35", 0.15 + load * 3)} toneMapped={false} />
             </mesh>
           ))}
         </>
@@ -191,7 +208,11 @@ function Details({
           </mesh>
           <mesh position={[0, h * 0.47, front]}>
             <planeGeometry args={[w * 0.7, h * 0.4]} />
-            <meshBasicMaterial color={glow(accent, 0.12 + load * 3)} toneMapped={false} />
+            <meshBasicMaterial color={glow("#FF9F1C", 0.08 + load * 2.7)} toneMapped={false} />
+          </mesh>
+          <mesh position={[0, h * 0.72, front + 0.015]}>
+            <boxGeometry args={[w * 0.58, 0.055, 0.055]} />
+            <Toon color="#4A3F44" />
           </mesh>
         </>
       );
@@ -204,7 +225,11 @@ function Details({
           </mesh>
           <mesh position={[w * 0.32, h * 0.9, front + 0.001]}>
             <planeGeometry args={[0.12, 0.05]} />
-            <meshBasicMaterial color={glow(state === "running_job" ? "#34d399" : "#4b5563", 2)} toneMapped={false} />
+            <meshBasicMaterial color={glow(state === "running_job" ? RUNNING_LED : "#8A817C", 2)} toneMapped={false} />
+          </mesh>
+          <mesh position={[0, h * 0.72, front + 0.025]}>
+            <boxGeometry args={[w * 0.56, 0.055, 0.055]} />
+            <Toon color="#4A5568" />
           </mesh>
         </>
       );
@@ -228,17 +253,39 @@ function Details({
       );
     case "reach_in_fridge":
       return (
-        <mesh position={[0, h * 0.5, front]}>
-          <planeGeometry args={[w * 0.84, h * 0.84]} />
-          <meshBasicMaterial color={glow(accent, 0.18 + load * 1.6)} toneMapped={false} />
-        </mesh>
+        <>
+          <mesh position={[0, h * 0.5, front]}>
+            <planeGeometry args={[w * 0.84, h * 0.84]} />
+            <meshBasicMaterial color={glow("#8ECAE6", 0.12 + load * 1.2)} transparent opacity={0.72} toneMapped={false} />
+          </mesh>
+          <mesh position={[0, h * 0.5, front + 0.012]}>
+            <boxGeometry args={[0.035, h * 0.8, 0.025]} />
+            <Toon color={INK} />
+          </mesh>
+          {[-0.1, 0.1].map((x) => (
+            <mesh key={x} position={[x * w, h * 0.5, front + 0.035]}>
+              <boxGeometry args={[0.035, h * 0.34, 0.035]} />
+              <Toon color="#4A5568" />
+            </mesh>
+          ))}
+        </>
       );
     case "ice_machine":
       return (
-        <mesh position={[0, h * 0.3, front]}>
-          <planeGeometry args={[w * 0.7, h * 0.35]} />
-          <Toon color="#9fb0c2" metalness={0.3} roughness={0.4} />
-        </mesh>
+        <>
+          <mesh position={[0, h * 0.32, front]}>
+            <planeGeometry args={[w * 0.72, h * 0.4]} />
+            <Toon color="#B7C9B2" />
+          </mesh>
+          <mesh position={[0, h * 0.55, front + 0.018]}>
+            <boxGeometry args={[w * 0.5, 0.05, 0.04]} />
+            <Toon color="#4A5568" />
+          </mesh>
+          <mesh position={[0, h * 0.78, front + 0.008]}>
+            <boxGeometry args={[w * 0.22, h * 0.09, 0.03]} />
+            <Toon color="#F4F1DE" />
+          </mesh>
+        </>
       );
     case "water_heater": {
       const r = Math.min(w, d) * 0.45;
@@ -274,48 +321,43 @@ function Fan({ w, d, h }: { w: number; d: number; h: number }) {
   );
 }
 
-function StatusLed({ position, color, active }: { position: [number, number, number]; color: string; active: boolean }) {
-  // Lit LEDs are bright enough to bloom; idle ones stay a flat grey dot.
+function StatusLed({ position, color }: { position: [number, number, number]; color: string }) {
   return (
     <mesh position={position}>
-      <sphereGeometry args={[0.11, 16, 12]} />
-      <meshBasicMaterial color={active ? glow(color, 2.5) : OFF_GREY} toneMapped={!active} />
+      <sphereGeometry args={[0.075, 16, 12]} />
+      <meshBasicMaterial color={glow(color, 2.2)} toneMapped={false} />
     </mesh>
   );
 }
 
-/** A steady coloured pad + outline on the floor under a working appliance (green on, blue reduced, amber waiting). */
-function StatusPad({ w, d, color }: { w: number; d: number; color: string }) {
-  const pw = w + 0.45;
-  const pd = d + 0.45;
+/** Reduced is a solid teal ring; held is the same calm geometry with an amber dash pattern. */
+function StateRing({ radius, color, dashed }: { radius: number; color: string; dashed: boolean }) {
+  const points = Array.from({ length: 65 }, (_, i) => {
+    const angle = (i / 64) * Math.PI * 2;
+    return [Math.cos(angle) * radius, 0.035, Math.sin(angle) * radius] as [number, number, number];
+  });
   return (
-    <group position={[0, 0.02, 0]}>
-      <mesh rotation-x={-Math.PI / 2}>
-        <planeGeometry args={[pw, pd]} />
-        <meshBasicMaterial color={color} transparent opacity={0.28} depthWrite={false} />
+    <Line points={points} color={color} lineWidth={3} transparent opacity={0.9} dashed={dashed} dashSize={0.18} gapSize={0.12} />
+  );
+}
+
+function ClockBadge({ position }: { position: [number, number, number] }) {
+  return (
+    <Billboard position={position}>
+      <mesh>
+        <circleGeometry args={[0.22, 32]} />
+        <meshBasicMaterial color="#ffffff" toneMapped={false} />
+        <Ink thickness={2} />
       </mesh>
-      {[
-        [0, -pd / 2, pw, 0.06],
-        [0, pd / 2, pw, 0.06],
-        [-pw / 2, 0, 0.06, pd],
-        [pw / 2, 0, 0.06, pd],
-      ].map(([x, z, sx, sz], i) => (
-        <mesh key={i} position={[x, 0.004, z]} rotation-x={-Math.PI / 2}>
-          <planeGeometry args={[sx, sz]} />
-          <meshBasicMaterial color={glow(color, 1.6)} toneMapped={false} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-/** A steady outline signals reduced/waiting state without competing motion. */
-function StateRing({ radius, color }: { radius: number; color: string }) {
-  return (
-    <mesh position={[0, 0.03, 0]} rotation-x={-Math.PI / 2}>
-      <ringGeometry args={[radius, radius + 0.07, 48]} />
-      <meshBasicMaterial color={color} transparent opacity={0.65} depthWrite={false} />
-    </mesh>
+      <mesh position={[0, 0.035, 0.002]} rotation-z={-0.7}>
+        <boxGeometry args={[0.025, 0.13, 0.02]} />
+        <meshBasicMaterial color={INK} />
+      </mesh>
+      <mesh position={[0.045, -0.015, 0.003]} rotation-z={0.65}>
+        <boxGeometry args={[0.02, 0.1, 0.02]} />
+        <meshBasicMaterial color={INK} />
+      </mesh>
+    </Billboard>
   );
 }
 

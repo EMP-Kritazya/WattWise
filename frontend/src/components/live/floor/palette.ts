@@ -55,6 +55,9 @@ export const APPLIANCE_BY_CATEGORY: Record<Category, string> = {
 };
 /** Idle / off appliances fade toward this grey. */
 export const OFF_TINT = "#D9D4CC";
+export const RUNNING_LED = "#EF476F";
+export const REDUCED_TEAL = "#2EC4B6";
+export const HELD_AMBER = "#FFB703";
 
 /** Emissive glow per equipment category. */
 export const ACCENT: Record<Category, string> = {
@@ -67,11 +70,11 @@ export const ACCENT: Record<Category, string> = {
 };
 
 export const STATE_HEX: Record<DeviceState, string> = {
-  on: "#34d399",
-  running_job: "#34d399",
-  reduced: "#6b8cff",
-  waiting: "#fbbf24",
-  off: "#4b5563",
+  on: RUNNING_LED,
+  running_job: RUNNING_LED,
+  reduced: REDUCED_TEAL,
+  waiting: HELD_AMBER,
+  off: OFF_TINT,
 };
 
 export const LANE_HEX: Record<Lane, string> = { without: "#f87171", with: "#34d399" };

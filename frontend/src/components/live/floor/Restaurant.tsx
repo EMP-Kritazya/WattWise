@@ -7,6 +7,7 @@ import { Device3D, type TagMode } from "./Device3D";
 import { TABLES, cableStart, cableRoute, type Placement } from "./plan";
 import { Scenery } from "./Scenery";
 import { useLabelOffsets, type LabelAnchor } from "./useLabelOffsets";
+import { REDUCED_TEAL } from "./palette";
 
 export interface RestaurantProps {
   lane: Lane;
@@ -83,16 +84,23 @@ export function Restaurant({ lane, tick, placement, detail, selected, onSelect, 
         );
       })}
 
-      {placement.boxes.map((p) => (
-        <Line
-          key={`cable:${p.meta.device.device_id}`}
-          points={cableRoute(cableStart(p)).map(([x, y]) => [x, 0.025, y] as [number, number, number])}
-          color="#94a3b8"
-          transparent
-          opacity={selected === p.meta.device.device_id ? 0.8 : 0.12}
-          lineWidth={1}
-        />
-      ))}
+      {placement.boxes.map((p) => {
+        const id = p.meta.device.device_id;
+        const reduced = readings.get(id)?.state === "reduced";
+        return (
+          <Line
+            key={`cable:${id}`}
+            points={cableRoute(cableStart(p)).map(([x, y]) => [x, 0.025, y] as [number, number, number])}
+            color={reduced ? REDUCED_TEAL : "#94a3b8"}
+            transparent
+            opacity={reduced ? 0.9 : selected === id ? 0.8 : 0.12}
+            lineWidth={reduced ? 2.4 : 1}
+            dashed={reduced}
+            dashSize={0.22}
+            gapSize={0.12}
+          />
+        );
+      })}
       {placement.lights.map((l) => {
         const id = l.meta.device.device_id;
         const r = readings.get(id);
