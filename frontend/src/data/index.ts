@@ -7,6 +7,7 @@ import type { Escalation, Lane, Proposal } from "@/types";
 export { requestSurge, startLive } from "./live";
 export { api, useApi } from "./useApi";
 export { publishHostDevices, useDevices } from "./useDevices";
+export { isFixtureHub, useHubHost, type HubConnectionState } from "./useHubHost";
 export { useLive } from "./useLive";
 export type { BlockPoint, ChatMessage, FeedItem, LanePoint, LiveSourceKind, Warning } from "@/store/sim";
 

@@ -10,6 +10,7 @@ import { AgentNetworkPage } from "@/pages/AgentNetworkPage";
 import { BuilderPage } from "@/pages/BuilderPage";
 import { LivePage } from "@/pages/LivePage";
 import { ProofPage } from "@/pages/ProofPage";
+import { SimHostPage } from "@/pages/SimHostPage";
 import { startLive } from "@/data";
 import { useDashboardStore as useSim } from "@/data";
 import { transport } from "@/transport";
@@ -47,6 +48,7 @@ export default function App() {
               <Route path="/live" element={<LivePage />} />
               <Route path="/agents" element={<AgentNetworkPage />} />
               <Route path="/proof" element={<ProofPage />} />
+              <Route path="/sim" element={<SimHostPage />} />
             </Routes>
             {/* On every screen: a waiting escalation pauses the clock, so the owner must always see it. */}
             <EscalationDialog />

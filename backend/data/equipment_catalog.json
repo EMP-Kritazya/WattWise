@@ -1,15 +1,14 @@
 [
   {
     "type_id": "hvac",
-    "name": "HVAC (rooftop unit)",
+    "name": "HVAC",
     "category": "cooling",
     "default_importance": "flexible",
     "rated_kw": 12.0,
-    "min_power_pct": 40,
     "power_model": "thermal",
-    "params": { "setpoint_c": 22.0, "r_c_per_kw": 0.25, "c_kwh_per_c": 3.0, "internal_gain_kw": 6.0 },
+    "params": { "setpoint_c": 22.5 },
     "default_limits": { "min_power_pct": 40, "max_reduce_min": 30 },
-    "source_note": "PLACEHOLDER typical ~10-ton rooftop unit; verify with ENERGY STAR light commercial HVAC data"
+    "source_note": "Modeled 10-ton rooftop unit input; rated draw is an explicit demo assumption informed by DOE commercial unitary AC/heat-pump test procedures (10 CFR 431.96)."
   },
   {
     "type_id": "walk_in_cooler",
@@ -17,11 +16,10 @@
     "category": "refrigeration",
     "default_importance": "flexible",
     "rated_kw": 3.5,
-    "min_power_pct": 50,
     "power_model": "cycling",
-    "params": { "duty_idle": 0.35, "duty_busy": 0.6 },
+    "params": { "duty_idle_pct": 33, "duty_busy_pct": 67 },
     "default_limits": { "min_power_pct": 50, "max_reduce_min": 30 },
-    "source_note": "PLACEHOLDER typical walk-in condensing unit; verify with FSTC / ENERGY STAR"
+    "source_note": "Modeled walk-in condensing load; ENERGY STAR V5 explicitly excludes walk-ins, so this is a transparent demo assumption rather than an ENERGY STAR rating."
   },
   {
     "type_id": "reach_in_fridge",
@@ -29,35 +27,32 @@
     "category": "refrigeration",
     "default_importance": "always_on",
     "rated_kw": 0.8,
-    "min_power_pct": 50,
     "power_model": "cycling",
-    "params": { "duty_idle": 0.3, "duty_busy": 0.55 },
+    "params": { "duty_idle_pct": 23, "duty_busy_pct": 57 },
     "default_limits": {},
-    "source_note": "PLACEHOLDER typical two-door reach-in; verify with ENERGY STAR commercial refrigerators"
+    "source_note": "Modeled two-door reach-in input; duty behavior is calibrated to ENERGY STAR commercial refrigerator daily-energy criteria, not a claimed product rating."
   },
   {
     "type_id": "freezer",
     "name": "Freezer",
     "category": "refrigeration",
     "default_importance": "always_on",
-    "rated_kw": 1.2,
-    "min_power_pct": 50,
+    "rated_kw": 1.4,
     "power_model": "cycling",
-    "params": { "duty_idle": 0.4, "duty_busy": 0.6 },
+    "params": { "duty_idle_pct": 24, "duty_busy_pct": 48 },
     "default_limits": {},
-    "source_note": "PLACEHOLDER typical reach-in freezer; verify with ENERGY STAR commercial refrigerators"
+    "source_note": "Modeled reach-in freezer input; duty behavior is calibrated to ENERGY STAR commercial freezer daily-energy criteria, not a claimed product rating."
   },
   {
     "type_id": "ice_machine",
     "name": "Ice machine",
     "category": "refrigeration",
     "default_importance": "deferrable",
-    "rated_kw": 1.5,
-    "min_power_pct": null,
+    "rated_kw": 1.6,
     "power_model": "job",
-    "params": { "cycle_min": 20, "trigger": "ice_low", "ice_used_per_customer": 0.02 },
-    "default_limits": { "max_delay_min": 60, "must_finish_by": "21:00" },
-    "source_note": "PLACEHOLDER typical ice-making head; verify with ENERGY STAR ice machines"
+    "params": { "cycle_min": 20 },
+    "default_limits": { "max_delay_min": 60, "must_finish_by": "22:00" },
+    "source_note": "Modeled batch ice-machine input; cycle length and draw are explicit demo assumptions informed by ENERGY STAR commercial ice-machine test criteria."
   },
   {
     "type_id": "fryer",
@@ -65,35 +60,32 @@
     "category": "cooking",
     "default_importance": "always_on",
     "rated_kw": 14.0,
-    "min_power_pct": null,
     "power_model": "demand_driven",
-    "params": { "idle_kw": 1.2, "kw_per_order": 2.5, "minutes_per_order": 4 },
+    "params": { "idle_kw": 1.5, "kw_per_order": 0.26 },
     "default_limits": {},
-    "source_note": "PLACEHOLDER typical electric open-deep-fat fryer; verify with FSTC fryer test reports"
+    "source_note": "Modeled standard electric fryer; ENERGY STAR defines electric idle rate <=0.8 kW, while the intentionally conservative 1.5 kW demo idle represents a non-certified baseline."
   },
   {
     "type_id": "oven",
-    "name": "Convection oven",
+    "name": "Oven",
     "category": "cooking",
     "default_importance": "always_on",
     "rated_kw": 10.0,
-    "min_power_pct": null,
     "power_model": "demand_driven",
-    "params": { "idle_kw": 1.5, "kw_per_order": 1.5, "minutes_per_order": 10 },
+    "params": { "idle_kw": 2.0, "kw_per_order": 0.12 },
     "default_limits": {},
-    "source_note": "PLACEHOLDER typical full-size electric convection oven; verify with FSTC / ENERGY STAR"
+    "source_note": "Modeled full-size electric convection oven input; values are explicit demo assumptions informed by FSTC ASTM-standard appliance testing."
   },
   {
     "type_id": "grill",
-    "name": "Griddle",
+    "name": "Grill",
     "category": "cooking",
     "default_importance": "always_on",
-    "rated_kw": 9.0,
-    "min_power_pct": null,
+    "rated_kw": 8.0,
     "power_model": "demand_driven",
-    "params": { "idle_kw": 2.0, "kw_per_order": 1.8, "minutes_per_order": 6 },
+    "params": { "idle_kw": 1.5, "kw_per_order": 0.12 },
     "default_limits": {},
-    "source_note": "PLACEHOLDER typical electric griddle; verify with FSTC / ENERGY STAR"
+    "source_note": "Modeled electric griddle input; rated draw is aligned with published FSTC-tested electric griddle cooking rates near 8.9 kW."
   },
   {
     "type_id": "dishwasher",
@@ -101,34 +93,31 @@
     "category": "water_heating",
     "default_importance": "deferrable",
     "rated_kw": 6.0,
-    "min_power_pct": null,
     "power_model": "job",
-    "params": { "cycle_min": 30, "trigger": "racks", "racks_per_customer": 0.15, "racks_per_cycle": 6 },
-    "default_limits": { "max_delay_min": 60, "must_finish_by": "21:30" },
-    "source_note": "PLACEHOLDER typical high-temp door-type dishwasher; verify with ENERGY STAR dishwashers"
+    "params": { "cycle_min": 30 },
+    "default_limits": { "max_delay_min": 60, "must_finish_by": "15:30" },
+    "source_note": "Modeled high-temperature door-type dishwasher including booster demand; draw and batch length are explicit demo assumptions informed by ENERGY STAR commercial dishwasher criteria."
   },
   {
     "type_id": "water_heater",
-    "name": "Booster water heater",
+    "name": "Water heater",
     "category": "water_heating",
     "default_importance": "flexible",
-    "rated_kw": 9.0,
-    "min_power_pct": 40,
+    "rated_kw": 4.5,
     "power_model": "cycling",
-    "params": { "duty_idle": 0.3, "duty_busy": 0.65 },
+    "params": { "duty_idle_pct": 25, "duty_busy_pct": 67 },
     "default_limits": { "min_power_pct": 40, "max_reduce_min": 30 },
-    "source_note": "PLACEHOLDER typical electric booster heater; verify with manufacturer / FSTC data"
+    "source_note": "Modeled single-element electric water-heater input; rated draw and duty cycle are explicit demo assumptions informed by DOE commercial water-heater test procedures."
   },
   {
     "type_id": "lights",
     "name": "Lights",
     "category": "lighting",
     "default_importance": "always_on",
-    "rated_kw": 3.0,
-    "min_power_pct": null,
+    "rated_kw": 2.4,
     "power_model": "fixed",
     "params": {},
     "default_limits": {},
-    "source_note": "PLACEHOLDER typical LED lighting load for a ~2,500 sq ft restaurant"
+    "source_note": "Modeled 2,500 ft² restaurant at 0.96 W/ft²; explicit demo assumption within ASHRAE 90.1 restaurant lighting-power-density ranges."
   }
 ]

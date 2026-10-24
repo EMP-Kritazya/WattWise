@@ -82,6 +82,44 @@ Earlier work, built for the previous design. Much of the UI carries over; see PL
 4. Add Vitest and the PLAN.md §4 simulation/hub tests, including byte-identical repeated runs and exact hub totals.
 5. Build `src/hub/link.ts` against `mockHubServer`, then add the `/sim` host panel in PLAN step 4.
 
+## Active Codex implementation checkpoint (Oct 24)
+Codex completed PLAN step 3 and the `/sim` host panel on `ashirwad`. Claude can take over from this checkpoint without repeating
+the browser simulation or hub work.
+
+- **Complete:** B1 catalog → B2–B5 deterministic TypeScript simulation → B6 hub → B7 link, with Vitest alongside the modules.
+- **Files in scope:** `backend/data/equipment_catalog.json`, `frontend/src/sim/`, `frontend/src/hub/`, frontend test/config files.
+- **Fixtures used read-only:** `contracts/fixtures/hub_protocol/*`, `contracts/fixtures/shapes/*`, and the Demo Café scenario.
+- **Do not start C2 screen redesign yet:** D3 (tile simulation view versus retaining optional 3D) is still Ashirwad's decision.
+- **Gate passed:** deterministic repeated reports, exact hub totals, command ack coverage, power bounds, fixture shape compatibility,
+  `npm test`, `npm run build`, and a fixture-mode browser smoke test of `/sim`.
+- **Latest completed commit before this work:** `35b9656` (A2–A4 handoff update). Working-tree changes after that commit belong to
+  this active checkpoint until the next handoff refresh.
+
+### Codex checkpoint 1 — catalog + simulation core compiled
+- `backend/data/equipment_catalog.json` now uses only the contract's fixed parameter shapes and removes all top-level
+  `min_power_pct` fields. Source notes distinguish published criteria from explicit demo assumptions.
+- Added deterministic modules under `src/sim/`: seeded customer arrivals, fixed/cycling/thermal/demand/job appliance models,
+  shared room physics, command clamping/acks, and a Zustand vanilla store for each lane.
+- Added `src/hub/hub.ts`, `link.ts`, and `status.ts`: the hub builds both lanes, feeds them one shared customer stream, applies
+  lane commands, publishes host devices through `useDevices()`, and emits contract-shaped reports.
+- `npm run build` passes at this checkpoint. Tests and the `/sim` operator surface are the next active work; do not treat this
+  as the final B1–B7 handoff yet.
+
+### Codex checkpoint 2 — B1–B7 + `/sim` complete
+- `src/hub/hub.test.ts` runs the entire 120-tick `server_to_hub.jsonl` fixture twice and asserts byte-identical output, exact
+  totals, report shape, bounded device power, unique device IDs, and one ack per Command. It separately covers physical-floor
+  clamping, delay clamping, `job_running`, `already_off`, and `unknown_device`.
+- `src/pages/SimHostPage.tsx` owns the dedicated host route. In fixture mode it uses `mockHubServer`; otherwise it connects to
+  `/ws/hub`. It clearly says to keep the tab open, exposes host/tick/time/mode, and shows both lanes with power, state, a subtle
+  active-device glow, and every physical gauge needed by the future Simulation view.
+- Browser-smoked at `http://localhost:5174/sim` with `VITE_MOCKS=1`: connected, ticks advanced, 12 devices appeared in each lane,
+  and the lane totals matched their cards. The mock protocol chunk is dynamically loaded so recorded fixtures do not inflate the
+  normal app entry bundle.
+- Verification: `npm test` = 5 passing tests; `npm run build` passes; `contracts/fixtures/check.py` passes all 177 files and all
+  174 regenerated deterministic fixtures byte-identically; `git diff --check` passes.
+- **Next work is PLAN step 5, but D3 is still a user decision.** Do not replace the Live page's current floor until Ashirwad
+  confirms whether the contract-specified wired device tiles replace it entirely or the 3D floor remains as an optional view.
+
 ## Demo focus: the judging round is the priority
 The live demo in judging is the main point. The app should **read as a simulation**: calm, clear, a few impactful moments.
 **Don't add anything outside UI.md / ASHIRWAD.md**; make the spec'd pieces look great instead.
