@@ -227,6 +227,21 @@ async def test_play_on_a_restored_kitchen_sends_sim_build_first(serve):
         assert await srv.runtime.restore_build() is False  # once only
 
 
+async def test_end_of_the_fake_recording_pauses_the_clock(serve, monkeypatch):
+    from runtime.kitchen_factory import NotRecordedError
+
+    async with serve() as srv:
+        await built(srv)
+        await srv.http.post("/api/sim/control", json={"action": "play"})
+
+        def past_the_recording(minutes, report):
+            raise NotRecordedError("STUB: no recorded step")
+
+        monkeypatch.setattr(srv.app.state.service.lanes, "step", past_the_recording)
+        assert await srv.runtime.tick_once() is False
+        assert srv.runtime.playing is False
+
+
 async def test_play_without_a_kitchen_is_404(serve):
     async with serve() as srv:
         srv.app.state.service.lanes._kitchens = {}
