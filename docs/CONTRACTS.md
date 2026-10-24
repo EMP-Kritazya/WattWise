@@ -291,6 +291,7 @@ Applied by code (never by the model) when the owner confirms; the result is the 
 | GET | `/api/backtest/{run_id}` | → list[BacktestResult] |
 | POST | `/api/chat` | `{ message }` → `{ chat_id: "chat_0001" }` (reply streams over WebSocket) |
 | GET | `/api/proposals?status=pending` | → list[Proposal] |
+| POST | `/api/proposals` | `{ kind: "authority", payload: ClaudeAuthority, summary }` → Proposal (Concierge after a paid plan, header `X-Agent-Token`; the owner still confirms) |
 | POST | `/api/proposals/{proposal_id}/confirm` | `{ confirm: true \| false }` → Proposal (owner confirmation from the UI) |
 | PUT | `/api/kitchen/authority` | ClaudeAuthority → ok (owner only) |
 | PUT | `/api/kitchen/preferences` | `{ text }` → ok |
