@@ -238,7 +238,7 @@ export function Lamps({ tables, level }: { tables: number[]; level: number }) {
 /** Outline around the building: green while the 15-minute average is under the cap, pulsing red when it's over. */
 export function CapOutline({ meter, showLabel }: { meter?: Meter; showLabel: boolean }) {
   const line = useRef<Line2>(null);
-  const over = meter != null && meter.block_avg_kw > meter.peak_cap_kw;
+  const over = meter != null && meter.block_avg_kw > meter.target_kw;
   useFrame(({ clock }) => {
     if (line.current) line.current.material.opacity = over ? 0.55 + 0.45 * Math.sin(clock.elapsedTime * 6) : 0.5;
   });
@@ -268,7 +268,7 @@ export function CapOutline({ meter, showLabel }: { meter?: Meter; showLabel: boo
                 : "rounded-full border border-emerald-400/40 bg-emerald-500/10 px-3 py-1 text-xs font-medium whitespace-nowrap text-emerald-200 shadow-lg"
             }
           >
-            {over ? "Over the cap" : "Under the cap"} · 15-min avg {fmtKw(meter.block_avg_kw)} / cap {fmtKw(meter.peak_cap_kw)}
+            {over ? "Over target" : "Within target"} · 15-min avg {fmtKw(meter.block_avg_kw)} / target {fmtKw(meter.target_kw)}
           </div>
         </Html>
       )}

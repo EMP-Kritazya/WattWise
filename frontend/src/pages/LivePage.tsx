@@ -10,7 +10,7 @@ import { PowerTrendCard } from "@/components/live/LaneChart";
 import { SimControls } from "@/components/live/SimControls";
 import { WarningBanner } from "@/components/live/WarningBanner";
 import { Button } from "@/components/ui/button";
-import { useLive as useSim } from "@/data";
+import { useDashboardStore as useSim } from "@/data";
 import { transport } from "@/transport";
 
 /** The main demo screen: controls · KPIs · the 3D floor · charts and decisions, with the assistant docked on the right. */

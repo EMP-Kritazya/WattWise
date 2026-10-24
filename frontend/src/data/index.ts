@@ -5,10 +5,13 @@ import { useSim } from "@/store/sim";
 import type { Escalation, Lane, Proposal } from "@/types";
 
 export { requestSurge, startLive } from "./live";
+export { api, useApi } from "./useApi";
+export { publishHostDevices, useDevices } from "./useDevices";
+export { useLive } from "./useLive";
 export type { BlockPoint, ChatMessage, FeedItem, LanePoint, LiveSourceKind, Warning } from "@/store/sim";
 
-/** General selector hook over the live store (same API as zustand's). */
-export const useLive = useSim;
+/** Legacy screen store, retained only while C2 migrates the existing screens to typed live rows. */
+export const useDashboardStore = useSim;
 
 export const useLaneTick = (lane: Lane) => useSim((s) => s.latest[lane]);
 export const useClock = () => useSim((s) => s.clock);

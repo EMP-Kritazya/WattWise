@@ -1,73 +1,19 @@
-import type { DeviceState, Escalation, Lane, TickState, WsMessage } from "@/types";
+import type {
+  Escalation,
+  LiveAgentLogRow,
+  LiveClockRow,
+  LiveComparisonRow,
+  LiveDeviceRow,
+  LiveEscalationRow,
+  LiveFeedRow,
+  LiveTickRow,
+  TickState,
+  WsMessage,
+} from "@/types";
 
 // SpacetimeDB live source (CONTRACTS.md section 5). The runtime publishes the shared kitchen into tables; every viewer
 // subscribes, so a judge's phone and the projector see the same kitchen. Rows are converted into the same messages
 // `/ws` sends, so the store and every screen work unchanged whichever source is live.
-
-/** Row shapes as listed in CONTRACTS.md section 5 (JSON columns arrive as strings). */
-export interface LiveTickRow {
-  lane: Lane;
-  ts: string;
-  total_kw: number;
-  block_avg_kw: number;
-  month_peak_kw: number;
-  peak_cap_kw: number;
-  cost_usd_today: number;
-  customers_per_hour: number;
-  forecast_kw_json: string | null;
-}
-export interface LiveDeviceRow {
-  lane: Lane;
-  device_id: string;
-  name: string;
-  importance: string;
-  state: DeviceState;
-  power_kw: number;
-  source: "simulated" | "measured";
-}
-export interface LiveComparisonRow {
-  ts: string;
-  saved_today_usd: number;
-  peak_avoided_kw: number;
-  month_peak_without_kw: number;
-  month_peak_with_kw: number;
-}
-export interface LiveFeedRow {
-  decision_id: string;
-  lane: Lane;
-  ts: string;
-  device_id: string;
-  action: string;
-  value: number | null;
-  status: string;
-  reason_code: string;
-  effect_json: string;
-  explanation: string;
-  explanation_source: "ai" | "template";
-}
-export interface LiveClockRow {
-  playing: boolean;
-  speed: number;
-  sim_ts: string;
-  paused_reason: string | null;
-}
-export interface LiveEscalationRow {
-  escalation_id: string;
-  lane: Lane;
-  status: Escalation["status"];
-  problem_json: string;
-  options_json: string;
-  chosen_option_id: string | null;
-  resolved_by: Escalation["resolved_by"];
-  rationale: string | null;
-}
-export interface LiveAgentLogRow {
-  ts_real: string;
-  from_agent: string;
-  to_agent: string;
-  kind: string;
-  summary: string;
-}
 
 const parse = <T,>(json: string | null | undefined, fallback: T): T => {
   if (!json) return fallback;
@@ -88,9 +34,25 @@ export function tickMessage(tick: LiveTickRow, devices: LiveDeviceRow[], prev?: 
     lane: tick.lane,
     ts: tick.ts,
     hub: {
+      hub_id: "sim_hub",
+      lane: tick.lane,
+      tick_id: tick.tick_id,
       ts: tick.ts,
       total_kw: tick.total_kw,
-      devices: mine.map((d) => ({ device_id: d.device_id, power_kw: d.power_kw, state: d.state, source: d.source })),
+      customers_per_hour: tick.customers_per_hour,
+      devices: mine.map((d) => ({
+        device_id: d.device_id,
+        type_id: d.type_id,
+        name: d.name,
+        importance: d.importance,
+        state: d.state,
+        power_kw: d.power_kw,
+        rated_kw: d.rated_kw,
+        power_pct: d.power_pct,
+        source: d.source,
+        physical: parse(d.physical_json, undefined),
+      })),
+      acks: [],
       source: mine.some((d) => d.source === "measured") ? "mixed" : "simulated",
     },
     meter: {
@@ -99,10 +61,13 @@ export function tickMessage(tick: LiveTickRow, devices: LiveDeviceRow[], prev?: 
       block_avg_kw: tick.block_avg_kw,
       block_start: prev?.meter.block_start ?? tick.ts,
       month_peak_kw: tick.month_peak_kw,
+      peak_mode: tick.peak_mode,
       peak_cap_kw: tick.peak_cap_kw,
-      energy_kwh_today: prev?.meter.energy_kwh_today ?? 0,
+      target_kw: tick.target_kw,
+      energy_kwh_today: tick.energy_kwh_today,
+      price_usd_per_kwh_now: tick.price_usd_per_kwh_now,
       cost_usd_today: tick.cost_usd_today,
-      cost_usd_month: prev?.meter.cost_usd_month ?? 0,
+      cost_usd_month: tick.cost_usd_month,
     },
     customers_per_hour: tick.customers_per_hour,
     new_decisions: [],
@@ -111,7 +76,7 @@ export function tickMessage(tick: LiveTickRow, devices: LiveDeviceRow[], prev?: 
   return { type: "tick", data };
 }
 
-export const comparisonMessage = (row: LiveComparisonRow): WsMessage => ({ type: "comparison", data: { ...row } });
+export const comparisonMessage = ({ id: _id, ...data }: LiveComparisonRow): WsMessage => ({ type: "comparison", data });
 
 export const feedMessage = (row: LiveFeedRow): WsMessage => ({
   type: "decision",
@@ -119,18 +84,18 @@ export const feedMessage = (row: LiveFeedRow): WsMessage => ({
     decision_id: row.decision_id,
     ts: row.ts,
     device_id: row.device_id,
-    action: row.action as never,
+    action: row.action,
     value: row.value,
-    reason_code: row.reason_code as never,
-    inside_rules: row.status !== "escalated",
-    status: row.status as never,
+    reason_code: row.reason_code,
+    inside_rules: true,
+    status: row.status,
     effect: parse(row.effect_json, { peak_before_kw: 0, peak_after_kw: 0, saving_usd: 0 }),
   },
   explanation: row.explanation,
   explanation_source: row.explanation_source,
 });
 
-export const clockMessage = (row: LiveClockRow): WsMessage => ({ type: "clock", ...row });
+export const clockMessage = ({ id: _id, sim_host: _simHost, ...clock }: LiveClockRow): WsMessage => ({ type: "clock", ...clock });
 
 export const escalationMessage = (row: LiveEscalationRow, prev?: Escalation): WsMessage => {
   const problem = parse(row.problem_json, prev?.problem ?? { forecast_peak_kw: 0, target_kw: 0, excess_kw: 0, reason: "" });
@@ -153,7 +118,7 @@ export const escalationMessage = (row: LiveEscalationRow, prev?: Escalation): Ws
   };
 };
 
-export const agentLogMessage = (row: LiveAgentLogRow): WsMessage => ({ type: "agent_log", data: { ...row } });
+export const agentLogMessage = ({ id: _id, ...data }: LiveAgentLogRow): WsMessage => ({ type: "agent_log", data });
 
 export class SpacetimeUnavailable extends Error {}
 

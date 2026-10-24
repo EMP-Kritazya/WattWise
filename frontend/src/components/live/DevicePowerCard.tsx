@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useDeviceMeta } from "@/hooks/useDeviceMeta";
 import { fmtKw } from "@/lib/format";
-import { useLive as useSim } from "@/data";
+import { useDashboardStore as useSim } from "@/data";
 import type { Lane } from "@/types";
 
 /** Where the power is going right now, per device, as the hub reports it. kW only: no percentages computed here. */

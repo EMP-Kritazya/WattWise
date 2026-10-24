@@ -2,6 +2,7 @@ import { useSim, type LiveSourceKind } from "@/store/sim";
 import { transport } from "@/transport";
 import type { WsMessage } from "@/types";
 import { callRequestSurge, connectSpacetime } from "./spacetime";
+import { ingestViewerMessages, startLiveRows } from "./useLive";
 
 const FLUSH_MS = 250; // ticks arrive ~2/s per lane; render at most ~4 times per second (UI.md)
 
@@ -17,6 +18,7 @@ const spacetimeDb: string | undefined = import.meta.env.VITE_SPACETIME_DB;
 
 /** Start live data. Chat, proposals and escalation choices always come over /ws as well. Returns a stop function. */
 export function startLive(): () => void {
+  const stopRows = startLiveRows();
   let buffer: WsMessage[] = [];
   const push = (msgs: WsMessage[]) => {
     buffer.push(...msgs);
@@ -26,6 +28,7 @@ export function startLive(): () => void {
     const batch = buffer;
     buffer = [];
     useSim.getState().applyMessages(batch);
+    ingestViewerMessages(batch);
   }, FLUSH_MS);
 
   const setSource = (kind: LiveSourceKind) => useSim.getState().setLiveSource(kind);
@@ -66,6 +69,7 @@ export function startLive(): () => void {
   return () => {
     stopWs();
     stopSpacetime?.();
+    stopRows();
     clearInterval(timer);
   };
 }
@@ -75,6 +79,11 @@ const LIVE_TABLE_TYPES = new Set<WsMessage["type"]>(["tick", "decision", "clock"
 
 /** Add customers. Over SpacetimeDB anyone (even a judge's phone) can call `request_surge`; otherwise REST. */
 export async function requestSurge(customers: number, durationMin = 60): Promise<void> {
+  if (import.meta.env.VITE_MOCKS === "1") {
+    const { requestSurgeReducer } = await import("@/mocks/spacetimeReducers");
+    await requestSurgeReducer(customers, durationMin);
+    return;
+  }
   if (useSim.getState().liveSource === "spacetime") {
     try {
       await callRequestSurge(customers, durationMin);

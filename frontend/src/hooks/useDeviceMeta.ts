@@ -12,7 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { deviceColor } from "@/lib/theme";
-import { useLive as useSim } from "@/data";
+import { useDashboardStore as useSim } from "@/data";
 import type { Category, Device } from "@/types";
 
 export interface DeviceMeta {
@@ -78,7 +78,10 @@ export function useDeviceMeta(): DeviceMeta[] {
           color: deviceColor(i),
           icon: TYPE_ICON[device.type_id] ?? CATEGORY_ICON[category],
           isJob: type ? type.power_model === "job" : device.importance === "deferrable",
-          minPowerPct: type?.min_power_pct ?? null,
+          minPowerPct:
+            type?.default_importance === "flexible" && "min_power_pct" in type.default_limits
+              ? Number(type.default_limits.min_power_pct)
+              : null,
         };
       }),
     [kitchen, catalog],

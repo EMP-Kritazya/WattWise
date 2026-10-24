@@ -48,7 +48,7 @@ export function AgentNetworkPage() {
   const recent = useMemo(() => log.slice(-50).reverse(), [log]);
   // The last few messages animate along their edges; keys change with the log so each one plays once.
   const flying = log.slice(-6).map((m, i) => ({ m, key: `${log.length - 6 + i}:${m.ts_real}` }));
-  const active = new Set(log.slice(-6).flatMap((m) => [m.from_agent, m.to_agent]));
+  const active = new Set<string>(log.slice(-6).flatMap((m) => [m.from_agent, m.to_agent]));
 
   return (
     <div className="mx-auto grid max-w-7xl gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_380px] xl:p-6">

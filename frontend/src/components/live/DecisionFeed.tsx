@@ -8,7 +8,7 @@ import { useDeviceNames } from "@/hooks/useDeviceNames";
 import { fmtAction, fmtKw, fmtSimTime, fmtUsd } from "@/lib/format";
 import { STATUS_LABEL } from "@/lib/theme";
 import { cn } from "@/lib/utils";
-import { useLive as useSim, type FeedItem } from "@/data";
+import { useDashboardStore as useSim, type FeedItem } from "@/data";
 import { transport } from "@/transport";
 import type { CommandAction, DecisionStatus } from "@/types";
 
@@ -23,7 +23,6 @@ const ACTION_ICON: Record<CommandAction, LucideIcon> = {
 
 const STATUS_CLASS: Record<DecisionStatus, string> = {
   executed: "border-lane-with/40 bg-lane-with/10 text-lane-with",
-  escalated: "border-importance-deferrable/40 bg-importance-deferrable/10 text-importance-deferrable",
   undone: "text-muted-foreground",
 };
 

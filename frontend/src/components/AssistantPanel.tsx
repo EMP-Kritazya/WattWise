@@ -3,7 +3,7 @@ import { Bot, Clock, Gauge, Send, Snowflake, Users, type LucideIcon } from "luci
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn, errorMessage } from "@/lib/utils";
-import { useLive as useSim, usePendingProposals } from "@/data";
+import { useDashboardStore as useSim, usePendingProposals } from "@/data";
 import { useAction } from "@/hooks/useAction";
 import type { Proposal } from "@/types";
 import { transport } from "@/transport";

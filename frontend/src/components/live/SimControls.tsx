@@ -5,7 +5,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAction } from "@/hooks/useAction";
 import { fmtSimClock } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { requestSurge, useLive as useSim } from "@/data";
+import { requestSurge, useDashboardStore as useSim } from "@/data";
 import { transport } from "@/transport";
 
 const SPEEDS = [1, 30, 120, 600];

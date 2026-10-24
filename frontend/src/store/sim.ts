@@ -224,7 +224,14 @@ export const useSim = create<SimState>()((set) => ({
             agentLog = [...agentLog, m.data].slice(-MAX_AGENT_LOG);
             break;
           case "clock":
-            clock = { playing: m.playing, speed: m.speed, sim_ts: m.sim_ts, paused_reason: m.paused_reason };
+            clock = {
+              playing: m.playing,
+              speed: m.speed,
+              sim_ts: m.sim_ts,
+              tick_id: m.tick_id,
+              paused_reason: m.paused_reason,
+              slowed_reason: m.slowed_reason,
+            };
             break;
           case "warning":
             warnings[m.code] = { code: m.code, message: m.message, data: m.data };

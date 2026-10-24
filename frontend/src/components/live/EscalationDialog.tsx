@@ -3,7 +3,7 @@ import { ShieldAlert, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useEscalations, useLive as useSim } from "@/data";
+import { useDashboardStore as useSim, useEscalations } from "@/data";
 import { useAction } from "@/hooks/useAction";
 import { fmtKw, fmtSimTime, fmtUsd } from "@/lib/format";
 import { cn } from "@/lib/utils";

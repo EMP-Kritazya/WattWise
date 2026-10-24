@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useDeviceMeta } from "@/hooks/useDeviceMeta";
 import { cn } from "@/lib/utils";
-import { requestSurge, useLive as useSim } from "@/data";
+import { requestSurge, useDashboardStore as useSim } from "@/data";
 import { transport } from "@/transport";
 import { DemoBar, newestDecision } from "./Hud";
 import { BACKGROUND, STATE_HEX } from "./palette";
@@ -94,7 +94,7 @@ export function LiveFloor({ demo, onDemoChange }: { demo: boolean; onDemoChange:
   const newestKey = newest ? `${newest.decision.decision_id}:${newest.decision.status}` : null;
   useEffect(() => {
     if (!newest || !follow || mode !== "with" || selected) return;
-    if (newest.decision.status !== "executed" && newest.decision.status !== "escalated") return;
+    if (newest.decision.status !== "executed") return;
     if (Date.now() - lastFocusAt.current < FOLLOW_COOLDOWN_MS) return;
     lastFocusAt.current = Date.now();
     setAutoFocus(newest.decision.device_id);

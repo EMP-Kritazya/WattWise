@@ -53,6 +53,5 @@ export const DEVICE_STATE_LABEL: Record<DeviceState, string> = {
 
 export const STATUS_LABEL: Record<DecisionStatus, string> = {
   executed: "done",
-  escalated: "escalated",
   undone: "undone",
 };

@@ -5,7 +5,7 @@ import { useAction } from "@/hooks/useAction";
 import { useDeviceNames } from "@/hooks/useDeviceNames";
 import { fmtAction, fmtKw, fmtSimClock, fmtUsd } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { requestSurge, useLive as useSim, type FeedItem } from "@/data";
+import { requestSurge, useDashboardStore as useSim, type FeedItem } from "@/data";
 import { transport } from "@/transport";
 import type { CommandAction } from "@/types";
 import { LANE_HEX } from "./palette";
@@ -19,7 +19,7 @@ export function PeakMeter({ className }: { className?: string }) {
   const without = useSim((s) => s.latest.without?.meter);
   const withLane = useSim((s) => s.latest.with?.meter);
   if (!without || !withLane) return null;
-  const cap = withLane.peak_cap_kw;
+  const cap = withLane.target_kw;
   // Bar lengths only draw the meter values against the cap; no number shown is derived from them.
   const scale = Math.max(cap * 1.35, without.block_avg_kw, withLane.block_avg_kw);
   return (
@@ -29,7 +29,7 @@ export function PeakMeter({ className }: { className?: string }) {
       <MeterRow label="Without WattWise" value={without.block_avg_kw} cap={cap} scale={scale} color={LANE_HEX.without} />
       <MeterRow label="With WattWise" value={withLane.block_avg_kw} cap={cap} scale={scale} color={LANE_HEX.with} />
       <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-2 text-[11px] text-white/55 tabular-nums">
-        <span>Cap {fmtKw(cap)}</span>
+        <span>Target {fmtKw(cap)}</span>
         <span>
           Month peak <span style={{ color: LANE_HEX.without }}>{fmtKw(without.month_peak_kw)}</span> vs{" "}
           <span style={{ color: LANE_HEX.with }}>{fmtKw(withLane.month_peak_kw)}</span>
@@ -90,7 +90,7 @@ export function DecisionToast({ className }: { className?: string }) {
   if (!newest || shownId !== id) return null;
   const d = newest.decision;
   const Icon = ACTION_ICON[d.action];
-  const waiting = d.status === "escalated";
+  const waiting = false;
   return (
     <div key={id} className={cn(GLASS, "w-[380px] max-w-full p-3.5 animate-in fade-in slide-in-from-bottom-4 duration-500", className)}>
       <div className="flex items-start gap-3">
@@ -133,7 +133,7 @@ export function newestDecision(feed: Record<string, FeedItem>): FeedItem | null 
   let best: FeedItem | null = null;
   for (const item of Object.values(feed)) {
     const s = item.decision.status;
-    if (s !== "executed" && s !== "escalated") continue;
+    if (s !== "executed") continue;
     if (!best || item.decision.ts > best.decision.ts || (item.decision.ts === best.decision.ts && item.decision.decision_id > best.decision.decision_id)) {
       best = item;
     }

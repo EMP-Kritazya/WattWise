@@ -22,7 +22,10 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
 
-    "paths": { "@/*": ["./src/*"] }
+    "paths": {
+      "@/*": ["./src/*"],
+      "@fixtures/*": ["../contracts/fixtures/*"]
+    }
   },
   "include": ["src"]
 }

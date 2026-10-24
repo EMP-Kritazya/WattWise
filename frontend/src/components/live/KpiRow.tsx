@@ -3,7 +3,7 @@ import { Gauge, Leaf, Receipt, Zap, type LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { fmtKw, fmtUsd } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { useLive as useSim } from "@/data";
+import { useDashboardStore as useSim } from "@/data";
 
 /** Headline numbers for the `with` lane, with the `without` lane underneath for comparison. */
 export function KpiRow() {
@@ -11,7 +11,7 @@ export function KpiRow() {
   const withLane = useSim((s) => s.latest.with?.meter);
   // Lane differences come from the engine's LaneComparison; the browser never subtracts lanes (UI.md).
   const comparison = useSim((s) => s.comparison);
-  const overCap = withLane ? withLane.block_avg_kw > withLane.peak_cap_kw : false;
+  const overCap = withLane ? withLane.block_avg_kw > withLane.target_kw : false;
 
   return (
     <div className="grid grid-cols-2 gap-3 2xl:grid-cols-4">
@@ -21,14 +21,14 @@ export function KpiRow() {
         tone={overCap ? "var(--lane-without)" : "var(--importance-flexible)"}
         label="15-min average"
         value={fmtKw(withLane?.block_avg_kw)}
-        sub={`Peak cap ${fmtKw(withLane?.peak_cap_kw)}`}
+        sub={`Current target ${fmtKw(withLane?.target_kw)}`}
       >
         {withLane && (
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted">
             {/* Bar length is only a picture of block_avg vs cap; no number is derived from it. */}
             <div
               className={cn("h-full rounded-full transition-[width]", overCap ? "bg-lane-without" : "bg-lane-with")}
-              style={{ width: `${Math.min(100, (withLane.block_avg_kw / withLane.peak_cap_kw) * 100)}%` }}
+              style={{ width: `${Math.min(100, (withLane.block_avg_kw / withLane.target_kw) * 100)}%` }}
             />
           </div>
         )}

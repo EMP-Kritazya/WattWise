@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { fmtKw } from "@/lib/format";
 import { IMPORTANCE_BADGE, IMPORTANCE_LABEL } from "@/lib/theme";
 import { errorMessage } from "@/lib/utils";
-import { useLive as useSim } from "@/data";
+import { useDashboardStore as useSim } from "@/data";
 import { transport } from "@/transport";
 import type { Category, ClaudeAuthority, DeferrableLimits, EquipmentType, FlexibleLimits, Importance, ImportanceLimits, KitchenConfig } from "@/types";
 
@@ -50,7 +50,7 @@ function limitsFor(t: EquipmentType, importance: Importance, close: string): Imp
   if (importance === t.default_importance && t.default_limits) return structuredClone(t.default_limits);
   switch (importance) {
     case "flexible":
-      return { min_power_pct: Math.max(t.min_power_pct ?? 40, minPct(t)), max_reduce_min: 30 };
+      return { min_power_pct: Math.max(40, minPct(t)), max_reduce_min: 30 };
     case "deferrable":
       return { max_delay_min: 60, must_finish_by: close };
     case "always_on":
@@ -117,12 +117,13 @@ export function BuilderPage() {
         importance: t.default_importance,
         limits: limitsFor(t, t.default_importance, close),
       })),
+      peak_mode: "cap",
       peak_cap_kw: capKw,
       operating_hours: { open, close },
       location: LOCATIONS[locationIdx],
-      owner_preferences: preferences.trim() || undefined,
+      owner_preferences: preferences.trim(),
       authority,
-      tariff_id: "", // STUB: no tariff list endpoint yet; the team records the tariff in DECISIONS.md
+      tariff_id: "demo_tariff_v1", // STUB: no tariff list endpoint exists yet.
       seed: Number(seed) || 42,
     };
     setBuilding(true);

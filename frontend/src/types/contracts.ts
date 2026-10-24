@@ -1,15 +1,29 @@
-// STUB: hand-transcribed from docs/CONTRACTS.md because the generated sources don't exist yet
-// (contracts/ws_messages.schema.json and the API's /openapi.json). Once they do, run `npm run gen:types`,
-// point src/types/index.ts at src/types/generated/, and delete this file. Never edit shapes here first:
-// change docs/CONTRACTS.md (with the team) and regenerate.
+// STUB: replace with generated OpenAPI, WebSocket-schema, and SpacetimeDB types.
+// Hand-transcribed from docs/CONTRACTS.md while those generated sources do not exist.
 
-// ---------- 1. Shared shapes ----------
-
+// STUB: replace with generated shared-shape types.
 export type Importance = "always_on" | "flexible" | "deferrable";
-
 export type Category = "cooling" | "refrigeration" | "cooking" | "water_heating" | "lighting" | "other";
-
 export type PowerModel = "fixed" | "cycling" | "thermal" | "demand_driven" | "job";
+export type Lane = "without" | "with";
+export type DataLabel = "live_api" | "recorded";
+
+export interface FlexibleLimits {
+  min_power_pct: number;
+  max_reduce_min: number;
+}
+export interface DeferrableLimits {
+  max_delay_min: number;
+  /** Local time, HH:MM. */
+  must_finish_by: string;
+}
+export type ImportanceLimits = Record<string, never> | FlexibleLimits | DeferrableLimits;
+export type EquipmentParams =
+  | Record<string, never>
+  | { duty_idle_pct: number; duty_busy_pct: number }
+  | { setpoint_c: number }
+  | { idle_kw: number; kw_per_order: number }
+  | { cycle_min: number };
 
 export interface EquipmentType {
   type_id: string;
@@ -17,36 +31,17 @@ export interface EquipmentType {
   category: Category;
   default_importance: Importance;
   rated_kw: number;
-  min_power_pct: number | null;
   power_model: PowerModel;
-  params: Record<string, unknown>;
-  /** Limits a new unit starts with (equipment_catalog.json). Optional until the generated types land. */
-  default_limits?: ImportanceLimits;
+  params: EquipmentParams;
+  default_limits: ImportanceLimits;
   source_note: string;
 }
-
-export interface FlexibleLimits {
-  min_power_pct: number;
-  max_reduce_min: number;
-}
-
-export interface DeferrableLimits {
-  max_delay_min: number;
-  /** Local time "HH:MM". */
-  must_finish_by: string;
-}
-
-/** `{}` for always_on, FlexibleLimits for flexible, DeferrableLimits for deferrable. */
-export type ImportanceLimits = Record<string, never> | FlexibleLimits | DeferrableLimits;
-
 export interface EquipmentEntry {
   type_id: string;
-  /** 0 = not in this kitchen. Each unit becomes a Device `<type_id>_<n>`. */
   count: number;
   importance: Importance;
   limits: ImportanceLimits;
 }
-
 export interface ClaudeAuthority {
   enabled: boolean;
   max_cap_overrun_kw: number;
@@ -54,21 +49,37 @@ export interface ClaudeAuthority {
   max_extra_reduce_min: number;
   may_go_below_min_power: boolean;
 }
-
 export interface KitchenConfig {
   name: string;
   equipment: EquipmentEntry[];
-  peak_cap_kw: number;
+  peak_mode: "minimize" | "cap";
+  peak_cap_kw: number | null;
   operating_hours: { open: string; close: string };
-  location?: { lat: number; lon: number; label: string };
-  owner_preferences?: string;
-  authority?: ClaudeAuthority;
+  location: { lat: number; lon: number; label: string };
+  owner_preferences: string;
+  authority: ClaudeAuthority;
   tariff_id: string;
   seed: number;
 }
+export interface Tariff {
+  tariff_id: string;
+  name: string;
+  label: "illustrative" | "urdb";
+  currency: string;
+  timezone: string;
+  energy: { name: string; start: string; end: string; usd_per_kwh: number }[];
+  demand: { name: string; window: { start: string; end: string } | null; usd_per_kw: number }[];
+}
 
 export type DeviceState = "off" | "on" | "reduced" | "waiting" | "running_job";
-
+export type DevicePhysical = Partial<{
+  indoor_temp_c: number;
+  box_temp_c: number;
+  dirty_racks: number;
+  ice_level_pct: number;
+  job_remaining_min: number;
+  orders_in_progress: number;
+}> & Record<string, unknown>;
 export interface Device {
   device_id: string;
   type_id: string;
@@ -77,41 +88,51 @@ export interface Device {
   state: DeviceState;
   power_kw: number;
   rated_kw: number;
-  /** "measured" only when a real ESP32 reading fed this device. */
+  power_pct: number;
   source: "simulated" | "measured";
+  physical?: DevicePhysical;
 }
-
-export interface HubDeviceReading {
-  device_id: string;
-  power_kw: number;
-  state: DeviceState;
-  source?: "simulated" | "measured";
+/** UI compatibility name. HubReport carries full Device objects in the current contract. */
+export type HubDeviceReading = Device;
+export interface CommandAck {
+  command_id: string;
+  lane: Lane;
+  ok: boolean;
+  applied_value: number | null;
+  reason: "out_of_range" | "job_running" | "already_off" | "unknown_device" | null;
 }
-
 export interface HubReport {
+  hub_id: string;
+  lane: Lane;
+  tick_id: number;
   ts: string;
   total_kw: number;
-  devices: HubDeviceReading[];
-  /** "mixed" when at least one device is measured. */
+  customers_per_hour: number;
+  devices: Device[];
+  acks: CommandAck[];
   source: "simulated" | "mixed";
 }
-
+export interface Reading {
+  hub_id: string;
+  channel: number;
+  device_id: string;
+  ts: string;
+  raw_w: number;
+  scale: number;
+  power_kw: number;
+}
 export type CommandAction = "on" | "off" | "start" | "delay" | "reduce" | "restore";
-
 export interface Command {
   command_id: string;
+  lane: Lane;
   ts: string;
   device_id: string;
   action: CommandAction;
-  /** Minutes for `delay`, power % for `reduce`. */
   value: number | null;
   decision_id: string | null;
   issued_by: "engine" | "owner";
 }
-
-/** No per-decision approvals any more: anything outside the rules becomes an Escalation. */
-export type DecisionStatus = "executed" | "escalated" | "undone";
-
+export type DecisionStatus = "executed" | "undone";
 export type ReasonCode =
   | "avoid_new_peak"
   | "stay_under_cap"
@@ -119,13 +140,11 @@ export type ReasonCode =
   | "catch_up"
   | "owner_override"
   | "escalation_choice";
-
 export interface Effect {
   peak_before_kw: number;
   peak_after_kw: number;
   saving_usd: number;
 }
-
 export interface Decision {
   decision_id: string;
   ts: string;
@@ -137,51 +156,23 @@ export interface Decision {
   status: DecisionStatus;
   effect: Effect;
 }
-
-export interface Meter {
+export interface Context {
   ts: string;
-  total_kw: number;
-  block_avg_kw: number;
-  block_start: string;
-  month_peak_kw: number;
-  peak_cap_kw: number;
-  energy_kwh_today: number;
-  cost_usd_today: number;
-  cost_usd_month: number;
+  weather?: { label: DataLabel; source: string; hourly: { ts: string; temp_c: number }[] };
+  prices?: { label: DataLabel; source: string; hourly: { ts: string; usd_per_kwh: number }[]; stress: "low" | "normal" | "high" };
+  events?: {
+    label: DataLabel;
+    source: string;
+    items: { name: string; venue: string; start: string; distance_km: number; expected_attendance: number }[];
+  };
+  crowd_effect?: { value: "none" | "small" | "medium" | "large"; set_by: "claude" | "owner" | "default"; reason: string };
 }
-
-export type Lane = "without" | "with";
-
-export interface TickState {
-  lane: Lane;
-  ts: string;
-  hub: HubReport;
-  meter: Meter;
-  customers_per_hour: number;
-  new_decisions: Decision[];
-  new_commands?: Command[];
-  new_escalations?: Escalation[];
-  indoor_temp_c?: number;
-  /** Next 2 h in 15-min steps (8 values); only on re-plan ticks, otherwise null. */
-  forecast_kw: number[] | null;
-}
-
-/** Lane differences, computed by the engine. The browser shows these; it never subtracts lanes itself. */
-export interface LaneComparison {
-  ts: string;
-  saved_today_usd: number;
-  peak_avoided_kw: number;
-  month_peak_without_kw: number;
-  month_peak_with_kw: number;
-}
-
 export interface RuleBreak {
-  kind: "cap_overrun" | "below_min_power" | "past_deadline" | (string & {});
+  kind: "cap_overrun" | "below_min_power" | "past_deadline" | "over_max_reduce" | "over_max_delay";
   device_id?: string;
   amount: number;
   unit: string;
 }
-
 export interface EscalationOption {
   option_id: string;
   summary: string;
@@ -190,9 +181,7 @@ export interface EscalationOption {
   rule_breaks: RuleBreak[];
   within_authority: boolean;
 }
-
 export type EscalationStatus = "open" | "resolved" | "awaiting_owner" | "expired_default";
-
 export interface Escalation {
   escalation_id: string;
   lane: Lane;
@@ -207,9 +196,40 @@ export interface Escalation {
   chosen_option_id: string | null;
   rationale: string | null;
 }
-
+export interface Meter {
+  ts: string;
+  total_kw: number;
+  block_avg_kw: number;
+  block_start: string;
+  month_peak_kw: number;
+  peak_mode: "minimize" | "cap";
+  peak_cap_kw: number | null;
+  target_kw: number;
+  energy_kwh_today: number;
+  price_usd_per_kwh_now: number;
+  cost_usd_today: number;
+  cost_usd_month: number;
+}
+export interface TickState {
+  lane: Lane;
+  ts: string;
+  hub: HubReport;
+  meter: Meter;
+  customers_per_hour: number;
+  new_decisions: Decision[];
+  new_commands?: Command[];
+  new_escalations?: Escalation[];
+  indoor_temp_c?: number;
+  forecast_kw: number[] | null;
+}
+export interface LaneComparison {
+  ts: string;
+  saved_today_usd: number;
+  peak_avoided_kw: number;
+  month_peak_without_kw: number;
+  month_peak_with_kw: number;
+}
 export type ProposalKind = "importance" | "peak_cap" | "authority" | "undo_decision" | "customer_event" | "resolve_escalation";
-
 export interface Proposal {
   proposal_id: string;
   ts: string;
@@ -217,39 +237,22 @@ export interface Proposal {
   payload: Record<string, unknown>;
   summary: string;
   status: "pending" | "confirmed" | "cancelled" | "expired";
-  created_by: "ai" | (string & {});
+  created_by: "ai";
   confirmed_via: "ui" | "asi_one" | null;
   expires_at: string;
 }
-
-export type DataLabel = "live_api" | "recorded";
-
-export interface Context {
-  ts: string;
-  weather?: { label: DataLabel; source: string; hourly: { ts: string; temp_c: number }[] };
-  prices?: { label: DataLabel; source: string; hourly: { ts: string; usd_per_kwh: number }[]; stress: "low" | "normal" | "high" };
-  events?: {
-    label: DataLabel;
-    source: string;
-    items: { name: string; venue: string; start: string; distance_km: number; expected_attendance: number }[];
-  };
-  crowd_effect?: { value: "none" | "small" | "medium" | "large"; set_by: string; reason: string };
-}
-
 export interface AgentLog {
   ts_real: string;
-  from_agent: string;
-  to_agent: string;
-  kind: string;
+  from_agent: "concierge" | "weather" | "grid" | "events" | "claude" | "engine";
+  to_agent: "concierge" | "weather" | "grid" | "events" | "claude" | "engine";
+  kind: "request" | "response" | "post" | "error";
   summary: string;
 }
-
 export interface DemandCharge {
   name: string;
   peak_kw: number;
   cost_usd: number;
 }
-
 export interface Bill {
   period: string;
   energy_kwh: number;
@@ -258,7 +261,6 @@ export interface Bill {
   total_usd: number;
   tariff_id: string;
 }
-
 export interface BacktestResult {
   dataset: string;
   month: string;
@@ -267,83 +269,60 @@ export interface BacktestResult {
   assumptions_id: string;
 }
 
-// ---------- 2. Seam 1: REST bodies ----------
-
-/** UNCLEAR in CONTRACTS.md: "KitchenConfig + list[Device]". Assumed to match snapshot()'s `{ config, devices }`. */
+// STUB: replace with generated REST/OpenAPI types.
 export interface KitchenView {
   config: KitchenConfig;
   devices: Device[];
+  tariff: Tariff;
 }
-
 export interface ImportanceUpdate {
   importance: Importance;
   limits: ImportanceLimits;
 }
-
+export interface PeakCapUpdate {
+  peak_mode: "minimize" | "cap";
+  peak_cap_kw: number | null;
+}
 export interface SimControlRequest {
   action: "play" | "pause" | "reset";
   speed?: number;
 }
-
-/** UNCLEAR in CONTRACTS.md ("clock state"). Assumed to match the `clock` WebSocket message. */
 export interface ClockState {
   playing: boolean;
   speed: number;
   sim_ts: string;
-  paused_reason: string | null;
+  tick_id: number;
+  paused_reason: "escalation" | "approval" | "hub_waiting" | "sim_host_offline" | null;
+  slowed_reason: "escalation" | null;
 }
-
 export interface DeviceCommandRequest {
   action: CommandAction;
   value?: number;
 }
-
 export interface CustomerEventRequest {
   customers: number;
   duration_min: number;
 }
-
-/**
- * PROPOSED, not in CONTRACTS.md yet (raise with Kritazya): what the Proof screen needs beyond list[BacktestResult].
- * Every number here comes from the engine, so the browser never subtracts bills. Served by GET /api/backtest/{run_id}/proof.
- */
-export interface ProofExtras {
-  run_id: string;
-  tariff: { id: string; name: string };
-  /** DATA_AND_PROOF.md: no number is shown until backtest-auditor returns CLEARED. */
-  audit: "cleared" | "pending" | "failed";
-  months: { month: string; partial: boolean; saved_vs_without_usd: number; saved_vs_timer_usd: number }[];
-  totals: { without_usd: number; timer_usd: number; with_usd: number; saved_vs_without_usd: number; saved_vs_timer_usd: number };
-  busiest_day: {
-    date: string;
-    series: { ts: string; without_kw: number; with_kw: number }[];
-    peak_without_kw: number;
-    peak_with_kw: number;
-    peak_without_ts: string;
-  };
-  sensitivity: { id: string; label: string; kind: "assumptions" | "tariff"; saved_usd_year: number; saved_pct: number; worst: boolean }[];
-  /** One cached month, hourly: load per policy and each policy's running bill so far. */
-  replay: {
-    month: string;
-    steps: { ts: string; without_kw: number; timer_kw: number; with_kw: number; without_usd: number; timer_usd: number; with_usd: number }[];
-  };
-}
-
 export interface BacktestRunRequest {
-  /** UNCLEAR in CONTRACTS.md: a list of "YYYY-MM" months or a count. */
-  months: string[] | number;
+  months: string[];
   assumptions_id: string;
 }
+export interface Health {
+  ok: boolean;
+  kitchen_impl: "fake" | "real";
+  live_transport: "spacetime" | "ws";
+  store: "convex" | "memory";
+  hardware: "off" | "sim_bridge" | "esp32";
+  sim_host: "connected" | "offline";
+}
 
-// ---------- 2. Seam 1: WebSocket /ws (server → client) ----------
-
-export type WarningCode = "cap_unreachable" | "hub_offline" | "live_transport_down" | "store_down";
-
+// STUB: replace with generated WebSocket-schema types.
+export type WarningCode = "cap_unreachable" | "sim_host_offline" | "hub_offline" | "live_transport_down" | "store_down";
 export type WsMessage =
   | { type: "tick"; data: TickState }
   | { type: "decision"; data: Decision; explanation: string; explanation_source: "ai" | "template" }
   | ({ type: "clock" } & ClockState)
-  | { type: "warning"; code: WarningCode | (string & {}); message: string; data: Record<string, unknown> }
+  | { type: "warning"; code: WarningCode; message: string; data: Record<string, unknown> }
   | { type: "chat_delta"; chat_id: string; text: string }
   | { type: "chat_done"; chat_id: string }
   | { type: "backtest_progress"; run_id: string; month: string; pct: number }
@@ -352,13 +331,141 @@ export type WsMessage =
   | { type: "escalation"; data: Escalation }
   | { type: "context"; data: Context }
   | { type: "agent_log"; data: AgentLog };
+export type WsMessageType = WsMessage["type"];
 
-export interface Health {
-  ok: boolean;
-  kitchen_impl: string;
-  live_transport: "spacetime" | "ws";
-  store: string;
-  hardware: string;
+// STUB: replace with generated SpacetimeDB row types.
+export interface LiveTickRow {
+  lane: Lane;
+  ts: string;
+  tick_id: number;
+  total_kw: number;
+  block_avg_kw: number;
+  month_peak_kw: number;
+  peak_mode: "minimize" | "cap";
+  peak_cap_kw: number | null;
+  target_kw: number;
+  energy_kwh_today: number;
+  price_usd_per_kwh_now: number;
+  cost_usd_today: number;
+  cost_usd_month: number;
+  customers_per_hour: number;
+  indoor_temp_c: number;
+  forecast_kw_json: string | null;
+  forecast_ts: string | null;
+}
+export interface TickHistoryRow {
+  lane: Lane;
+  ts: string;
+  total_kw: number;
+  block_avg_kw: number;
+}
+export interface LiveDeviceRow {
+  key: string;
+  lane: Lane;
+  device_id: string;
+  type_id: string;
+  name: string;
+  importance: Importance;
+  state: DeviceState;
+  power_kw: number;
+  rated_kw: number;
+  power_pct: number;
+  source: "simulated" | "measured";
+  physical_json: string | null;
+}
+export interface LiveComparisonRow extends LaneComparison { id: 0 }
+export interface LiveFeedRow {
+  decision_id: string;
+  lane: Lane;
+  ts: string;
+  device_id: string;
+  action: CommandAction;
+  value: number | null;
+  status: DecisionStatus;
+  reason_code: ReasonCode;
+  effect_json: string;
+  explanation: string;
+  explanation_source: "ai" | "template";
+}
+export interface LiveClockRow extends ClockState { id: 0; sim_host: "connected" | "offline" }
+export interface LiveContextRow {
+  id: 0;
+  weather_summary: string;
+  weather_label: DataLabel;
+  prices_summary: string;
+  prices_label: DataLabel;
+  events_summary: string;
+  events_label: DataLabel;
+  crowd_effect: "none" | "small" | "medium" | "large";
+}
+export interface LiveEscalationRow {
+  escalation_id: string;
+  lane: Lane;
+  status: EscalationStatus;
+  problem_json: string;
+  options_json: string;
+  chosen_option_id: string | null;
+  resolved_by: Escalation["resolved_by"];
+  rationale: string | null;
+}
+export interface LiveAgentLogRow extends AgentLog { id: number }
+export interface SurgeRequestRow {
+  id: number;
+  customers: number;
+  duration_min: number;
+  requested_by: string;
+  created_at: string;
+  consumed: boolean;
+}
+export interface LiveTables {
+  live_tick: LiveTickRow[];
+  tick_history: TickHistoryRow[];
+  live_device: LiveDeviceRow[];
+  live_comparison: LiveComparisonRow[];
+  live_feed: LiveFeedRow[];
+  live_clock: LiveClockRow[];
+  live_context: LiveContextRow[];
+  live_escalation: LiveEscalationRow[];
+  live_agent_log: LiveAgentLogRow[];
+  surge_request: SurgeRequestRow[];
 }
 
-export type WsMessageType = WsMessage["type"];
+// STUB: replace with generated hub-protocol types.
+export interface HubHelloMessage {
+  type: "hub_hello";
+  protocol: 1;
+  hub_id: "sim_hub";
+  role: "sim_host";
+  client: "wattwise-web/0.1";
+}
+export interface HubReportMessage { type: "hub_report"; tick_id: number; reports: Record<Lane, HubReport> }
+export interface HubWelcomeMessage { type: "hub_welcome"; accepted: boolean; reason: "host_taken" | null; tick_id: number }
+export interface SimBuildMessage {
+  type: "sim_build";
+  kitchen_id: string;
+  config: KitchenConfig;
+  catalog: EquipmentType[];
+  devices: Device[];
+  seed: number;
+  start_sim_ts: string;
+}
+export interface Surge { surge_id: string; customers: number; duration_min: number }
+export interface SimInputs { outdoor_temp_c?: number; crowd_multiplier?: number; is_open: boolean }
+export interface SimTickMessage {
+  type: "sim_tick";
+  tick_id: number;
+  sim_ts: string;
+  minutes: number;
+  surges: Surge[];
+  inputs: SimInputs;
+  commands: Command[];
+  replay: boolean;
+}
+export interface SimControlMessage {
+  type: "sim_control";
+  action: "play" | "pause" | "reset";
+  speed: number;
+  paused_reason: ClockState["paused_reason"];
+}
+export type HubToServerMessage = HubHelloMessage | HubReportMessage;
+export type ServerToHubMessage = HubWelcomeMessage | SimBuildMessage | SimTickMessage | SimControlMessage;

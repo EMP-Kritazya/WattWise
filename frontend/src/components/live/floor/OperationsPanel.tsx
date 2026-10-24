@@ -4,7 +4,7 @@ import { useDeviceMeta } from "@/hooks/useDeviceMeta";
 import { fmtAction, fmtKw, fmtSimTime } from "@/lib/format";
 import { IMPORTANCE_LABEL, STATUS_LABEL } from "@/lib/theme";
 import { cn } from "@/lib/utils";
-import { useLive as useSim } from "@/data";
+import { useDashboardStore as useSim } from "@/data";
 import { transport } from "@/transport";
 import type { HubDeviceReading, Lane } from "@/types";
 import { DeviceDetails } from "./DeviceDetails";
@@ -71,15 +71,15 @@ export function DemandSummary() {
             <div key={lane} className="min-w-0 border-l-2 pl-3" style={{ borderColor: lane === "with" ? "#34d399" : "#f87171" }}>
               <div className="text-xs text-slate-300">{lane === "with" ? "With WattWise" : "Without WattWise"}</div>
               <div className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">{fmtKw(meter?.block_avg_kw)}</div>
-              <div className={cn("text-xs", meter && meter.block_avg_kw > meter.peak_cap_kw ? "text-red-300" : "text-slate-400")}>
-                {!meter ? "Waiting for data" : meter.block_avg_kw > meter.peak_cap_kw ? "Above cap" : "Within cap"}
+              <div className={cn("text-xs", meter && meter.block_avg_kw > meter.target_kw ? "text-red-300" : "text-slate-400")}>
+                {!meter ? "Waiting for data" : meter.block_avg_kw > meter.target_kw ? "Above target" : "Within target"}
               </div>
             </div>
           );
         })}
         <div className="border-l border-white/15 pl-3">
           <div className="text-xs text-slate-300">Owner’s peak cap</div>
-          <div className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">{fmtKw(latest.with?.meter.peak_cap_kw)}</div>
+          <div className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">{fmtKw(latest.with?.meter.target_kw)}</div>
           <div className="text-xs text-slate-400">Target for both lanes</div>
         </div>
       </div>

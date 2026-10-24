@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { useLive as useSim } from "@/data";
+import { useDashboardStore as useSim } from "@/data";
 
 /** Connection state and a count of every /ws message type received, to check the seam at a glance. */
 export function StatusBar({ className }: { className?: string }) {

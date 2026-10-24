@@ -28,7 +28,7 @@ export const realTransport: Transport = {
   createKitchen: (config) => request("POST", "/api/kitchen", config),
   getKitchen: () => request("GET", "/api/kitchen"),
   setImportance: (deviceId, body) => request("PUT", `/api/kitchen/devices/${enc(deviceId)}/importance`, body),
-  setPeakCap: (peak_cap_kw) => request("PUT", "/api/kitchen/peak-cap", { peak_cap_kw }),
+  setPeakCap: (body) => request("PUT", "/api/kitchen/peak-cap", body),
   simControl: (body) => request("POST", "/api/sim/control", body),
   deviceCommand: (deviceId, body) => request("POST", `/api/devices/${enc(deviceId)}/command`, body),
   addCustomers: (body) => request("POST", "/api/events/customers", body),
@@ -36,8 +36,6 @@ export const realTransport: Transport = {
   listDecisions: (limit = 50) => request("GET", `/api/decisions?limit=${limit}`),
   runBacktest: (body) => request("POST", "/api/backtest/run", body),
   getBacktest: (runId) => request("GET", `/api/backtest/${enc(runId)}`),
-  // STUB: proposed endpoint, not in CONTRACTS.md yet.
-  getProofExtras: (runId) => request("GET", `/api/backtest/${enc(runId)}/proof`),
   chat: (message) => request("POST", "/api/chat", { message }),
   listProposals: (status = "pending") => request("GET", `/api/proposals?status=${status}`),
   confirmProposal: (proposalId, confirm) => request("POST", `/api/proposals/${enc(proposalId)}/confirm`, { confirm }),

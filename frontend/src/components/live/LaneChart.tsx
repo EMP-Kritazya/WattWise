@@ -16,7 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { fmtKw, fmtSimTime } from "@/lib/format";
 import { LANE_COLOR, LANE_LABEL } from "@/lib/theme";
-import { useLive as useSim } from "@/data";
+import { useDashboardStore as useSim } from "@/data";
 
 const BLOCK_MS = 15 * 60_000;
 const AXIS_TICK = { fontSize: 11, fill: "var(--muted-foreground)" };
@@ -105,10 +105,10 @@ function LanesLines() {
         <Legend wrapperStyle={{ fontSize: 11 }} />
         {withMeter && (
           <ReferenceLine
-            y={withMeter.peak_cap_kw}
+            y={withMeter.target_kw}
             stroke="var(--cap-line)"
             strokeDasharray="6 4"
-            label={{ value: `Peak cap ${fmtKw(withMeter.peak_cap_kw)}`, position: "insideTopLeft", fontSize: 11, fill: "var(--cap-line)" }}
+            label={{ value: `Target ${fmtKw(withMeter.target_kw)}`, position: "insideTopLeft", fontSize: 11, fill: "var(--cap-line)" }}
           />
         )}
         {withoutMeter && <ReferenceLine y={withoutMeter.month_peak_kw} stroke={LANE_COLOR.without} strokeOpacity={0.4} />}
@@ -123,7 +123,7 @@ function LanesLines() {
 
 function DemandBlocks() {
   const blocks = useSim((s) => s.blocks);
-  const cap = useSim((s) => s.latest.with?.meter.peak_cap_kw);
+  const cap = useSim((s) => s.latest.with?.meter.target_kw);
 
   const data = useMemo(() => {
     const rows = new Map<number, Row>();

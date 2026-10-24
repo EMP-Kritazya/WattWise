@@ -1,6 +1,5 @@
 import type {
   BacktestResult,
-  ProofExtras,
   BacktestRunRequest,
   ClaudeAuthority,
   ClockState,
@@ -18,6 +17,7 @@ import type {
   KitchenConfig,
   KitchenView,
   Meter,
+  PeakCapUpdate,
   SimControlRequest,
   WsMessage,
 } from "@/types";
@@ -35,7 +35,7 @@ export interface Transport {
   createKitchen(config: KitchenConfig): Promise<{ kitchen_id: string }>;
   getKitchen(): Promise<KitchenView>;
   setImportance(deviceId: string, body: ImportanceUpdate): Promise<Device>;
-  setPeakCap(peakCapKw: number): Promise<Meter>;
+  setPeakCap(body: PeakCapUpdate): Promise<Meter>;
   simControl(body: SimControlRequest): Promise<ClockState>;
   deviceCommand(deviceId: string, body: DeviceCommandRequest): Promise<Command>;
   addCustomers(body: CustomerEventRequest): Promise<void>;
@@ -43,8 +43,6 @@ export interface Transport {
   listDecisions(limit?: number): Promise<Decision[]>;
   runBacktest(body: BacktestRunRequest): Promise<{ run_id: string }>;
   getBacktest(runId: string): Promise<BacktestResult[]>;
-  /** PROPOSED endpoint, see ProofExtras. */
-  getProofExtras(runId: string): Promise<ProofExtras>;
   chat(message: string): Promise<{ chat_id: string }>;
   listProposals(status?: Proposal["status"]): Promise<Proposal[]>;
   confirmProposal(proposalId: string, confirm: boolean): Promise<Proposal>;

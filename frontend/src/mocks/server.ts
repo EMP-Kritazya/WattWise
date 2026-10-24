@@ -1,7 +1,7 @@
 import { ApiError } from "@/transport/errors";
 import type { ConnectionStatus, Transport } from "@/transport/types";
 import type {
-  ProofExtras,
+  AgentLog,
   BacktestResult,
   ClaudeAuthority,
   Context,
@@ -27,12 +27,14 @@ import type {
   KitchenView,
   Lane,
   Meter,
+  PeakCapUpdate,
   ReasonCode,
   SimControlRequest,
+  Tariff,
   WsMessage,
 } from "@/types";
 import { mockCatalog } from "./catalog";
-import { DEMAND_USD_PER_KW, MOCK_MONTHS, mockBacktestMonth, mockProofExtras } from "./proof";
+import { DEMAND_USD_PER_KW, MOCK_MONTHS, mockBacktestMonth } from "./proof";
 import { mulberry32 } from "./rng";
 
 // MOCK: an in-browser stand-in for the FastAPI server + FakeKitchen (docs/design/API.md), so the UI can be built
@@ -55,6 +57,22 @@ const CLAUDE_THINKS_MS = 2_500;
 const ENGINE_REDUCE_MIN = 15;
 const OWNER_HOLD_MIN = 30;
 const AI_DELAY_MS = 1_500;
+const MOCK_TARIFF: Tariff = {
+  tariff_id: "demo_tariff_v1",
+  name: "WattWise demo commercial rate",
+  label: "illustrative",
+  currency: "USD",
+  timezone: "America/Los_Angeles",
+  energy: [
+    { name: "off_peak", start: "00:00", end: "16:00", usd_per_kwh: 0.22 },
+    { name: "peak", start: "16:00", end: "21:00", usd_per_kwh: 0.38 },
+    { name: "off_peak", start: "21:00", end: "24:00", usd_per_kwh: 0.22 },
+  ],
+  demand: [
+    { name: "max_demand", window: null, usd_per_kw: 20 },
+    { name: "peak_demand", window: { start: "16:00", end: "21:00" }, usd_per_kw: 8 },
+  ],
+};
 
 type EngineMove =
   | { kind: "reduce"; pct: number; untilMs: number }
@@ -86,7 +104,7 @@ const round2 = (n: number) => Math.round(n * 100) / 100;
 const iso = (ms: number) => new Date(ms).toISOString();
 const latency = (ms = 80) => new Promise((resolve) => setTimeout(resolve, ms));
 const sumKw = (rs: HubDeviceReading[]) => round2(rs.reduce((s, r) => s + r.power_kw, 0));
-const cycleMin = (t: EquipmentType) => Number(t.params.cycle_min ?? 30);
+const cycleMin = (t: EquipmentType) => Number("cycle_min" in t.params ? t.params.cycle_min : 30);
 
 function limit(limits: ImportanceLimits, key: string, fallback: number): number {
   const v = (limits as Record<string, unknown>)[key];
@@ -128,7 +146,7 @@ class MockServer implements Transport {
   private simMs = START_MS;
   private playing = false;
   private speed = 120;
-  private pausedReason: string | null = null;
+  private pausedReason: ClockState["paused_reason"] = null;
   private timer: ReturnType<typeof setInterval> | undefined;
   private surges: { perHour: number; untilMs: number }[] = [];
   private moves = new Map<string, EngineMove>(); // engine moves, `with` lane only
@@ -180,7 +198,7 @@ class MockServer implements Transport {
   async getKitchen(): Promise<KitchenView> {
     await latency();
     const config = this.requireKitchen();
-    return { config: structuredClone(config), devices: this.devices.map((d) => this.toDevice(d)) };
+    return { config: structuredClone(config), devices: this.devices.map((d) => this.toDevice(d)), tariff: structuredClone(MOCK_TARIFF) };
   }
 
   async setImportance(deviceId: string, body: ImportanceUpdate): Promise<Device> {
@@ -196,10 +214,11 @@ class MockServer implements Transport {
     return this.toDevice(d);
   }
 
-  async setPeakCap(peakCapKw: number): Promise<Meter> {
+  async setPeakCap(body: PeakCapUpdate): Promise<Meter> {
     await latency();
     const config = this.requireKitchen();
-    config.peak_cap_kw = peakCapKw;
+    config.peak_mode = body.peak_mode;
+    config.peak_cap_kw = body.peak_cap_kw;
     this.checkCapReachable();
     return this.meterView("with");
   }
@@ -249,6 +268,7 @@ class MockServer implements Transport {
     this.holdUntil.set(deviceId, this.simMs + OWNER_HOLD_MIN * MIN_MS);
     return {
       command_id: `c_${String(++this.seq.command).padStart(4, "0")}`,
+      lane: "with",
       ts: iso(this.simMs),
       device_id: deviceId,
       action: body.action,
@@ -294,7 +314,7 @@ class MockServer implements Transport {
         const pl = p.payload as { device_id: string; importance: Importance; limits: ImportanceLimits };
         await this.setImportance(pl.device_id, { importance: pl.importance, limits: pl.limits });
       } else if (p.kind === "peak_cap") {
-        await this.setPeakCap(Number((p.payload as { peak_cap_kw: number }).peak_cap_kw));
+        await this.setPeakCap({ peak_mode: "cap", peak_cap_kw: Number((p.payload as { peak_cap_kw: number }).peak_cap_kw) });
       }
     }
     const done: Proposal = { ...p, status: confirm ? "confirmed" : "cancelled", confirmed_via: confirm ? "ui" : null };
@@ -319,7 +339,7 @@ class MockServer implements Transport {
 
   async health(): Promise<Health> {
     await latency();
-    return { ok: true, kitchen_impl: "mock", live_transport: "ws", store: "memory", hardware: "none" };
+    return { ok: true, kitchen_impl: "fake", live_transport: "ws", store: "memory", hardware: "off", sim_host: "connected" };
   }
 
   async undo(decisionId: string): Promise<Decision> {
@@ -353,11 +373,6 @@ class MockServer implements Transport {
   async getBacktest(): Promise<BacktestResult[]> {
     await latency();
     return MOCK_MONTHS.map(mockBacktestMonth);
-  }
-
-  async getProofExtras(runId: string): Promise<ProofExtras> {
-    await latency();
-    return mockProofExtras(runId, MOCK_MONTHS.map(mockBacktestMonth));
   }
 
   async chat(message: string): Promise<{ chat_id: string }> {
@@ -473,7 +488,17 @@ class MockServer implements Transport {
         data: {
           lane,
           ts,
-          hub: { ts, total_kw: total, devices: readings, source: "simulated" },
+          hub: {
+            hub_id: "sim_hub",
+            lane,
+            tick_id: Math.max(0, minute),
+            ts,
+            total_kw: total,
+            customers_per_hour: Math.round(customersPerHour),
+            devices: readings,
+            acks: [],
+            source: "simulated",
+          },
           meter: this.meterView(lane),
           customers_per_hour: Math.round(customersPerHour),
           new_decisions: lane === "with" ? newDecisions : [],
@@ -512,7 +537,7 @@ class MockServer implements Transport {
   private raiseEscalation(ts: string, withTotalKw: number, config: KitchenConfig): Escalation | null {
     const flex = this.largestFlexible((d) => !this.overrides.has(d.device_id));
     const job = this.devices.find((d) => d.importance === "deferrable");
-    const cap = config.peak_cap_kw;
+    const cap = config.peak_cap_kw ?? 40;
     const forecastPeak = round2(Math.max(withTotalKw + 2.5, cap + 1.5));
     const overrun = round2(forecastPeak - cap);
     const n = ++this.seq.escalation;
@@ -564,7 +589,7 @@ class MockServer implements Transport {
       rationale: null,
     };
     this.escalations.set(e.escalation_id, e);
-    this.logAgent("engine", "claude", "escalation", `Forecast ${forecastPeak.toFixed(1)} kW vs cap ${cap.toFixed(1)} kW: ${options.length} options`);
+    this.logAgent("engine", "claude", "post", `Forecast ${forecastPeak.toFixed(1)} kW vs cap ${cap.toFixed(1)} kW: ${options.length} options`);
 
     // Claude thinks for a moment, then picks within authority or hands it to the owner.
     setTimeout(() => {
@@ -577,7 +602,7 @@ class MockServer implements Transport {
         const waiting: Escalation = { ...cur, status: "awaiting_owner", rationale: "The fix that holds the cap breaks one of your limits, so I'm asking you." };
         this.escalations.set(cur.escalation_id, waiting);
         this.awaitingOwner = cur.escalation_id;
-        this.logAgent("claude", "owner", "escalation", "Outside my authority: asking the owner");
+        this.logAgent("claude", "concierge", "post", "Outside my authority: asking the owner");
         this.playing = false;
         this.pausedReason = "escalation";
         this.stopLoop();
@@ -602,7 +627,7 @@ class MockServer implements Transport {
     }
     const done: Escalation = { ...e, status: "resolved", resolved_by: by, chosen_option_id: optionId, rationale: rationale ?? e.rationale };
     this.escalations.set(e.escalation_id, done);
-    this.logAgent(by, "engine", "choice", `${option.summary}`);
+    this.logAgent(by === "owner" ? "concierge" : "claude", "engine", "post", `${option.summary}`);
     this.emit({ type: "escalation", data: done });
     if (this.awaitingOwner === e.escalation_id) {
       this.awaitingOwner = null;
@@ -614,14 +639,14 @@ class MockServer implements Transport {
   }
 
   private command(ts: string, deviceId: string, action: CommandAction, value: number | null): Command {
-    return { command_id: `c_${String(++this.seq.command).padStart(4, "0")}`, ts, device_id: deviceId, action, value, decision_id: null, issued_by: "engine" };
+    return { command_id: `c_${String(++this.seq.command).padStart(4, "0")}`, lane: "with", ts, device_id: deviceId, action, value, decision_id: null, issued_by: "engine" };
   }
 
   /** "Never touch the walk-in" / "set the cap to 45 kW" in chat → a proposal the owner confirms in the UI. */
   private maybePropose(message: string) {
     const text = message.toLowerCase();
     let proposal: Proposal | null = null;
-    const base = { ts: iso(this.simMs), status: "pending" as const, created_by: "ai", confirmed_via: null, expires_at: iso(this.simMs + 30 * MIN_MS) };
+    const base = { ts: iso(this.simMs), status: "pending" as const, created_by: "ai" as const, confirmed_via: null, expires_at: iso(this.simMs + 30 * MIN_MS) };
     const capMatch = text.match(/cap[^0-9]*(\d+(?:\.\d+)?)/);
     if (/never touch|don.?t touch|leave .* alone/.test(text)) {
       const d = this.devices.find((x) => text.includes(x.type.name.toLowerCase().split(" ")[0])) ?? this.devices.find((x) => x.type.type_id === "walk_in_cooler");
@@ -683,7 +708,7 @@ class MockServer implements Transport {
     this.emit({ type: "context", data: structuredClone(this.context) });
   }
 
-  private logAgent(from: string, to: string, kind: string, summary: string) {
+  private logAgent(from: AgentLog["from_agent"], to: AgentLog["to_agent"], kind: AgentLog["kind"], summary: string) {
     this.emit({ type: "agent_log", data: { ts_real: new Date().toISOString(), from_agent: from, to_agent: to, kind, summary } });
   }
 
@@ -696,7 +721,20 @@ class MockServer implements Transport {
 
   private naturalReading(d: MockDevice, open: boolean, hour: number, busy: number): HubDeviceReading {
     const rated = d.type.rated_kw;
-    const r = (power_kw: number, state: DeviceState): HubDeviceReading => ({ device_id: d.device_id, power_kw: round2(power_kw), state });
+    const r = (power_kw: number, state: DeviceState): HubDeviceReading => {
+      const rounded = round2(power_kw);
+      return {
+        device_id: d.device_id,
+        type_id: d.type.type_id,
+        name: d.name,
+        importance: d.importance,
+        power_kw: rounded,
+        rated_kw: rated,
+        power_pct: Math.round((100 * rounded) / rated),
+        state,
+        source: "simulated",
+      };
+    };
     switch (d.type.power_model) {
       case "fixed":
         return open ? r(rated, "on") : r(0, "off");
@@ -760,7 +798,8 @@ class MockServer implements Transport {
 
   /** Every 5 sim minutes: if the `with` lane is near the cap, delay a running job, else turn down a flexible device. */
   private replan(ts: string, withTotalKw: number, config: KitchenConfig): Decision | null {
-    if (withTotalKw <= config.peak_cap_kw * 0.95) return null;
+    const targetKw = config.peak_cap_kw ?? this.meters.with.monthPeakKw;
+    if (withTotalKw <= targetKw * 0.95) return null;
     const free = (d: MockDevice) =>
       !this.moves.has(d.device_id) && !this.overrides.has(d.device_id) && (this.holdUntil.get(d.device_id) ?? 0) <= this.simMs;
 
@@ -888,8 +927,11 @@ class MockServer implements Transport {
       block_avg_kw: round2(m.blockCount ? m.blockSumKw / m.blockCount : m.totalKw),
       block_start: iso(m.blockStartMs),
       month_peak_kw: round2(m.monthPeakKw),
+      peak_mode: this.config?.peak_mode ?? "cap",
       peak_cap_kw: this.config?.peak_cap_kw ?? 0,
+      target_kw: this.config?.peak_cap_kw ?? round2(m.monthPeakKw),
       energy_kwh_today: round2(m.energyKwhToday),
+      price_usd_per_kwh_now: ENERGY_USD_PER_KWH,
       cost_usd_today: round2(costToday),
       cost_usd_month: round2(MONTH_ENERGY_USD_BEFORE_TODAY + costToday + m.monthPeakKw * DEMAND_USD_PER_KW),
     };
@@ -903,7 +945,7 @@ class MockServer implements Transport {
       if (d.importance === "flexible") return s + (d.type.rated_kw * limit(d.limits, "min_power_pct", 40)) / 100;
       return s;
     }, 0);
-    if (unavoidableKw > config.peak_cap_kw) {
+    if (config.peak_cap_kw != null && unavoidableKw > config.peak_cap_kw) {
       this.emit({
         type: "warning",
         code: "cap_unreachable",
@@ -925,6 +967,7 @@ class MockServer implements Transport {
       state: r?.state ?? "off",
       power_kw: r?.power_kw ?? 0,
       rated_kw: d.type.rated_kw,
+      power_pct: r?.power_pct ?? 0,
       source: "simulated",
     };
   }
@@ -942,7 +985,14 @@ class MockServer implements Transport {
   }
 
   private clockState(): ClockState {
-    return { playing: this.playing, speed: this.speed, sim_ts: iso(this.simMs), paused_reason: this.pausedReason };
+    return {
+      playing: this.playing,
+      speed: this.speed,
+      sim_ts: iso(this.simMs),
+      tick_id: Math.max(0, Math.round((this.simMs - START_MS) / MIN_MS)),
+      paused_reason: this.pausedReason,
+      slowed_reason: null,
+    };
   }
 
   private emitClock() {

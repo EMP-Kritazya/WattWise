@@ -11,7 +11,7 @@ import { BuilderPage } from "@/pages/BuilderPage";
 import { LivePage } from "@/pages/LivePage";
 import { ProofPage } from "@/pages/ProofPage";
 import { startLive } from "@/data";
-import { useLive as useSim } from "@/data";
+import { useDashboardStore as useSim } from "@/data";
 import { transport } from "@/transport";
 
 const NAV = [
@@ -75,7 +75,7 @@ function Brand() {
 function MockBadge() {
   return transport.kind === "mock" ? (
     <Badge variant="outline" className="border-amber-400/30 bg-amber-400/10 text-amber-300">
-      Mock server: made-up numbers
+      {import.meta.env.VITE_MOCKS === "1" ? "Fixture mode · fake data" : "Legacy mock · made-up numbers"}
     </Badge>
   ) : null;
 }

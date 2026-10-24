@@ -1,6 +1,6 @@
 import { TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useLive as useSim } from "@/data";
+import { useDashboardStore as useSim } from "@/data";
 
 /**
  * Active warnings (cap_unreachable, hub_offline, live_transport_down, store_down), one line each.
