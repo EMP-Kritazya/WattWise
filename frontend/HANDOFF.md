@@ -106,6 +106,7 @@ the browser simulation or hub work.
   as the final B1–B7 handoff yet.
 
 ### Codex checkpoint 2 — B1–B7 + `/sim` complete
+- Implementation commit: `ae1cbe5` (`Frontend: add deterministic browser simulation hub`).
 - `src/hub/hub.test.ts` runs the entire 120-tick `server_to_hub.jsonl` fixture twice and asserts byte-identical output, exact
   totals, report shape, bounded device power, unique device IDs, and one ack per Command. It separately covers physical-floor
   clamping, delay clamping, `job_running`, `already_off`, and `unknown_device`.
