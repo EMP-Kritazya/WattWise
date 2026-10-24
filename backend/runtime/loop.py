@@ -128,6 +128,7 @@ class RunLoop:
             self.speed = speed
         if action == "play":
             self.service.require_kitchen()
+            await self.restore_build()
             self.playing = True
             if self.autorun:
                 self._ensure_task()
@@ -183,6 +184,20 @@ class RunLoop:
             self.service.post_context(copy.deepcopy(self.context))
             self.live.send("publish_context", copy.deepcopy(self.context))
         return result
+
+    async def restore_build(self) -> bool:
+        """A kitchen restored from the store at startup has lanes but no `sim_build` yet: send it once, unchanged.
+
+        Without this, play on a restored kitchen ticks a hub that was never built. No-op after any `build`.
+        """
+        if self._build_count or not self.service.lanes:
+            return False
+        self._build_count += 1
+        devices = self.service.get_kitchen()["devices"]
+        await self.bridge.reset({d["device_id"] for d in devices})
+        await self.hub.send_build(KITCHEN_ID, self.service.lanes.config, self.service.catalog(), devices,
+                                  self.service.lanes.seed, _iso(self._start))
+        return True
 
     # ------------------------------------------------------------ owner + agents
 
