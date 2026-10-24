@@ -15,7 +15,7 @@ import json
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from runtime.kitchen_factory import EngineApi
 from runtime.lanes import LANES, Lanes
@@ -61,6 +61,7 @@ class KitchenService:
         self._tariff = _load(fixtures_dir / "shapes" / "tariff.json")
         self._catalog = _load(fixtures_dir / "shapes" / "equipment_catalog.json")
         self.lanes = Lanes(engine, self._tariff)
+        self.on_escalation: Callable[[dict], None] | None = None  # every resolve, from any thread (runtime/escalations.py)
         kitchen = store.latest_kitchen()
         if kitchen is not None:
             self.lanes.build(kitchen["config"], SEED)
@@ -171,7 +172,24 @@ class KitchenService:
         escalation = self._lane().resolve_escalation(escalation_id, body["option_id"], resolved_by, rationale)
         if escalation["status"] in FINAL_ESCALATION_STATUSES:
             self._store.record_escalation(escalation)
+        if self.on_escalation is not None:
+            self.on_escalation(copy.deepcopy(escalation))  # runtime/escalations.py publishes it
         return escalation
+
+    @_serialized
+    def expire_escalation(self, last_known: dict) -> dict:
+        """Past its deadline the engine has applied its default itself (CONTRACTS.md §1 Escalation, §3). Stores and
+        returns the final state: the engine's when it lists one. STUB (contract question): the facade has no call that
+        returns an expired escalation, so otherwise it is the last known state with the engine's default filled in."""
+        escalation_id = last_known["escalation_id"]
+        engine = next((e for e in self._lane().open_escalations() if e["escalation_id"] == escalation_id), None)
+        if engine is not None and engine["status"] in FINAL_ESCALATION_STATUSES:
+            final = engine
+        else:
+            final = {**copy.deepcopy(last_known), "status": "expired_default", "resolved_by": "default",
+                     "chosen_option_id": last_known["default_option_id"], "rationale": None}
+        self._store.record_escalation(final)
+        return final
 
     # ------------------------------------------------------------ backtest
 

@@ -145,9 +145,10 @@ def get_escalations(svc: Service, status: m.EscalationStatus | None = None):
     return svc.escalations(status)
 
 
+# async: the owner's choice is published by runtime/escalations.py, which lives on the event loop.
 @router.post("/escalations/{escalation_id}/resolve", response_model=m.Escalation, responses=R404, **_exclude_unset)
-def post_escalation_resolve(escalation_id: str, body: m.EscalationResolveRequest, svc: Service):
-    return svc.resolve_escalation(escalation_id, _body(body))
+async def post_escalation_resolve(escalation_id: str, body: m.EscalationResolveRequest, rt: Runtime):
+    return await rt.escalations.resolve_by_owner(escalation_id, _body(body)["option_id"])
 
 
 @router.get("/proposals", response_model=list[m.Proposal], **_exclude_unset)
@@ -265,7 +266,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     fallback = None if isinstance(port, WsLive) else WsLive(broadcaster.broadcast)
     live = LivePublisher(port, fallback=fallback, on_warning=broadcaster.broadcast)
     app.state.runtime = runtime = RunLoop(service=service, hub=hub, live=live, store=store,
-                                          start_sim_ts=settings.sim_start_ts)
+                                          start_sim_ts=settings.sim_start_ts, publish_ws=broadcaster.send_soon,
+                                          demo_mode=settings.demo_mode)
+    service.on_escalation = runtime.escalations.changed
     # Proposals and chat use /ws whatever the live transport (CONTRACTS.md §2).
     app.state.proposals = proposals = ProposalBook(
         service, clock=lambda: runtime.sim_ts, publish=broadcaster.send_soon,
@@ -276,6 +279,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         tools, create_llm(settings.claude_provider, settings.anthropic_api_key, settings.anthropic_model),
         publish=broadcaster.send_soon, timezone=service.tariff["timezone"], engine_rule_error=engine.RuleError,
     )
+    runtime.escalations.agent = app.state.agent  # Claude off (no key) → escalations wait for the owner or the default
     install_error_handlers(app, engine.RuleError)
     app.include_router(router)
 

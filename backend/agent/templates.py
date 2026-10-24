@@ -22,6 +22,18 @@ def explain_decision(decision: dict, device_name: str) -> str:
     return f"Restored {device_name} to normal power to repay its energy {peaks}."
 
 
+def explain_escalation(escalation: dict, option: dict | None) -> str:
+    """How an escalation ended, when there is no Claude rationale. Quotes the engine's option summary."""
+    summary = option["summary"] if option else escalation["chosen_option_id"]
+    if escalation["status"] == "awaiting_owner":
+        return f"Claude suggests: {summary}. It is outside Claude's authority, so it waits for the owner."
+    if escalation["resolved_by"] == "claude":
+        return f"Claude chose: {summary}."
+    if escalation["resolved_by"] == "owner":
+        return f"The owner chose: {summary}."
+    return f"No choice before the deadline, so the engine's default applies: {summary}."
+
+
 def chat_reply(meter: dict | None) -> str:
     """The chat answer with no Claude key (or a failed call): the live Meter, quoted unchanged."""
     if meter is None:

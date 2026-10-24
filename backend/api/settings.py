@@ -39,6 +39,7 @@ class Settings:
     claude_provider: str = "anthropic"
     anthropic_model: str | None = None  # None → agent/claude_agent.py DEFAULT_MODEL
     anthropic_api_key: str | None = field(default=None, repr=False)  # None → Claude off, template text
+    demo_mode: bool = False  # DEMO_MODE=1: the clock pauses while Claude decides an escalation
     fixtures_dir: Path = field(default_factory=lambda: REPO_ROOT / "contracts" / "fixtures")
 
     @classmethod
@@ -54,5 +55,6 @@ class Settings:
             claude_provider=_choice("CLAUDE_PROVIDER", "anthropic"),
             anthropic_model=os.environ.get("ANTHROPIC_MODEL") or None,
             anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY") or None,
+            demo_mode=os.environ.get("DEMO_MODE") == "1",
             fixtures_dir=Path(os.environ.get("FIXTURES_DIR", REPO_ROOT / "contracts" / "fixtures")),
         )

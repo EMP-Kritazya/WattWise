@@ -21,6 +21,7 @@ from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
 from agent.templates import explain_decision
+from runtime.escalations import Escalations
 from runtime.hub_link import HubLink, TickAborted
 from runtime.events import SurgeQueue
 from runtime.lanes import LANES
@@ -66,6 +67,8 @@ class RunLoop:
         store: Store,
         start_sim_ts: str,
         autorun: bool = True,
+        publish_ws: Callable[[dict], None] | None = None,
+        demo_mode: bool = False,
     ):
         self.service = service  # api.service.KitchenService: lanes, tariff, catalog, lock
         self.hub = hub
@@ -76,7 +79,7 @@ class RunLoop:
         self.surges = SurgeQueue()
         self.playing = False
         self.speed = DEFAULT_SPEED
-        self.slowed_reason: str | None = None  # escalation slowdown: not built yet (API.md, last in Phase C)
+        self.slowed_reason: str | None = None  # escalation slowdown: not built (open question Q1 for Kritazya)
         self.hub_status: str | None = hub.paused_reason  # hub_waiting | sim_host_offline | None, from HubLink.on_status
         self.context: dict | None = None  # latest merged Context (posts merge)
         self.tick_id = 0
@@ -88,6 +91,9 @@ class RunLoop:
         self._last_store_flush = time.monotonic()
         self._task: asyncio.Task | None = None
         self._wake: asyncio.Event | None = None
+        # Claude resolves the engine's escalations; `escalations.agent` is set once the agent exists (api/main.py).
+        self.escalations = Escalations(service=service, live=live, clock=lambda: self.sim_ts,
+                                       on_pause=self._on_escalation_pause, publish_ws=publish_ws, demo_mode=demo_mode)
 
     # ------------------------------------------------------------ clock
 
@@ -98,7 +104,8 @@ class RunLoop:
 
     @property
     def paused_reason(self) -> str | None:
-        return self.hub_status
+        """The hub first (nothing can tick without it), then the demo-mode escalation pause."""
+        return self.hub_status or self.escalations.paused_reason
 
     def clock_state(self) -> dict:
         return {"playing": self.playing, "speed": self.speed, "sim_ts": self.sim_ts, "tick_id": self.tick_id,
@@ -141,6 +148,11 @@ class RunLoop:
     def on_host(self, connected: bool) -> None:
         self._poke()
 
+    def _on_escalation_pause(self) -> None:
+        """DEMO_MODE=1: the clock pauses while Claude decides an escalation and resumes after."""
+        self._publish_clock()
+        self._poke()
+
     # ------------------------------------------------------------ kitchen
 
     async def build(self, config: dict) -> dict:
@@ -152,6 +164,7 @@ class RunLoop:
         self._commands = []
         self._owner_command_ids = set()
         self.surges.reset()
+        self.escalations.reset()
         devices = self.service.get_kitchen()["devices"]
         await self.hub.send_build(KITCHEN_ID, config, self.service.catalog(), devices, self.service.lanes.seed,
                                   _iso(self._start))
@@ -248,6 +261,7 @@ class RunLoop:
             return False
         self._queue_commands(states)
         self._publish(tick_id, states, comparison)
+        self.escalations.after_tick()
         self._buffer_records(states)
         self._maybe_flush_store()
         return True
@@ -267,7 +281,7 @@ class RunLoop:
                 text = explain_decision(decision, names.get(decision["device_id"], decision["device_id"]))
                 self.live.send("publish_feed", lane, decision, text, "template")
             for escalation in states[lane]["new_escalations"]:
-                self.live.send("publish_escalation", escalation)
+                self.escalations.opened(escalation)  # published, then Claude decides in the background
         self._publish_clock()
 
     # ------------------------------------------------------------ store
@@ -319,7 +333,8 @@ class RunLoop:
     # ------------------------------------------------------------ pacing
 
     def _runnable(self) -> bool:
-        return self.playing and self.hub.connected and bool(self.service.lanes)
+        return (self.playing and self.hub.connected and bool(self.service.lanes)
+                and self.escalations.paused_reason is None)
 
     def _poke(self) -> None:
         if self._wake is not None:
@@ -352,6 +367,7 @@ class RunLoop:
                     pass
 
     async def stop(self) -> None:
+        await self.escalations.stop()
         if self._task is not None:
             self._task.cancel()
             try:
