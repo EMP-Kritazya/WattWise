@@ -9,6 +9,7 @@ export { api, useApi } from "./useApi";
 export { publishHostDevices, useDevices } from "./useDevices";
 export { isFixtureHub, useHubHost, type HubConnectionState } from "./useHubHost";
 export { useLive } from "./useLive";
+export { useEvalArtifact } from "./useEvalArtifact";
 export type { BlockPoint, ChatMessage, FeedItem, LanePoint, LiveSourceKind, Warning } from "@/store/sim";
 
 /** Legacy screen store, retained only while C2 migrates the existing screens to typed live rows. */
