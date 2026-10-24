@@ -11,7 +11,7 @@ The whole restaurant in the current `plan.ts` layout, restyled as a toy miniatur
 - the **demand-charge card** (Without +$67.20 / With $0 extra);
 - a Claude card.
 
-### Follow-up complete — Toy Box now spans the product (checkpoint pending)
+### Follow-up complete — Toy Box now spans the product (commit `28585f2`)
 Ashirwad asked Codex to make the rest of the interface feel like the same product as the completed live floor. The shared warm-cream
 canvas, Fredoka/Nunito typography, white ink-outlined cards, toy-like controls and semantic teal/coral/amber palette now cover navigation,
 Builder, Agent Network, Proof, `/sim`, charts, dialogs and assistant surfaces. Data flow and interaction behavior are unchanged.
