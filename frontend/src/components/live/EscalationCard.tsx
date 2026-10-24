@@ -20,7 +20,7 @@ export function EscalationCard() {
   return (
     <section
       aria-live="polite"
-      className={cn("flex flex-wrap items-start gap-4 rounded-xl border px-4 py-3", state.box)}
+      className={cn("flex flex-wrap items-start gap-4 rounded-[22px] border-2 border-[#22223B] px-4 py-3 shadow-[0_4px_0_#22223B]", state.box)}
     >
       <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl", state.icon)}>
         <Icon className={cn("size-5", e.status === "open" && "animate-spin")} />

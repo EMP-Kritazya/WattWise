@@ -37,7 +37,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <div className="flex min-h-screen">
+      <div className="flex min-h-screen bg-transparent">
         <Sidebar />
         <div className="flex min-w-0 flex-1 flex-col">
           <TopBar />
@@ -53,7 +53,7 @@ export default function App() {
             {/* On every screen: a waiting escalation pauses the clock, so the owner must always see it. */}
             <EscalationDialog />
           </main>
-          <StatusBar className="border-t px-4 py-2 lg:hidden" />
+          <StatusBar className="border-t-2 border-[#22223B] bg-[#FFF1E2] px-4 py-2 lg:hidden" />
         </div>
       </div>
     </BrowserRouter>
@@ -63,11 +63,11 @@ export default function App() {
 function Brand() {
   return (
     <div className="flex items-center gap-2.5">
-      <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+      <span className="flex size-10 items-center justify-center rounded-xl border-2 border-[#22223B] bg-primary text-primary-foreground shadow-[0_3px_0_#22223B]">
         <Leaf className="size-5" />
       </span>
       <div className="leading-tight">
-        <div className="text-base font-semibold tracking-tight">WattWise</div>
+        <div className="font-['Fredoka',sans-serif] text-lg font-bold tracking-tight">WattWise</div>
         <div className="text-[11px] text-muted-foreground">Keep the peak under the cap</div>
       </div>
     </div>
@@ -76,7 +76,7 @@ function Brand() {
 
 function MockBadge() {
   return transport.kind === "mock" ? (
-    <Badge variant="outline" className="border-amber-400/30 bg-amber-400/10 text-amber-300">
+    <Badge variant="outline" className="border-[#22223B] bg-[#FFF0BA] text-[#704A00]">
       {import.meta.env.VITE_MOCKS === "1" ? "Fixture mode · fake data" : "Legacy mock · made-up numbers"}
     </Badge>
   ) : null;
@@ -84,19 +84,19 @@ function MockBadge() {
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
   cn(
-    "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-    isActive && "bg-accent text-foreground",
+    "flex items-center gap-2.5 rounded-xl border-2 border-transparent px-3 py-2 text-sm font-extrabold text-muted-foreground transition-all hover:bg-accent hover:text-foreground",
+    isActive && "border-[#22223B] bg-primary text-[#22223B] shadow-[0_3px_0_#22223B]",
   );
 
 /** Large screens: brand, kitchen, navigation, and the connection status at the bottom. */
 function Sidebar() {
   const kitchenName = useSim((s) => s.kitchen?.config.name);
   return (
-    <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col gap-6 border-r bg-card/50 px-3 py-5 lg:flex">
+    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col gap-6 border-r-2 border-[#22223B] bg-[#FFF1E2]/95 px-3 py-5 lg:flex">
       <div className="px-2">
         <Brand />
       </div>
-      <div className="px-3">
+      <div className="rounded-2xl border-2 border-[#22223B] bg-white px-3 py-2.5 shadow-[0_3px_0_#22223B]">
         <div className="text-[11px] tracking-wide text-muted-foreground uppercase">Kitchen</div>
         <div className="mt-0.5 truncate font-medium">{kitchenName ?? "Not built yet"}</div>
       </div>
@@ -119,7 +119,7 @@ function Sidebar() {
 /** Small screens: everything from the sidebar in one row. */
 function TopBar() {
   return (
-    <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b px-4 py-3 lg:hidden">
+    <header className="sticky top-0 z-30 flex flex-wrap items-center gap-x-4 gap-y-2 border-b-2 border-[#22223B] bg-[#FFF1E2]/95 px-4 py-3 backdrop-blur lg:hidden">
       <Brand />
       <nav className="flex gap-1">
         {NAV.map(({ to, label, icon: Icon }) => (

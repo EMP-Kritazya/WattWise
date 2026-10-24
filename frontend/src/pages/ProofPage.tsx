@@ -33,7 +33,7 @@ export function ProofPage() {
         <div>
           <div className="flex items-center gap-2">
             <FlaskConical className="size-5 text-primary" />
-            <h1 className="text-2xl font-semibold tracking-tight">Proof</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Proof</h1>
           </div>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Recorded restaurant data replayed under the same tariff and assumptions for each policy.
@@ -93,7 +93,13 @@ function MonthResult({ result }: { result: BacktestResult }) {
 
 function BillCard({ title, bill, accent = false }: { title: string; bill: Bill; accent?: boolean }) {
   return (
-    <div className={accent ? "rounded-xl border border-primary/35 bg-primary/5 p-4" : "rounded-xl border bg-muted/20 p-4"}>
+    <div
+      className={
+        accent
+          ? "rounded-[18px] border-2 border-[#22223B] bg-[#DFF6F3] p-4 shadow-[0_3px_0_#22223B]"
+          : "rounded-[18px] border-2 border-[#22223B] bg-[#FFF6E9] p-4"
+      }
+    >
       <div className="text-sm font-medium">{title}</div>
       <div className="mt-2 text-2xl font-semibold tabular-nums">{fmtUsd(bill.total_usd)}</div>
       <dl className="mt-3 space-y-1.5 text-xs text-muted-foreground">
@@ -114,7 +120,7 @@ function Row({ label, value }: { label: string; value: string }) {
 function Checks({ result }: { result: BacktestResult }) {
   const ok = result.checks.baseline_matches_raw && result.checks.energy_conserved && result.checks.rule_violations === 0;
   return (
-    <Badge variant="outline" className={ok ? "border-emerald-500/35 text-emerald-400" : "border-amber-500/35 text-amber-300"}>
+    <Badge variant="outline" className={ok ? "border-[#22223B] bg-[#DFF6F3] text-[#167D74]" : "border-[#22223B] bg-[#FFF0BA] text-[#8A5A00]"}>
       {ok && <CheckCircle2 className="mr-1 size-3" />}
       {ok ? "Checks passed" : `${result.checks.rule_violations} rule violations`}
     </Badge>

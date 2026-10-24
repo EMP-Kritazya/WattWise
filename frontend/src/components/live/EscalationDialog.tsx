@@ -50,7 +50,7 @@ export function EscalationDialog() {
 
 function OptionRow({ option: o, isDefault, disabled, onChoose }: { option: EscalationOption; isDefault: boolean; disabled: boolean; onChoose: () => void }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border bg-secondary/40 p-3">
+    <div className="flex items-center gap-3 rounded-2xl border-2 border-[#22223B] bg-[#FFF6E9] p-3">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2 text-sm font-medium">
           {o.summary}

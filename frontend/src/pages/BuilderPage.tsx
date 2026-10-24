@@ -147,7 +147,7 @@ export function BuilderPage() {
     <div className="mx-auto grid max-w-6xl gap-6 p-6 lg:grid-cols-[1fr_320px]">
       <div className="flex flex-col gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Kitchen Builder</h1>
+          <h1 className="text-3xl font-bold">Kitchen Builder</h1>
           <p className="text-muted-foreground">Pick your equipment and how many of each. Every unit reports to one hub.</p>
         </div>
         {!catalog && !error && <p className="text-sm text-muted-foreground">Loading equipment…</p>}
@@ -158,8 +158,8 @@ export function BuilderPage() {
             </CardHeader>
             <CardContent className="flex flex-col divide-y px-4">
               {g.types.map((t) => (
-                <div key={t.type_id} className="flex items-center gap-3 py-2">
-                  <div className="flex-1">
+                <div key={t.type_id} className="flex flex-wrap items-center gap-3 py-2">
+                  <div className="min-w-32 flex-1">
                     <div className="font-medium">{t.name}</div>
                     <div className="text-xs text-muted-foreground">{fmtKw(t.rated_kw)} rated</div>
                   </div>
@@ -247,7 +247,7 @@ export function BuilderPage() {
               <MapPin className="size-4 shrink-0 text-muted-foreground" />
               <select
                 id="location"
-                className="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+                className="h-10 w-full rounded-xl border-2 border-[#22223B] bg-white px-3 text-sm font-semibold shadow-[0_2px_0_#22223B] outline-none focus:ring-4 focus:ring-primary/30"
                 value={locationIdx}
                 onChange={(e) => setLocationIdx(Number(e.target.value))}
               >
@@ -263,7 +263,7 @@ export function BuilderPage() {
             <textarea
               id="prefs"
               rows={3}
-              className="w-full rounded-md border bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground"
+              className="w-full rounded-xl border-2 border-[#22223B] bg-white px-3 py-2 text-sm shadow-[0_2px_0_#22223B] outline-none placeholder:text-muted-foreground focus:ring-4 focus:ring-primary/30"
               placeholder="Anything WattWise should know about how you run the kitchen"
               value={preferences}
               onChange={(e) => setPreferences(e.target.value)}
@@ -340,8 +340,8 @@ function UnitRow({ name, type: t, setting, close, onChange }: { name: string; ty
               onClick={() => onChange({ importance: imp, limits: limitsFor(t, imp, close) })}
               className={
                 setting.importance === imp
-                  ? `rounded-md border px-2 py-0.5 text-xs ${IMPORTANCE_BADGE[imp]}`
-                  : "rounded-md border px-2 py-0.5 text-xs text-muted-foreground hover:bg-secondary"
+                  ? `rounded-full border-2 border-[#22223B] px-2.5 py-0.5 text-xs font-bold ${IMPORTANCE_BADGE[imp]}`
+                  : "rounded-full border-2 border-transparent px-2.5 py-0.5 text-xs font-bold text-muted-foreground hover:bg-secondary"
               }
             >
               {IMPORTANCE_LABEL[imp]}

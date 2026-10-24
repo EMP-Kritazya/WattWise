@@ -17,9 +17,9 @@ import { useDashboardStore as useSim } from "@/data";
 
 const BLOCK_MS = 15 * 60_000;
 const AXIS_TICK = { fontSize: 11, fill: "var(--muted-foreground)" };
-const GRID = "oklch(1 0 0 / 7%)";
+const GRID = "rgb(34 34 59 / 14%)";
 const TOOLTIP = {
-  contentStyle: { background: "var(--popover)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 },
+  contentStyle: { background: "var(--popover)", border: "2px solid var(--border)", borderRadius: 14, fontSize: 12, boxShadow: "0 3px 0 #22223B" },
   labelStyle: { color: "var(--muted-foreground)" },
 };
 

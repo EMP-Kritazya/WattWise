@@ -17,7 +17,7 @@ export function WarningBanner() {
         <div
           key={w.code}
           role="alert"
-          className="flex items-start gap-3 rounded-lg border border-importance-deferrable/40 bg-importance-deferrable/10 px-4 py-3 text-sm"
+          className="flex items-start gap-3 rounded-2xl border-2 border-[#22223B] bg-[#FFF0BA] px-4 py-3 text-sm shadow-[0_3px_0_#22223B]"
         >
           <TriangleAlert className="mt-0.5 size-4 shrink-0 text-importance-deferrable" />
           <p className="flex-1">{w.message}</p>

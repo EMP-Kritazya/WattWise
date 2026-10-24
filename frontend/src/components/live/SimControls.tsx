@@ -24,7 +24,7 @@ export function SimControls() {
   const waiting = clock?.paused_reason === "escalation";
 
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border bg-card px-4 py-3">
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-[22px] border-2 border-[#22223B] bg-white px-4 py-3 shadow-[0_5px_0_#22223B]">
       <div className="mr-auto min-w-40">
         <div className="text-xs text-muted-foreground">{kitchenName ?? "Kitchen"} · simulated time</div>
         <div className="flex items-baseline gap-2">
@@ -35,7 +35,7 @@ export function SimControls() {
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
         <Button size="sm" className="w-24" disabled={busy || waiting} onClick={() => run(() => transport.simControl({ action: playing ? "pause" : "play" }))}>
           {playing ? <Pause /> : <Play />}
           {playing ? "Pause" : "Play"}
@@ -44,11 +44,12 @@ export function SimControls() {
           type="single"
           variant="outline"
           size="sm"
+          className="order-3 w-full sm:order-none sm:w-fit"
           value={String(clock?.speed ?? 120)}
           onValueChange={(v) => v && run(() => transport.simControl({ action: playing ? "play" : "pause", speed: Number(v) }))}
         >
           {SPEEDS.map((s) => (
-            <ToggleGroupItem key={s} value={String(s)} className="px-2.5">
+            <ToggleGroupItem key={s} value={String(s)} className="px-2 sm:px-2.5">
               {s}×
             </ToggleGroupItem>
           ))}
@@ -72,7 +73,7 @@ export function SimControls() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <span className="flex items-center gap-1.5 rounded-lg bg-secondary px-2.5 py-1.5 text-sm tabular-nums" title="Customers per hour (simulated)">
+        <span className="flex items-center gap-1.5 rounded-xl border-2 border-[#22223B] bg-[#FFF0BA] px-2.5 py-1.5 text-sm font-bold tabular-nums" title="Customers per hour (simulated)">
           <Users className="size-4 text-muted-foreground" />
           {latest?.customers_per_hour ?? "–"}
           <span className="text-xs text-muted-foreground">/ h</span>

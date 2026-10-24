@@ -67,8 +67,8 @@ function FeedRow({ item, name }: { item: FeedItem; name: string }) {
   const faded = d.status === "undone";
 
   return (
-    <div className={cn("flex gap-3 rounded-lg border bg-secondary/40 p-3 text-sm", faded && "opacity-60")}>
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-importance-flexible/15 text-importance-flexible">
+    <div className={cn("flex gap-3 rounded-2xl border-2 border-[#22223B] bg-[#FFF6E9] p-3 text-sm", faded && "opacity-60")}>
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-[#22223B] bg-[#CDEAC0] text-[#22223B]">
         <Icon className="size-4" />
       </span>
       <div className="min-w-0 flex-1">

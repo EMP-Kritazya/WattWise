@@ -29,12 +29,12 @@ export function ReadingStatus({ reading }: { reading?: HubDeviceReading }) {
       className={cn(
         "inline-flex items-center gap-1 text-xs font-medium",
         state === "reduced"
-          ? "text-blue-300"
+          ? "text-[#167D74]"
           : state === "waiting"
-            ? "text-amber-300"
+            ? "text-[#8A5A00]"
             : state === "off" || !state
-              ? "text-slate-400"
-              : "text-emerald-300",
+              ? "text-[#7D7885]"
+              : "text-[#167D74]",
       )}
     >
       <Icon className="size-3.5" />
@@ -48,8 +48,8 @@ export function DemandSummary() {
   const connection = useSim((s) => s.connection);
   const clock = useSim((s) => s.clock);
   return (
-    <div className="border-b border-white/10 bg-slate-950/50 px-4 py-3">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+    <div className="border-b-2 border-[#22223B] bg-[#FFF6E9] px-4 py-3 text-[#22223B]">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs text-[#6B687B]">
         <span>15-minute demand · the monthly maximum drives demand charges</span>
         <span role="status">
           {connection !== "open"
@@ -69,18 +69,18 @@ export function DemandSummary() {
           const meter = latest[lane]?.meter;
           return (
             <div key={lane} className="min-w-0 border-l-2 pl-3" style={{ borderColor: lane === "with" ? "#34d399" : "#f87171" }}>
-              <div className="text-xs text-slate-300">{lane === "with" ? "With WattWise" : "Without WattWise"}</div>
+              <div className="text-xs font-bold text-[#5B5968]">{lane === "with" ? "With WattWise" : "Without WattWise"}</div>
               <div className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">{fmtKw(meter?.block_avg_kw)}</div>
-              <div className={cn("text-xs", meter && meter.block_avg_kw > meter.target_kw ? "text-red-300" : "text-slate-400")}>
+              <div className={cn("text-xs", meter && meter.block_avg_kw > meter.target_kw ? "text-[#C93658]" : "text-[#6B687B]")}>
                 {!meter ? "Waiting for data" : meter.block_avg_kw > meter.target_kw ? "Above target" : "Within target"}
               </div>
             </div>
           );
         })}
-        <div className="border-l border-white/15 pl-3">
-          <div className="text-xs text-slate-300">Owner’s peak cap</div>
+        <div className="border-l-2 border-[#22223B]/20 pl-3">
+          <div className="text-xs font-bold text-[#5B5968]">Owner’s peak cap</div>
           <div className="mt-1 text-xl font-semibold tabular-nums sm:text-2xl">{fmtKw(latest.with?.meter.target_kw)}</div>
-          <div className="text-xs text-slate-400">Target for both lanes</div>
+          <div className="text-xs text-[#6B687B]">Target for both lanes</div>
         </div>
       </div>
     </div>
@@ -119,10 +119,10 @@ export function OperationsPanel({
     return filter === "all" || (filter === "active" ? r != null && r.power_kw > 0 : r?.state === "reduced" || r?.state === "waiting");
   });
   return (
-    <aside className="flex min-h-0 flex-col border-t border-white/10 bg-[#111827] lg:border-t-0 lg:border-l" aria-label="Appliance status">
-      <div className="border-b border-white/10 p-4">
+    <aside className="flex min-h-0 flex-col border-t-2 border-[#22223B] bg-[#FFF6E9] text-[#22223B] lg:border-t-0 lg:border-l-2" aria-label="Appliance status">
+      <div className="border-b-2 border-[#22223B] p-4">
         <h3 className="font-semibold">What is running?</h3>
-        <p className="mt-1 text-xs text-slate-400">
+        <p className="mt-1 text-xs text-[#6B687B]">
           {mode === "compare"
             ? "Compare each appliance in the same simulation."
             : `${lane === "with" ? "With" : "Without"} WattWise · select an appliance to locate it.`}
@@ -142,7 +142,9 @@ export function OperationsPanel({
               onClick={() => setFilter(id)}
               className={cn(
                 "rounded-md px-2 py-2 text-xs focus-visible:outline-2 focus-visible:outline-blue-300",
-                filter === id ? "bg-slate-700 text-white" : "text-slate-400 hover:bg-slate-800",
+                filter === id
+                  ? "border-2 border-[#22223B] bg-[#2EC4B6] text-[#22223B] shadow-[0_2px_0_#22223B]"
+                  : "border-2 border-transparent text-[#6B687B] hover:bg-[#FFE7D1]",
               )}
             >
               {label}
@@ -152,7 +154,7 @@ export function OperationsPanel({
       </div>
       <div className="max-h-80 min-h-0 flex-1 overflow-y-auto lg:max-h-none">
         {mode === "compare" && (
-          <div className="grid grid-cols-[1fr_80px_80px] gap-1 px-4 pt-3 text-right text-xs text-slate-400">
+          <div className="grid grid-cols-[1fr_80px_80px] gap-1 px-4 pt-3 text-right text-xs text-[#6B687B]">
             <span />
             <span>Without</span>
             <span>With</span>
@@ -169,14 +171,14 @@ export function OperationsPanel({
               aria-pressed={selected === id}
               onClick={() => onSelect(selected === id ? null : id)}
               className={cn(
-                "flex w-full items-center gap-3 border-b border-white/5 px-4 py-3 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-blue-300",
-                selected === id ? "bg-blue-400/15" : "hover:bg-white/5",
+                "flex w-full items-center gap-3 border-b border-[#22223B]/10 px-4 py-3 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-[#2EC4B6]",
+                selected === id ? "bg-[#CDEFEA]" : "hover:bg-white/70",
               )}
             >
-              <Icon className="size-4 shrink-0 text-slate-400" />
+              <Icon className="size-4 shrink-0 text-[#6B687B]" />
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-medium">{m.device.name}</span>
-                <span className="text-xs text-slate-400">{IMPORTANCE_LABEL[m.device.importance]}</span>
+                <span className="text-xs text-[#6B687B]">{IMPORTANCE_LABEL[m.device.importance]}</span>
               </span>
               {mode === "compare" && (
                 <span className="w-20 shrink-0 text-right">
@@ -191,10 +193,10 @@ export function OperationsPanel({
             </button>
           );
         })}
-        {!visible.length && <p className="p-4 text-sm text-slate-400">No appliances match this filter.</p>}
+        {!visible.length && <p className="p-4 text-sm text-[#6B687B]">No appliances match this filter.</p>}
       </div>
-      <div className="max-h-72 shrink-0 overflow-y-auto border-t border-white/10 p-4">
-        <div className="text-xs font-medium uppercase tracking-wide text-slate-400">
+      <div className="max-h-72 shrink-0 overflow-y-auto border-t-2 border-[#22223B] bg-white/60 p-4">
+        <div className="text-xs font-bold uppercase tracking-wide text-[#6B687B]">
           {selected ? "Last WattWise decision for this appliance" : "Latest WattWise decision"}
         </div>
         {event ? (
@@ -203,25 +205,25 @@ export function OperationsPanel({
               {metas.find((m) => m.device.device_id === event.decision.device_id)?.device.name ?? event.decision.device_id} ·{" "}
               {fmtAction(event.decision.action, event.decision.value)}
             </div>
-            <div className="mt-1 text-xs text-slate-400">
+            <div className="mt-1 text-xs text-[#6B687B]">
               {fmtSimTime(event.decision.ts)} · {STATUS_LABEL[event.decision.status]}
             </div>
-            {event.explanation && <p className="mt-2 text-xs leading-relaxed text-slate-300">{event.explanation}</p>}
-            <button type="button" onClick={() => onSelect(event.decision.device_id)} className="mt-2 rounded border border-blue-300/30 px-2 py-1.5 text-xs text-blue-300 hover:bg-blue-400/10">Locate appliance on floor</button>
-            <p className="mt-2 text-xs text-slate-400">
+            {event.explanation && <p className="mt-2 text-xs leading-relaxed text-[#4E4B5C]">{event.explanation}</p>}
+            <button type="button" onClick={() => onSelect(event.decision.device_id)} className="mt-2 rounded-xl border-2 border-[#22223B] bg-white px-2 py-1.5 text-xs font-bold text-[#167D74] shadow-[0_2px_0_#22223B] hover:bg-[#DFF6F3]">Locate appliance on floor</button>
+            <p className="mt-2 text-xs text-[#6B687B]">
               Engine’s projected peak: {fmtKw(event.decision.effect.peak_before_kw)} → {fmtKw(event.decision.effect.peak_after_kw)}
             </p>
           </div>
         ) : (
-          <p className="mt-2 text-sm text-slate-400">No decision yet. Add customers to demonstrate how WattWise responds.</p>
+          <p className="mt-2 text-sm text-[#6B687B]">No decision yet. Add customers to demonstrate how WattWise responds.</p>
         )}
         {chosen && (
           <details key={`${lane}:${selected}`} className="mt-3">
-            <summary className="cursor-pointer py-2 text-sm text-blue-300">Appliance details & owner controls</summary>
+            <summary className="cursor-pointer py-2 text-sm font-bold text-[#167D74]">Appliance details & owner controls</summary>
             {mode === "with" && readings.has(chosen.device.device_id) && connection === "open" ? (
               <DeviceDetails meta={chosen} reading={readings.get(chosen.device.device_id)} onClose={() => onSelect(null)} />
             ) : (
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-[#6B687B]">
                 Owner controls are available in the With WattWise view when connected and readings are available.
               </p>
             )}

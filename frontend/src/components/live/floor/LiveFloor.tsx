@@ -169,8 +169,8 @@ export function LiveFloor({ demo, onDemoChange }: { demo: boolean; onDemoChange:
   return (
     <section
       className={cn(
-        "flex flex-col overflow-hidden border bg-[#0f1424] text-slate-100",
-        demo ? "fixed inset-0 z-40 overflow-y-auto" : "rounded-xl",
+        "flex flex-col overflow-hidden border-2 border-[#22223B] bg-[#0f1424] text-slate-100",
+        demo ? "fixed inset-0 z-40 overflow-y-auto" : "rounded-[22px] shadow-[0_6px_0_#22223B]",
       )}
       aria-label="Live kitchen simulation"
     >

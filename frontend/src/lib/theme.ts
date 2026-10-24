@@ -2,28 +2,28 @@ import type { Category, DecisionStatus, DeviceState, Importance, Lane } from "@/
 
 /** Glow / accent per equipment category on the isometric floor. */
 export const CATEGORY_ACCENT: Record<Category, string> = {
-  cooking: "oklch(0.78 0.17 55)",
-  refrigeration: "oklch(0.82 0.11 210)",
-  water_heating: "oklch(0.75 0.13 245)",
-  cooling: "oklch(0.86 0.1 195)",
-  lighting: "oklch(0.9 0.13 90)",
-  other: "oklch(0.8 0.06 290)",
+  cooking: "#FFB4A2",
+  refrigeration: "#A9D6F5",
+  water_heating: "#FFC8DD",
+  cooling: "#E9EDC9",
+  lighting: "#FFB703",
+  other: "#C3CEF6",
 };
 
 /** One stable color per device (by its position in the kitchen), shared by the floor callouts and the donut. */
 const DEVICE_PALETTE = [
-  "oklch(0.76 0.17 152)",
-  "oklch(0.72 0.15 250)",
-  "oklch(0.8 0.15 75)",
-  "oklch(0.7 0.17 25)",
-  "oklch(0.72 0.15 300)",
-  "oklch(0.8 0.12 200)",
-  "oklch(0.75 0.16 350)",
-  "oklch(0.84 0.16 125)",
-  "oklch(0.76 0.16 50)",
-  "oklch(0.74 0.12 175)",
-  "oklch(0.66 0.15 275)",
-  "oklch(0.88 0.13 95)",
+  "#2EC4B6",
+  "#A9D6F5",
+  "#FFB703",
+  "#EF476F",
+  "#C3CEF6",
+  "#BDE0FE",
+  "#FFC8DD",
+  "#CDEAC0",
+  "#FFB4A2",
+  "#69C9BF",
+  "#E5989B",
+  "#FFD6A5",
 ];
 export const deviceColor = (index: number) => DEVICE_PALETTE[index % DEVICE_PALETTE.length];
 

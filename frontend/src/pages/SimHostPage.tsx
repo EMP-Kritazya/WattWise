@@ -17,7 +17,7 @@ export function SimHostPage() {
           <div className="mb-2 flex items-center gap-2 text-xs font-medium tracking-[0.18em] text-primary uppercase">
             <ServerCog className="size-4" /> Dedicated simulation host
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Browser hub</h1>
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Browser hub</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Keep this tab open during the demo. It runs both kitchen lanes and reports every appliance reading to FastAPI.
           </p>
@@ -33,8 +33,8 @@ export function SimHostPage() {
       </section>
 
       {status.connection === "host_taken" && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-400/25 bg-amber-400/10 p-4 text-sm text-amber-100">
-          <CircleAlert className="mt-0.5 size-5 shrink-0 text-amber-300" />
+        <div className="flex items-start gap-3 rounded-[22px] border-2 border-[#22223B] bg-[#FFF0BA] p-4 text-sm text-[#5F4200] shadow-[0_4px_0_#22223B]">
+          <CircleAlert className="mt-0.5 size-5 shrink-0 text-[#8A5A00]" />
           <div><strong>Host already claimed.</strong> Close the other <code>/sim</code> tab, then reload this page.</div>
         </div>
       )}
@@ -54,7 +54,7 @@ function ConnectionBadge({ connection }: { connection: HubConnectionState }) {
       variant="outline"
       className={cn(
         "w-fit gap-2 px-3 py-1.5",
-        good ? "border-primary/30 bg-primary/10 text-primary" : "border-amber-400/30 bg-amber-400/10 text-amber-200",
+        good ? "border-[#22223B] bg-[#DFF6F3] text-[#167D74]" : "border-[#22223B] bg-[#FFF0BA] text-[#8A5A00]",
       )}
     >
       <span className={cn("size-2 rounded-full", good ? "bg-primary shadow-[0_0_10px_var(--primary)]" : "bg-amber-300")} />
@@ -107,9 +107,9 @@ function DeviceRow({ device }: { device: Device }) {
   const active = device.power_kw > 0;
   return (
     <div className={cn(
-      "rounded-lg border bg-background/35 p-3 transition-colors",
-      active && "border-primary/30 bg-primary/[0.045]",
-      device.state === "waiting" && "border-importance-deferrable/35 bg-importance-deferrable/[0.045]",
+      "rounded-2xl border-2 border-[#22223B] bg-[#FFF6E9] p-3 transition-colors",
+      active && "bg-[#DFF6F3]",
+      device.state === "waiting" && "bg-[#FFF0BA]",
     )}>
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">

@@ -11,6 +11,19 @@ The whole restaurant in the current `plan.ts` layout, restyled as a toy miniatur
 - the **demand-charge card** (Without +$67.20 / With $0 extra);
 - a Claude card.
 
+### Follow-up complete — Toy Box now spans the product (checkpoint pending)
+Ashirwad asked Codex to make the rest of the interface feel like the same product as the completed live floor. The shared warm-cream
+canvas, Fredoka/Nunito typography, white ink-outlined cards, toy-like controls and semantic teal/coral/amber palette now cover navigation,
+Builder, Agent Network, Proof, `/sim`, charts, dialogs and assistant surfaces. Data flow and interaction behavior are unchanged.
+
+- Shared design tokens and primitives were updated in `src/index.css` and `src/components/ui/`; page components now inherit the same system.
+- The normal Live view retains its dark control header but its demand summary and equipment inspector now use the Toy Box paper treatment.
+- Agent nodes use the floor palette and ink; Proof policy cards make the WattWise result teal; `/sim` device cards use the same state colours.
+- Raw WebSocket counters moved into the connection status tooltip, removing debug noise while preserving diagnostics.
+- Phone-width fixes: the replay speeds wrap to their own row and Builder equipment steppers wrap without horizontal overflow.
+- Browser-verified `/live`, `/builder`, `/agents`, `/proof` (including completed backtest results) and `/sim` at phone width, plus Builder,
+  Live and Proof at desktop width. `npm run build`, `npm test` and `git diff --check` pass.
+
 ### Build order (UI_CONCEPTS.md §5)
 1. **Step 1, done and pushed (commit `6ac918d`):** toon materials, ink outlines, Toy Box palette, warm lighting, raised Street view.
    - `src/components/live/floor/toon.tsx`:
