@@ -1,5 +1,9 @@
 # Design: Data and proof (owner: Kritazya)
 
+## Principles
+Same data, tariff and loop for every policy · no peeking · all 12 months (January partial) · strong timer baseline ·
+worst case shown · Claude never in the scored backtest · exact labels.
+
 Goal: show, on historical data, what WattWise would have saved — fairly, reproducibly, honestly.
 
 ## Data
@@ -10,8 +14,21 @@ Goal: show, on historical data, what WattWise would have saved — fairly, repro
 | Tariff | OpenEI Utility Rate Database | One **real, named** commercial tariff with demand charges (e.g. a PG&E rate). Record the id in DECISIONS.md. |
 | Equipment power | FSTC test reports, ENERGY STAR specs | Rated/idle power for the equipment catalog |
 
-Loading rules: electricity columns only · ComStock timestamps are EST → convert to UTC, display in America/Los_Angeles ·
-energy per 15 min → `power_kw = kwh × 4` · verify column names at download and record them here.
+Loading rules: electricity columns only · energy per 15 min → `power_kw = kwh × 4` · verify column names at download
+and record them here.
+
+**Region and time zone (check before anything else).** Pick the ComStock county in the **same region as the tariff**
+(a California county for a PG&E rate) so the lunch rush lands at the right local hour against the tariff's time-of-use
+windows. Check and record the dataset's timestamp convention (zone, standard vs daylight time, interval start vs end).
+Convert to UTC inside; display in the restaurant's local zone (America/Los_Angeles for a California county).
+Record dataset id, county and convention in DECISIONS.md #13.
+
+| Field | Value (fill at download) |
+|---|---|
+| Dataset id / file | |
+| County | |
+| Timestamp zone + convention | |
+| Electricity column names used | |
 
 ## Distributing historical load onto devices (engine code, never AI)
 A fixed recipe. Same input → same output. Devices always sum to the original value exactly.
@@ -37,14 +54,19 @@ Shares and windows are **assumptions**: keep them in `backtest/assumptions.yaml`
 
 ## Replay and backtest
 - The replay feeds the kitchen one 15-min row at a time → no peeking by construction.
-- First 3 weeks = warm-up history, not scored.
+- Replay step = 15 minutes; the decider runs on **every** step (live mode runs it every 5 sim minutes).
+- First 3 weeks = warm-up history, not scored. So **January is scored from day 22 and labeled "partial"** on the Proof
+  screen. "All 12 months" means 11 full months + partial January.
 - Run each month three ways through the **same** loop and bill them with the **same** tariff function:
 
 | Policy | What it does |
 |---|---|
 | `without` | Every device exactly as in the data |
-| `timer` | Best fixed daily schedule for deferrable jobs, chosen on the **previous** month (a fair, strong baseline) |
-| `with` | The WattWise engine |
+| `timer` | Best fixed daily schedule for deferrable jobs, chosen on the **previous** month (a fair, strong baseline). January has no previous month, so its timer is fitted on the warm-up weeks |
+| `with` | The WattWise engine; escalations resolved by the **default** (no Claude), so results are reproducible and conservative |
+
+Context in replay: historical weather (Open-Meteo archive) and prices (CAISO history) for the same dates, labeled
+`real_measured`; crowd effect `none`. Optional, cut item: one replayed week with Claude resolving escalations, shown separately.
 
 ## Checks (all must pass before a number is shown)
 | Check | Expected |
@@ -60,7 +82,8 @@ Re-run with `low_flex` (half the flexibility), `heavy_equipment` (+20% draw), `b
 and 2 other real tariffs. Report the worst case next to the base case.
 
 ## Outputs
-12-month table · busiest-day chart · sensitivity table · cached results for the Proof screen.
+12-month table · busiest-day chart · sensitivity table · cached results for the Proof screen (file for `DEMO_MODE`)
+· every BacktestResult saved to Convex `backtest_results`. No number is shown until `backtest-auditor` returns CLEARED.
 
 ## Labels (use exactly)
 "DOE-calibrated restaurant profile (NREL ComStock)" · "Real metered food-service building (BDG2)" · "Simulated".
