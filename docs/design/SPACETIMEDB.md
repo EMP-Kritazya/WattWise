@@ -16,6 +16,9 @@ SpacetimeDB is what ticks: every viewer and judge sees and plays in the same kit
 6. **Generated bindings only** (`spacetime generate`), never hand-edited.
 7. **Design for the screens' queries:** keys and indexes by lane and time, newest first.
 8. **Fallback exists.** `LIVE_TRANSPORT=ws` sends the same messages over FastAPI `/ws`; the UI hook switches automatically.
+9. **The UI's only live source.** Every screen in every tab (sim host included) draws from these tables: kitchen floor from
+   `live_device` (state, power, physical gauges), energy and cost from `live_tick`, charts from `tick_history`. The browser
+   simulation never writes here; it reports to FastAPI over `/ws/hub` and the runtime publishes.
 
 ## Tables and reducers
 CONTRACTS.md section 5 (`live_tick`, `tick_history`, `live_device`, `live_comparison`, `live_feed`, `live_clock`,

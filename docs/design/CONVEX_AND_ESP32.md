@@ -6,7 +6,8 @@ bills, backtest results, per-device 15-min blocks, hourly context snapshots. It 
 ## Principles
 - Load-bearing, not a side cache (Convex track ask): devices, commands, proposals and records really live here.
 - Durable, not live: nothing here is read every tick by the UI (that's SpacetimeDB).
-- The bridge is the hub swap: simulated hub (`HARDWARE=sim_bridge`) and real ESP32 (`HARDWARE=esp32`) use the same functions.
+- The bridge is the hub swap: the browser hub's readings relayed by the runtime (`HARDWARE=sim_bridge`) and a real ESP32
+  (`HARDWARE=esp32`) use the same functions and the same Command / Reading shapes as the hub protocol.
 - Fail safe both ways (below). Fallback `STORE=memory` with the same interface.
 
 ## Tables and functions

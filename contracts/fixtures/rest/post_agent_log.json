@@ -1,0 +1,15 @@
+{
+  "method": "POST",
+  "path": "/api/agent-log",
+  "status": 200,
+  "request": {
+    "ts_real": "2026-10-25T17:30:00.040Z",
+    "from_agent": "concierge",
+    "to_agent": "weather",
+    "kind": "request",
+    "summary": "Forecast 6 h for 37.80,-122.44"
+  },
+  "response": {
+    "ok": true
+  }
+}

@@ -10,7 +10,7 @@
 |---|---|
 | `backend` (API + runtime + engine) | Container Apps, 1 replica, `/api/health` probe |
 | `agents` (Concierge, Weather, Grid, Events) | Container Apps, 1 replica, always on (Agentverse / ASI:One reachability) |
-| Frontend | Static Web Apps (API, SpacetimeDB, Convex URLs as build-time env) |
+| Frontend | Static Web Apps (API, SpacetimeDB, Convex URLs as build-time env). The `/sim` tab (simulation + hub) runs in one browser and connects to `backend` over `wss://…/ws/hub` |
 | Secrets | Container Apps secrets (or Key Vault if time) |
 | Monitoring | Application Insights if time: requests, escalations, Claude latency, agent messages |
 | Claude | Anthropic API; Microsoft Foundry via `CLAUDE_PROVIDER=foundry` if Marketplace billing works on the student account |

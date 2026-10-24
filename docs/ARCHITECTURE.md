@@ -2,87 +2,141 @@
 
 ## The system
 ```
- OWNER (phone)                          OWNER + JUDGES (browsers)
- ASI:One chat                           React dashboard  ── Azure Static Web Apps          [Ashirwad]
-     │ Agent Chat Protocol                  │ REST: config, clicks,          ▲ live subscription (every viewer, same kitchen)
-     ▼                                      │ approvals, chat, authority     │ + judges' surge buttons (request reducer)
- ┌──────────── FETCH AGENTS (Agentverse) ───┼─────────┐                      │
- │ Concierge (chat, Claude) · Weather ·     │         │                      │
- │ Grid prices · Events          [Suyog]    │         │                      │
- └───────┬───────────────────────────────── │ ────────┘                      │
-         │ REST (context, chat relay)       ▼                                │
- ┌───────▼──────── BACKEND · Azure Container Apps, 1 replica ─────────────┐  │
- │ API (FastAPI)  ·  RUNTIME (loop, two lanes, escalations, device bridge)│  │   [Suyog]
- │ AGENT (Claude: explain, answer, propose, resolve escalations)          │  │
- │      │ engine facade (Python calls, plain objects)                     │  │
- │ ┌────▼──────────────── ENGINE (no I/O) ─────────────────────────────┐ │  │
- │ │ SIMULATION: devices → HUB ⇄ commands            [Ashirwad]        │ │  │
- │ │ BRAIN: meter → forecaster(+context) → decider → escalation        │ │  │   [Kritazya]
- │ │        → executor → hub ;  ledger · compare_lanes · replay/backtest│ │  │
- │ └────────────────────────────────────────────────────────────────────┘ │  │
- │ LIVE client ── HTTP reducers ──────────────────────────────────────────┼──┘──▶ SpacetimeDB (live)   [Kritazya]
- │ STORE + DEVICE BRIDGE ─────────────────────────────────────────────────┼─────▶ Convex (records, devices) [Suyog]
- └─────────────────────────────────────────────────────────────────────────┘          ▲ convex-esp32
-                                                                                ESP32 hub (optional, replaces the simulated hub)
+ OWNER (phone)                 OWNER + JUDGES (browsers) ── React app on Azure Static Web Apps                     [Ashirwad]
+ ASI:One chat                  ┌───────────────────────────────────────────────────────────────────────────────┐
+     │ Agent Chat Protocol     │ UI (every tab): Live floor, energy + cost, charts, feed, escalations, chat     │
+     │                         │   reads live state ONLY from SpacetimeDB; actions via REST                    │
+     │                         │ SIM HOST (exactly one tab, /sim):                                             │
+     │                         │   SIMULATION (appliances, physics, customers, both lanes)                     │
+     │                         │        ⇅ readings / apply(command)                                            │
+     │                         │   HUB (the one ESP32-style controller)                                        │
+     │                         └──────┬─────────────────────────▲──────────────────────▲───────────────────────┘
+     ▼                                │ hub_report (+ acks)     │ sim_tick (+ commands) │ live subscription
+ ┌──── FETCH AGENTS (Agentverse) ─┐   │  WebSocket /ws/hub      │                       │ + surge buttons
+ │ Concierge (chat, Claude) ·     │   │                         │                       │   (request reducer)
+ │ Weather · Grid · Events [Suyog]│   │                         │                       │
+ └──────┬─────────────────────────┘   │                         │                       │
+        │ periodic context (REST)     │                         │                       │
+ ┌──────▼────── BACKEND · Azure Container Apps, 1 replica ──────┴───────────────┐       │
+ │ API (FastAPI: REST, /ws/hub, /ws fallback)                                   │       │   [Suyog]
+ │ RUNTIME: CLOCK (1 sim min per tick, 120× default) · hub link · two lanes ·   │       │
+ │          escalations → Claude · proposals · device bridge                    │       │
+ │ CLAUDE agent (explain, answer, propose, pick an escalation option id)        │       │
+ │      │ engine facade (Python calls, plain objects)                           │       │
+ │ ┌────▼──────── ENGINE (no I/O) ─────────────────────────────────────────┐    │       │   [Kritazya]
+ │ │ meter → forecaster(+context) → decider (replans every 5 sim min)      │    │       │
+ │ │ → escalation (when no in-preference move holds the cap) → commands    │    │       │
+ │ │ rules · ledger · compare_lanes · replay/backtest   (internals: TBD)   │    │       │
+ │ └───────────────────────────────────────────────────────────────────────┘    │       │
+ │ LIVE client ── HTTP reducers ───────────────────────────────────────────────┼───────┴──▶ SpacetimeDB  [Kritazya]
+ │ STORE + DEVICE BRIDGE ──────────────────────────────────────────────────────┼──────────▶ Convex       [Suyog]
+ └──────────────────────────────────────────────────────────────────────────────┘                ▲ convex-esp32
+                                                                                        real ESP32 (optional)
 ```
 
-## Who owns what
-| Part | Owner | Builds | Never does |
-|---|---|---|---|
-| Engine brain + proof | Kritazya | Facade, meter, forecaster, context use, decider, escalation options, executor, rules, ledger, `compare_lanes`, replay, backtest, data, contracts models | Network, users, Claude |
-| Live layer | Kritazya | SpacetimeDB module + `backend/live/` client | Business logic in reducers |
-| Simulation | Ashirwad | Devices, power models, hub, customers, equipment catalog | Network, decisions |
-| Frontend | Ashirwad | Every screen, data hooks (SpacetimeDB + REST + `/ws` fallback), mocks, chat drawer | Any calculation |
-| API + runtime + AI | Suyog | FastAPI, run loop, lanes, escalation relay, proposals, Claude agent + tools, `/ws` fallback, FakeKitchen | Compute numbers |
-| Fetch agents | Suyog | Concierge (ASI:One), Weather, Grid, Events agents | Compute numbers, retype numbers |
-| Convex + ESP32 | Suyog | Records, device bridge, firmware | Decide |
-| Azure | Kritazya (Container Apps) · Ashirwad (Static Web Apps) | Deploy, secrets, health probe | |
+## Parts and their boundaries
+| Part | Lives in | Owner | Does | Never does |
+|---|---|---|---|---|
+| **Simulation** | `frontend/src/sim/` | Ashirwad | Appliance power models and physical state (temperatures, racks, ice, orders), seeded customer flow, both lanes; steps exactly once per `sim_tick` | Decide, read the engine, read the wall clock, use unseeded randomness |
+| **Hub** | `frontend/src/hub/` | Ashirwad | The single ESP32-style controller: collects every appliance reading into a HubReport per lane, applies Commands to appliances (clamped to physical limits), acks them, speaks the hub protocol over `/ws/hub` | Decide, compute cost or forecasts |
+| **UI** | `frontend/src/screens/`, `src/data/` | Ashirwad | Draws the kitchen, energy, current cost, charts, feed, escalations, chat | Simulate, compute, import `src/sim` or `src/hub` |
+| **API + runtime** | `backend/api/`, `backend/runtime/` | Suyog | Owns the clock; drives the hub tick by tick; calls the engine; publishes live state; relays escalations to Claude; proposals; bridges | Compute numbers, decide |
+| **Claude agent** | `backend/agent/` | Suyog | Explains, answers, proposes; picks one engine option id when the engine escalates | Produce numbers, apply anything itself |
+| **Fetch agents** | `agents/` | Suyog | Fetch weather, prices, events on a fixed interval; Concierge chat in ASI:One | Compute or retype numbers |
+| **Engine** | `backend/engine/` | Kritazya | Every number: energy, cost (real tariff), forecasts, decisions, escalation options; validates every choice | I/O of any kind, call Claude |
+| **Live layer** | `spacetime/`, `backend/live/` | Kritazya | SpacetimeDB module + Python client; the UI's only live data source | Business logic in reducers |
+| **Convex + ESP32** | `convex/`, `firmware/` | Suyog | Durable records, device map, real ESP32 bridge | Decide |
 
-Quick test: **computes a number → engine. Simulated device behaviour → simulation. Moves data or talks to a person, AI or agent → Suyog.
-Visible on screen → Ashirwad. Live tables → Kritazya.**
+### Boundary rules
+1. **The hub is the only door to the appliances.** The engine sees the kitchen only as HubReports (current state per lane) and
+   changes it only with Commands, which travel runtime → `sim_tick` → hub → appliance. The simulation never sees the engine.
+   A real ESP32 is a second hub with the same Command and Reading shapes (through Convex).
+2. **FastAPI owns time.** One `sim_tick` = 1 simulated minute; at 120× a tick is sent every 0.5 real s. The simulation steps only
+   when a tick arrives. The engine replans every 5 sim minutes. Commands produced at tick *n* are delivered in tick *n + 1*.
+3. **Charts from SpacetimeDB, appliances from the hub.** The main screen toggles between a **Charts** view and a **Simulation**
+   view. Charts (energy, cost, peaks, forecast, comparison) always read SpacetimeDB, the engine's published results, in every tab.
+   The Simulation view draws appliances through one hook: in the sim host tab it shows the hub's live React state (the source of
+   truth for appliance state); in viewer tabs the same components draw `live_device` rows. Actions go over REST; surges through
+   the `request_surge` reducer. `LIVE_TRANSPORT=ws` sends the same rows over `/ws` (offline fallback).
+4. **Exactly one sim host.** The first `/sim` tab whose `hub_hello` is accepted runs both lanes. Others are refused
+   (`host_taken`) and stay plain viewers. Host gone → the clock pauses (`paused_reason: sim_host_offline`) and resumes on reconnect.
+5. **The engine does no I/O.** It gets HubReports and context as plain objects through the facade and returns TickStates.
+   "The engine contacts Claude" means: the engine emits an Escalation; the runtime calls Claude and hands the chosen id back.
+6. **Claude only on escalation.** The engine handles every routine move within the owner's limits and preferences. Only
+   when no such move holds the cap does it offer 2–3 evaluated alternatives plus `ask_owner`; Claude picks one; the engine
+   validates it against `ClaudeAuthority`; beyond it → owner confirmation; no answer by the deadline → safe default.
+7. **Context is periodic.** The Concierge fetches Weather, Grid and Events every `CONTEXT_INTERVAL_S` (default 600 real s)
+   and on kitchen build, posts it unchanged, and the runtime passes the latest to the engine. The engine never waits for it.
+8. **Two truths, no overlap.** The hub is the truth of appliance state. The engine is the truth of every computed number
+   (energy, cost, forecasts, decisions). The engine returns results to the runtime; the live client (`backend/live/`) writes them to
+   SpacetimeDB; the UI shows them.
 
-## Seams
+Quick test: **computes a number → engine. Appliance behaviour → simulation. Collects readings or applies a command → hub.
+Moves time, data or talks to a person, AI or agent → Suyog. Visible on screen → Ashirwad. Live tables → Kritazya.**
+
+## Seams (each has a contract and a fake, so nobody waits for anybody)
 | # | Seam | Form | Fake for independent work |
 |---|---|---|---|
-| S1 | Frontend ↔ API | REST (+ `/ws` fallback) | `frontend/src/mocks` (Ashirwad) |
-| S2 | API/runtime ↔ Engine | Python facade, plain objects | `fakes/fake_kitchen.py` (Suyog) |
-| S3 | Runtime → SpacetimeDB → browsers | `backend/live` client + tables/reducers + generated TS bindings | `fakes/fake_live.py` + seed script (Kritazya) |
+| S1 | UI ↔ API | REST (+ `/ws` fallback) | `frontend/src/mocks` REST handlers on `contracts/fixtures/rest/` (Ashirwad) |
+| S2 | Runtime ↔ Engine | Python facade, plain objects | `backend/fakes/fake_kitchen.py` on `fixtures/facade/` (Suyog) |
+| S3 | Runtime → SpacetimeDB → UI | `backend/live` client + tables/reducers + generated TS bindings | `fakes/fake_live.py`, `spacetime/seed.ts`, frontend mock live hook on `fixtures/spacetime/` (Kritazya / Ashirwad) |
 | S4 | Runtime ↔ Convex ↔ ESP32 | Convex functions | `STORE=memory`, `HARDWARE=off` (Suyog) |
-| S5 | Agents ↔ API and agent ↔ agent | REST + Fetch message models + Chat Protocol | `--recorded` mode per agent (Suyog) |
-| S6 | Simulation ↔ Brain (inside engine) | Hub interface: `report()` / `deliver(command)` | `engine/fake_hub.py` (Ashirwad) |
+| S5 | Agents ↔ API, agent ↔ agent | REST + Fetch message models + Chat Protocol | `--recorded` mode per agent on `fixtures/agents/` (Suyog) |
+| S6 | Hub ↔ API (the hub protocol) | WebSocket `/ws/hub`: `hub_hello`, `sim_build`, `sim_tick`, `hub_report`, `sim_control` | Frontend: `src/mocks/mockHubServer.ts` plays `fixtures/hub_protocol/server_to_hub.jsonl` (Ashirwad). Backend: `fakes/fake_hub_client.py` plays `hub_to_server.jsonl` (Suyog) |
+| S7 | Simulation ↔ Hub (inside the browser) | TypeScript interface `Appliance`: `step()`, `reading()`, `apply()` | Ashirwad's own tests; nobody else depends on it |
 
-## Four flows
-**1. Tick (reflexes).** Runtime collects surges (REST + SpacetimeDB requests), draws one set of customer events, passes the
-latest context and any fresh ESP32 readings, calls `step(1)` on both lanes → hub reports → meter → every 5 sim min forecast + decide
-inside rules → executor commands the hub → runtime gets `TickState` (+ `new_commands`, `new_escalations`) → `compare_lanes` →
-live client publishes one batch to SpacetimeDB → bridge forwards ESP32-mapped commands to Convex → store buffers records.
+All fakes read the same shared fixtures in `contracts/fixtures/` (built by the `fixture-builder` subagent), so the three
+branches agree byte for byte when they merge.
 
-**2. Context (senses).** Every 10 real minutes (and on kitchen build) the Concierge asks the Weather, Grid and Events agents →
-they call their APIs → structured replies → `POST /api/context` unchanged → runtime `set_context` on both lanes → forecaster uses it.
-Claude classifies events into a `crowd_effect` category → `POST /api/context/crowd-effect`. Every agent message is logged → SpacetimeDB `live_agent_log`.
+## Five flows
+**1. Tick (reflexes).** Every real tick the runtime: collects surges (SpacetimeDB requests + REST) → sends `sim_tick`
+(sim_ts, 1 minute, surges, physical inputs, pending Commands for both lanes) → the hub applies the Commands, the simulation steps
+1 minute, the hub replies `hub_report` (one HubReport per lane + command acks) → runtime merges any fresh ESP32 readings, calls
+`step(1, report)` on both engine lanes → every 5 sim minutes the engine replans → TickStates (meter, decisions, `new_commands`,
+escalations) → `compare_lanes` → one batched SpacetimeDB publish → `new_commands` queued for the next `sim_tick` → ESP32-mapped
+Commands forwarded to Convex → store buffers records. No `hub_report` within 2 real s → the clock waits (`hub_waiting`).
 
-**3. Escalation (judgment).** Decider finds a block over the cap with no in-rules fix → builds an Escalation with 2–4 options
-(each with engine-computed peak, cost, comfort impact, rule breaks, `within_authority`) and a safe default → runtime asks Claude
-(context + owner preferences + options) → Claude returns an option id → runtime calls `resolve_escalation(id, option, "claude", rationale)`
-→ engine validates: inside authority → applies; outside → becomes an owner Proposal. Deadline passes with no answer → default applies.
+**2. Context (senses).** Every `CONTEXT_INTERVAL_S` the Concierge asks Weather, Grid and Events → structured replies →
+`POST /api/context` unchanged → runtime `set_context` on both lanes. Physical parts of it (outdoor temperature, crowd
+multiplier) also go to the simulation inside `sim_tick.inputs`. Claude classifies events into `crowd_effect` (a category).
+Every agent message is logged → SpacetimeDB `live_agent_log`.
+
+**3. Escalation (judgment).** Engine finds a block over the cap with no move inside the owner's limits and preferences →
+Escalation with 2–3 evaluated alternatives + `ask_owner`, engine numbers for each, `within_authority`, a safe default →
+runtime asks Claude (context + preferences + options) → Claude returns an id → `resolve_escalation(...)` → engine validates:
+inside authority → its Commands go out with the next tick; outside → owner Proposal. No answer by the deadline → default.
 Demo mode pauses the clock while waiting.
 
-**4. Owner (control).** Dashboard REST or ASI:One chat → explanations and answers from engine tools → any change is a Proposal →
-owner confirms → code applies via the facade.
+**4. Owner (control).** Dashboard REST or ASI:One chat → answers from engine tools → any change is a Proposal → owner confirms →
+code applies via the facade. Manual device clicks → `owner_command()` → Command in the next `sim_tick`.
 
-## Hub swap (simulated ESP32 → real ESP32)
-The brain only talks to the hub interface. Simulated hub: in-process. Real hub: runtime forwards the `with` lane's commands for
-mapped devices to Convex (`HARDWARE=esp32`), the ESP32 executes them and reports readings, which enter via `ingest_reading()`.
-Bridge test without hardware: `HARDWARE=sim_bridge` sends the simulated hub's readings and commands through the same Convex
-functions, so the real ESP32 is a drop-in. Every device's 15-min average is stored in Convex `device_blocks` whatever the source.
+**5. Build.** `POST /api/kitchen` → runtime builds both engine lanes → sends `sim_build` (config, devices, seed, start time) to the
+sim host → the simulation creates both kitchens → `reset_all` + first publish to SpacetimeDB → play.
+Forecaster warm-up history: **TBD (Kritazya, engine decision)**.
+
+## Hub swap (simulated hub → real ESP32)
+The engine only sees HubReports and emits Commands. `HARDWARE=esp32`: the runtime forwards the `with` lane's Commands for mapped
+devices to Convex; the ESP32 executes them and reports Readings, which the runtime merges into that lane's HubReport as
+`measured` (via `ingest_reading`). `HARDWARE=sim_bridge`: the runtime sends the browser hub's readings for mapped devices
+through the same Convex functions, proving the drop-in without hardware. Every device's 15-min average lands in Convex `device_blocks`.
 
 ## Time
-The engine has no clock; the runtime calls `step(minutes)`. 120× live, max speed in backtest, paused while an approval or escalation
-waits in demo mode. Escalation deadlines are in sim time; Claude's timeout is in real time.
+The runtime owns the clock: `sim_tick` every `0.5 s × 120 / speed` (speeds 1×, 30×, 120× default, 600×). The engine and the
+simulation have no clock of their own. Paused while the hub is missing, and in demo mode while an escalation or approval waits.
+Escalation deadlines are in sim time; Claude's timeout is in real time. Backtest runs in Python at full speed without the browser.
+
+**Claude at 120×.** At 120× one real second is two sim minutes, so an 8 s Claude call would cost 16 sim minutes. Three guards:
+1. **Escalate early.** The engine forecasts 2 h ahead and opens an escalation as soon as a block ≥ 30 sim min ahead looks
+   unfixable, so the decision is needed well before the block starts (deadline = block start − 5 sim min).
+2. **Slow the clock while Claude thinks.** Outside demo mode the runtime drops the clock to `ESCALATION_SPEED` (default 1×, real
+   time) while an escalation is open (`slowed_reason: escalation`), then restores the owner's speed. In demo mode it pauses, as before.
+3. **Never wait past the deadline.** Claude timeout 8 real s; the engine keeps making routine moves meanwhile; at the deadline the
+   safe default applies. In real deployment the clock is 1× anyway, so this only matters for the sped-up simulation.
 
 ## Deploy
 Azure Container Apps: `backend` (API + runtime + engine, min = max = 1 replica) and `agents` (uAgents, 1 replica, always on).
-Static Web Apps: frontend. SpacetimeDB and Convex: their hosted clouds. Claude: Anthropic API, or Microsoft Foundry via env.
+Static Web Apps: frontend; the demo laptop keeps the `/sim` tab open. SpacetimeDB and Convex: hosted clouds.
+Claude: Anthropic API, or Microsoft Foundry via env.
 
 ## Out of scope
 Mains-powered equipment, real restaurant installs, multiple kitchens per deployment.

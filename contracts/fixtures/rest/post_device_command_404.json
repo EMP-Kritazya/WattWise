@@ -1,0 +1,11 @@
+{
+  "method": "POST",
+  "path": "/api/devices/pizza_oven_1/command",
+  "status": 404,
+  "request": {
+    "action": "start"
+  },
+  "response": {
+    "detail": "Unknown device pizza_oven_1"
+  }
+}

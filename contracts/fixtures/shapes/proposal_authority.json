@@ -1,0 +1,17 @@
+{
+  "proposal_id": "p_0003",
+  "ts": "2026-07-18T02:30:00Z",
+  "kind": "authority",
+  "payload": {
+    "enabled": true,
+    "max_cap_overrun_kw": 2.0,
+    "max_extra_delay_min": 20,
+    "max_extra_reduce_min": 15,
+    "may_go_below_min_power": false
+  },
+  "summary": "Let Claude accept at most 2 kW over the cap",
+  "status": "pending",
+  "created_by": "ai",
+  "confirmed_via": null,
+  "expires_at": "2026-07-18T03:00:00Z"
+}

@@ -1,0 +1,12 @@
+{
+  "method": "POST",
+  "path": "/api/events/customers",
+  "status": 200,
+  "request": {
+    "customers": 40,
+    "duration_min": 60
+  },
+  "response": {
+    "ok": true
+  }
+}

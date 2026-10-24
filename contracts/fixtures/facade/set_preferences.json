@@ -1,0 +1,7 @@
+{
+  "call": "set_preferences",
+  "args": {
+    "text": "Keep the dining room comfortable during dinner service."
+  },
+  "returns": null
+}

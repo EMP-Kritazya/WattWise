@@ -1,0 +1,11 @@
+[
+  {
+    "hub_id": "esp32_1",
+    "channel": 0,
+    "device_id": "dishwasher_1",
+    "ts": "2026-07-18T02:25:00Z",
+    "raw_w": 5.8,
+    "scale": 1000,
+    "power_kw": 5.8
+  }
+]

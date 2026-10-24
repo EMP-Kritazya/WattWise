@@ -1,0 +1,11 @@
+{
+  "function": "commands:ack",
+  "type": "mutation",
+  "args": {
+    "command_id": "c_0001",
+    "ok": true,
+    "applied_value": 50,
+    "reason": null
+  },
+  "returns": null
+}

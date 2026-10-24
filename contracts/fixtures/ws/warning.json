@@ -1,0 +1,9 @@
+{
+  "type": "warning",
+  "code": "cap_unreachable",
+  "message": "Your always-on equipment alone needs 44 kW. Raise the cap or change an importance.",
+  "data": {
+    "unavoidable_kw": 44.0,
+    "peak_cap_kw": 40.0
+  }
+}

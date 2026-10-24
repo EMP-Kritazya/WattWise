@@ -1,0 +1,6 @@
+{
+  "type": "sim_control",
+  "action": "play",
+  "speed": 120,
+  "paused_reason": null
+}

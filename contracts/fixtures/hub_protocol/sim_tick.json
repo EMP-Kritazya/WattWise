@@ -1,0 +1,25 @@
+{
+  "type": "sim_tick",
+  "tick_id": 36,
+  "sim_ts": "2026-07-18T01:05:00Z",
+  "minutes": 1,
+  "surges": [],
+  "inputs": {
+    "outdoor_temp_c": 28.4,
+    "crowd_multiplier": 1.25,
+    "is_open": true
+  },
+  "commands": [
+    {
+      "command_id": "c_0001",
+      "lane": "with",
+      "ts": "2026-07-18T01:05:00Z",
+      "device_id": "dishwasher_1",
+      "action": "delay",
+      "value": 50,
+      "decision_id": "d_0001",
+      "issued_by": "engine"
+    }
+  ],
+  "replay": false
+}

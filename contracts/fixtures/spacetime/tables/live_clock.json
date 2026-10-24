@@ -1,0 +1,12 @@
+[
+  {
+    "id": 0,
+    "playing": true,
+    "speed": 120,
+    "sim_ts": "2026-07-18T02:30:00Z",
+    "tick_id": 120,
+    "paused_reason": null,
+    "slowed_reason": null,
+    "sim_host": "connected"
+  }
+]

@@ -1,0 +1,29 @@
+{
+  "call": "ingest_reading",
+  "args": {
+    "reading": {
+      "hub_id": "esp32_1",
+      "channel": 0,
+      "device_id": "dishwasher_1",
+      "ts": "2026-07-18T02:25:00Z",
+      "raw_w": 5.8,
+      "scale": 1000,
+      "power_kw": 5.8
+    }
+  },
+  "returns": {
+    "device_id": "dishwasher_1",
+    "type_id": "dishwasher",
+    "name": "Dishwasher 1",
+    "importance": "deferrable",
+    "state": "running_job",
+    "power_kw": 5.8,
+    "rated_kw": 6.0,
+    "power_pct": 97,
+    "source": "measured",
+    "physical": {
+      "dirty_racks": 0,
+      "job_remaining_min": 25
+    }
+  }
+}

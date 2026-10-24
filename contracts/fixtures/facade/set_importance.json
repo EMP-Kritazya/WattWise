@@ -1,0 +1,22 @@
+{
+  "call": "set_importance",
+  "args": {
+    "device_id": "walk_in_cooler_1",
+    "importance": "always_on",
+    "limits": {}
+  },
+  "returns": {
+    "device_id": "walk_in_cooler_1",
+    "type_id": "walk_in_cooler",
+    "name": "Walk-in cooler 1",
+    "importance": "always_on",
+    "state": "on",
+    "power_kw": 3.5,
+    "rated_kw": 3.5,
+    "power_pct": 100,
+    "source": "simulated",
+    "physical": {
+      "box_temp_c": 2.0
+    }
+  }
+}

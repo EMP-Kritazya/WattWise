@@ -1,0 +1,12 @@
+{
+  "method": "PUT",
+  "path": "/api/kitchen/devices/pizza_oven_1/importance",
+  "status": 404,
+  "request": {
+    "importance": "always_on",
+    "limits": {}
+  },
+  "response": {
+    "detail": "Unknown device pizza_oven_1"
+  }
+}

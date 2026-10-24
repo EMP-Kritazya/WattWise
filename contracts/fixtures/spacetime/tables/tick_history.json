@@ -1,0 +1,62 @@
+[
+  {
+    "lane": "without",
+    "ts": "2026-07-18T02:26:00Z",
+    "total_kw": 31.6,
+    "block_avg_kw": 33.74
+  },
+  {
+    "lane": "with",
+    "ts": "2026-07-18T02:26:00Z",
+    "total_kw": 40.71,
+    "block_avg_kw": 36.84
+  },
+  {
+    "lane": "without",
+    "ts": "2026-07-18T02:27:00Z",
+    "total_kw": 31.64,
+    "block_avg_kw": 33.57
+  },
+  {
+    "lane": "with",
+    "ts": "2026-07-18T02:27:00Z",
+    "total_kw": 40.76,
+    "block_avg_kw": 37.16
+  },
+  {
+    "lane": "without",
+    "ts": "2026-07-18T02:28:00Z",
+    "total_kw": 32.2,
+    "block_avg_kw": 33.46
+  },
+  {
+    "lane": "with",
+    "ts": "2026-07-18T02:28:00Z",
+    "total_kw": 41.33,
+    "block_avg_kw": 37.48
+  },
+  {
+    "lane": "without",
+    "ts": "2026-07-18T02:29:00Z",
+    "total_kw": 31.64,
+    "block_avg_kw": 33.33
+  },
+  {
+    "lane": "with",
+    "ts": "2026-07-18T02:29:00Z",
+    "total_kw": 40.83,
+    "block_avg_kw": 37.72
+  },
+  {
+    "lane": "without",
+    "ts": "2026-07-18T02:30:00Z",
+    "total_kw": 31.64,
+    "block_avg_kw": 33.22
+  },
+  {
+    "lane": "with",
+    "ts": "2026-07-18T02:30:00Z",
+    "total_kw": 40.86,
+    "block_avg_kw": 37.93
+  }
+]

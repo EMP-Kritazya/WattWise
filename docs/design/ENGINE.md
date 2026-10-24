@@ -7,21 +7,37 @@
 - No I/O: context in and commands out as plain objects. No wall-clock time.
 - Energy moved, never deleted (ledger). Food-safety floor is absolute.
 
-Reads the hub, forecasts, decides, executes. Pure Python: no I/O, no wall-clock time, no AI calls, no Convex or
-SpacetimeDB. Real ESP32 readings arrive through `ingest_reading()`; commands leave as `TickState.new_commands`.
+> **Status: engine internals are under review (Kritazya).** The facade (CONTRACTS.md §3), TickState, Decision, Escalation and
+> Command shapes are fixed so the API and frontend can build against fakes. Everything below is the current draft of how the
+> engine works inside; sections marked TBD will change.
+
+Reads the hub's current state, forecasts, decides, and returns Commands. Pure Python: no I/O, no wall-clock time, no AI calls,
+no Convex or SpacetimeDB.
+
+**Boundary.** The engine sees the kitchen only as the HubReport the runtime passes to `step(1, hub_report)` (the browser hub's
+state of that lane for the minute just simulated). It changes the kitchen only by returning Commands in `TickState.new_commands`;
+the runtime delivers them to the hub in the next `sim_tick`. Real ESP32 readings arrive through `ingest_reading()`.
+The appliance physics lives in the browser (`frontend/src/sim/`); any model the engine needs to project an option (e.g. indoor
+temperature change for HVAC) is the engine's own planning model, parameterised from the equipment catalog — **TBD (Kritazya)**.
+Warm-up history source — **TBD (Kritazya)**.
+Escalation is the only path to Claude: the engine emits an Escalation, the runtime asks Claude, the engine validates the answer.
 
 ## 1. Meter (`engine/meter.py`)
 - Energy: `energy_kwh += total_kw × minutes / 60`.
 - Demand: average kW over each 15-minute block aligned to local :00/:15/:30/:45.
   When a block closes: `month_peak_kw = max(month_peak_kw, block_avg_kw)`. Reset each billing month.
 - Cost: energy charges (time-of-use if the tariff has them) + every demand charge the tariff defines
-  (many commercial tariffs have more than one, e.g. monthly max and peak-period).
+  (many commercial tariffs have more than one, e.g. monthly max and peak-period). Demo: the made-up `demo_tariff_v1`
+  (CONTRACTS.md Tariff); later a real URDB rate in the same shape. Context grid prices never set the bill.
 
 ## 1b. Context (`engine/context.py`)
 - `set_context(context)` merges structured context (CONTRACTS.md). Plain object; the engine never fetches it.
+  This is the engine's "pull" from Fetch: the Fetch agents refresh context periodically into the API (`POST /api/context`),
+  and the runtime hands the latest Context to the engine through `set_context` whenever it changes. Anyone else
+  (Claude's `get_context` tool, the UI) reads the same Context via `GET /api/context`. How the engine uses it: **TBD (Kritazya)**.
 - Weather → outdoor temperature for the HVAC model and an HVAC term in the forecast (hotter than history → more cooling load).
 - Prices → hourly energy price for costing; among moves with equal peak effect, prefer the cheaper hour.
-- Crowd effect → customer multiplier none 1.00 · small 1.10 · medium 1.25 · large 1.40 (passed to `CustomerSource`).
+- Crowd effect → customer multiplier none 1.00 · small 1.10 · medium 1.25 · large 1.40 (the runtime also passes it to the simulation in `sim_tick.inputs`).
 - Missing or stale context → last known value, then tariff / historical defaults. Labels are carried through.
 
 ## 2. Forecaster (`engine/forecaster.py`)
@@ -35,9 +51,10 @@ SpacetimeDB. Real ESP32 readings arrive through `ingest_reading()`; commands lea
 ## 3. Target
 ```
 unavoidable_kw = forecast of always_on + flexible-at-minimum load (the lowest the engine could possibly reach)
-target_kw      = peak_cap_kw                           if the owner set one
-               = max(month_peak_kw, unavoidable_kw)    otherwise   (load below this month's peak is "free")
-if unavoidable_kw > peak_cap_kw: emit warning "cap_unreachable" and plan against unavoidable_kw
+target_kw      = peak_cap_kw                           if peak_mode = "cap" (owner's limit)
+               = max(month_peak_kw, unavoidable_kw)    if peak_mode = "minimize" (load below this month's peak is "free")
+if peak_mode = "cap" and unavoidable_kw > peak_cap_kw: emit warning "cap_unreachable" and plan against unavoidable_kw
+(Draft — target logic in minimize mode is part of the engine decisions still TBD.)
 ```
 
 ## 4. Decider (`engine/decider.py`) — runs every 5 simulated minutes (live) or every 15-minute step (replay)
@@ -63,13 +80,13 @@ Every move becomes a **Decision** with `effect` computed by re-running the forec
 
 ## 4b. Escalation (`engine/escalation.py`)
 Opened as soon as the forecast shows an unfixable block, ideally ≥ 30 sim min ahead, so there is time to choose.
-1. **Generate options** (2–4), each a concrete set of Commands that may break a rule by a stated amount:
+1. **Generate options:** 2–3 evaluated alternatives plus `ask_owner`, each alternative a concrete set of Commands that may break a rule by a stated amount:
    `accept_overrun` (do nothing more; peak goes over the cap) · `deep_reduce_<device>` (a flexible device below its
    minimum, never below the food-safety floor) · `extend_delay_<device>` (a deferrable job past its deadline) · `ask_owner`.
-2. **Project each option** by re-forecasting with it applied: `peak_kw`, `cost_delta_usd` (demand + energy, vs. accept_overrun),
+2. **Project each option** by re-forecasting with it applied: `peak_kw`, `cost_delta_usd` (demand + energy, vs. holding the target with no rule broken),
    `max_indoor_temp_change_c` (from the HVAC model), and `rule_breaks` with amounts.
 3. **Mark `within_authority`** against ClaudeAuthority (overrun kW, extra delay min, extra reduce min, below-min allowed).
-4. **Default** = least-harm option within authority (normally `accept_overrun`); if none is within authority, `ask_owner`.
+4. **Default** = `accept_overrun` if within authority (it changes no device); otherwise `ask_owner`. (Demo rule; ranking by harm is a later engine decision.)
    At the deadline an unresolved escalation does nothing extra (physically the same as an overrun): `expired_default`.
 5. **Resolve:** `resolve_escalation(id, option, by, rationale)`.
    `claude` + within authority → apply · `claude` + outside → status `awaiting_owner` (runtime creates a Proposal) ·
@@ -78,9 +95,10 @@ Opened as soon as the forecast shows an unfixable block, ideally ≥ 30 sim min 
 The engine never calls Claude; the runtime brings the choice back. Replay/backtest always use the default (no Claude).
 
 ## 5. Executor (`engine/kitchen.py`)
-- Decisions inside the owner's limits: executed immediately → Command to the hub → `status: executed`.
-- Every Command the hub delivers in a step (engine or owner) is returned in `TickState.new_commands`, so the runtime can
-  forward it to a real hub. The engine itself never sends anything.
+- Decisions inside the owner's limits: executed immediately → Command in `TickState.new_commands` (delivered next tick) → `status: executed`.
+- Every Command issued in a step (engine or owner) is returned in `TickState.new_commands`; the runtime sends it to the browser
+  hub in the next `sim_tick` and to a real ESP32 through Convex. The engine itself never sends anything. CommandAcks come back
+  in the next HubReport's device state (a clamped command shows up as the real power).
 - Anything outside the limits only happens through an Escalation (section 4b).
 - Owner clicks (`owner_command`) always win; the engine leaves that device alone for 30 sim min.
 - `undo(decision_id)`: reverts the command and protects the device for 30 sim min.
@@ -128,3 +146,6 @@ overrun), status `expired_default`. Claude choosing `accept_overrun` with author
 **Context:** crowd effect `medium` → multiplier exactly 1.25; no context → identical run to before context existed.
 **Always-on:** no Command ever targets an always_on device (assert over a full simulated day).
 **No-peeking:** history view raises if anything reads ts ≥ now; a full replay day must not raise.
+**Boundary:** the engine imports nothing outside `engine/` and `contracts/`; decider tests run on HubReport fixtures from
+`contracts/fixtures/hub_protocol/` alone.
+**Escalation shape:** every escalation has 2–3 alternatives plus `ask_owner`, and its default is one of them.

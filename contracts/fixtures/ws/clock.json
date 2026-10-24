@@ -1,0 +1,9 @@
+{
+  "type": "clock",
+  "playing": true,
+  "speed": 1,
+  "sim_ts": "2026-07-18T01:30:00Z",
+  "tick_id": 60,
+  "paused_reason": null,
+  "slowed_reason": "escalation"
+}

@@ -1,0 +1,18 @@
+{
+  "call": "owner_command",
+  "args": {
+    "device_id": "ice_machine_1",
+    "action": "start",
+    "value": null
+  },
+  "returns": {
+    "command_id": "c_0020",
+    "lane": "with",
+    "ts": "2026-07-18T01:20:00Z",
+    "device_id": "ice_machine_1",
+    "action": "start",
+    "value": null,
+    "decision_id": null,
+    "issued_by": "owner"
+  }
+}

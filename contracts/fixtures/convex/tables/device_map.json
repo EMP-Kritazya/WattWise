@@ -1,0 +1,8 @@
+[
+  {
+    "hub_id": "esp32_1",
+    "channel": 0,
+    "device_id": "dishwasher_1",
+    "scale": 1000
+  }
+]

@@ -1,0 +1,14 @@
+{
+  "ts": "2026-07-18T01:30:00Z",
+  "total_kw": 38.68,
+  "block_avg_kw": 39.9,
+  "block_start": "2026-07-18T01:15:00Z",
+  "month_peak_kw": 39.9,
+  "peak_mode": "cap",
+  "peak_cap_kw": 40.0,
+  "target_kw": 40.0,
+  "energy_kwh_today": 322.796,
+  "price_usd_per_kwh_now": 0.38,
+  "cost_usd_today": 83.95,
+  "cost_usd_month": 1848.93
+}

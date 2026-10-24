@@ -1,0 +1,112 @@
+[
+  {
+    "config": {
+      "name": "Demo Café",
+      "equipment": [
+        {
+          "type_id": "hvac",
+          "count": 2,
+          "importance": "flexible",
+          "limits": {
+            "min_power_pct": 40,
+            "max_reduce_min": 30
+          }
+        },
+        {
+          "type_id": "walk_in_cooler",
+          "count": 1,
+          "importance": "flexible",
+          "limits": {
+            "min_power_pct": 50,
+            "max_reduce_min": 30
+          }
+        },
+        {
+          "type_id": "reach_in_fridge",
+          "count": 1,
+          "importance": "always_on",
+          "limits": {}
+        },
+        {
+          "type_id": "freezer",
+          "count": 1,
+          "importance": "always_on",
+          "limits": {}
+        },
+        {
+          "type_id": "ice_machine",
+          "count": 1,
+          "importance": "deferrable",
+          "limits": {
+            "max_delay_min": 60,
+            "must_finish_by": "22:00"
+          }
+        },
+        {
+          "type_id": "fryer",
+          "count": 1,
+          "importance": "always_on",
+          "limits": {}
+        },
+        {
+          "type_id": "oven",
+          "count": 1,
+          "importance": "always_on",
+          "limits": {}
+        },
+        {
+          "type_id": "grill",
+          "count": 1,
+          "importance": "always_on",
+          "limits": {}
+        },
+        {
+          "type_id": "dishwasher",
+          "count": 1,
+          "importance": "deferrable",
+          "limits": {
+            "max_delay_min": 60,
+            "must_finish_by": "19:30"
+          }
+        },
+        {
+          "type_id": "water_heater",
+          "count": 1,
+          "importance": "flexible",
+          "limits": {
+            "min_power_pct": 40,
+            "max_reduce_min": 30
+          }
+        },
+        {
+          "type_id": "lights",
+          "count": 1,
+          "importance": "always_on",
+          "limits": {}
+        }
+      ],
+      "peak_mode": "cap",
+      "peak_cap_kw": 40.0,
+      "operating_hours": {
+        "open": "10:00",
+        "close": "22:00"
+      },
+      "location": {
+        "lat": 37.8,
+        "lon": -122.44,
+        "label": "Marina, San Francisco"
+      },
+      "owner_preferences": "Keep the dining room comfortable during dinner service.",
+      "authority": {
+        "enabled": true,
+        "max_cap_overrun_kw": 3.0,
+        "max_extra_delay_min": 20,
+        "max_extra_reduce_min": 15,
+        "may_go_below_min_power": false
+      },
+      "tariff_id": "demo_tariff_v1",
+      "seed": 42
+    },
+    "created_at": "2026-10-25T17:29:58.000Z"
+  }
+]

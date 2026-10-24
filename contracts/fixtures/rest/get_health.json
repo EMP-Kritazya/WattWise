@@ -1,0 +1,14 @@
+{
+  "method": "GET",
+  "path": "/api/health",
+  "status": 200,
+  "request": null,
+  "response": {
+    "ok": true,
+    "kitchen_impl": "fake",
+    "live_transport": "spacetime",
+    "store": "convex",
+    "hardware": "off",
+    "sim_host": "connected"
+  }
+}
