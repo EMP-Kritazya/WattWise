@@ -43,6 +43,7 @@ class FakeHubClient:
         self.url = url
         self.hello, self.reports = load_recording(Path(fixtures_dir or os.environ.get("FIXTURES_DIR") or DEFAULT_FIXTURES_DIR))
         self.answered: list[int] = []
+        self.received: list[dict] = []  # every server → hub message, in order (tests compare it with server_to_hub.jsonl)
 
     async def run(self) -> list[int]:
         """Connect and answer ticks until the server closes the socket. Returns the tick_ids answered."""
@@ -60,6 +61,7 @@ class FakeHubClient:
                 except websockets.ConnectionClosed:
                     break
                 msg = json.loads(raw)
+                self.received.append(msg)
                 kind = msg.get("type")
                 if kind == "sim_tick" and msg.get("replay"):
                     pending_replay = msg["tick_id"]

@@ -3,7 +3,8 @@
 Computes nothing. Every number comes from the engine (FakeKitchen in fake mode) or a stored record:
 - an unknown id (device, decision, proposal, escalation, backtest run) → NotFoundError (404);
 - engine RuleError → 422; a call fake mode has no recording for → NotRecordedError (501), never a made-up answer.
-The clock (`/api/sim/control`) and chat still replay `contracts/fixtures/rest/` until the runtime and agent exist.
+The clock, surges, owner commands, context stamping and agent logs live in `runtime/loop.py`, which calls in here.
+Chat still replays `contracts/fixtures/rest/` until the agent exists.
 """
 
 from __future__ import annotations
@@ -17,11 +18,11 @@ from pathlib import Path
 from typing import Any
 
 from runtime.kitchen_factory import EngineApi
+from runtime.lanes import LANES, Lanes
 from store import Store
 
 from .errors import NoKitchenError, NotFoundError, NotRecordedError, RuleError
 
-LANES = ("without", "with")
 KITCHEN_ID = "k_01"  # one kitchen per process (demo)
 SEED = 42
 DECISION_EXTRAS = ("lane", "explanation", "explanation_source")
@@ -54,28 +55,31 @@ class KitchenService:
         self._engine = engine
         self._store = store
         # One lock for every facade call and check-then-write (e.g. confirming a proposal from UI + ASI:One at once).
-        # runtime/loop.py must take the same lock around step() in Phase B.
+        # runtime/loop.py takes the same lock around step().
         self.lock = threading.RLock()
         # STUB: tariff and catalog come from backend/data/ (Kritazya / Ashirwad) once it exists on this branch.
         self._tariff = _load(fixtures_dir / "shapes" / "tariff.json")
         self._catalog = _load(fixtures_dir / "shapes" / "equipment_catalog.json")
-        # STUB: answered from rest fixtures until runtime/loop.py (clock) and agent/ (chat) exist.
+        # STUB: answered from rest fixtures until agent/ (chat) exists.
         self._rest = [_load(f) for f in sorted((fixtures_dir / "rest").glob("*.json"))]
-        self._lanes: dict[str, Any] = {}
+        self.lanes = Lanes(engine, self._tariff)
         kitchen = store.latest_kitchen()
         if kitchen is not None:
-            self._lanes = self._build_lanes(kitchen["config"])
+            self.lanes.build(kitchen["config"], SEED)
+
+    @property
+    def tariff(self) -> dict:
+        return self._tariff
 
     # ------------------------------------------------------------ helpers
 
-    def _build_lanes(self, config: dict) -> dict[str, Any]:
-        # warm_up(...) is TBD (CONTRACTS.md §3); not called until its signature exists.
-        return {lane: self._engine.Kitchen(config, self._tariff, lane, SEED) for lane in LANES}
+    def require_kitchen(self) -> None:
+        if not self.lanes:
+            raise NoKitchenError()
 
     def _lane(self, lane: str = "with") -> Any:
-        if not self._lanes:
-            raise NoKitchenError()
-        return self._lanes[lane]
+        self.require_kitchen()
+        return self.lanes[lane]
 
     def _require_device(self, device_id: str) -> None:
         if device_id not in {d["device_id"] for d in self._lane().snapshot()["devices"]}:
@@ -100,9 +104,9 @@ class KitchenService:
 
     @_serialized
     def build_kitchen(self, config: dict) -> dict:
-        self._lanes = self._build_lanes(config)  # RuleError leaves the store untouched
+        """Both lanes + the `kitchens` record. Called by `RunLoop.build`, which then sends `sim_build`."""
+        self.lanes.build(config, SEED)  # RuleError leaves the lanes and the store untouched
         self._store.record_kitchen(config, self._now_utc())
-        # STUB: runtime/loop.py calls HubLink.send_build here once the clock exists (it owns start_sim_ts).
         return {"kitchen_id": KITCHEN_ID}
 
     @_serialized
@@ -129,21 +133,13 @@ class KitchenService:
         self._lane().set_preferences(body["text"])
         return {"ok": True}
 
-    # ------------------------------------------------------------ clock, devices, events
-
-    @_serialized
-    def sim_control(self, body: dict) -> dict:
-        return self._rest_replay("POST", "/api/sim/control", body)
+    # ------------------------------------------------------------ devices
 
     @_serialized
     def device_command(self, device_id: str, body: dict) -> dict:
+        """The owner Command; `RunLoop.owner_command` queues it for the next sim_tick."""
         self._require_device(device_id)
         return self._lane().owner_command(device_id, body["action"], body.get("value"))
-
-    @_serialized
-    def customer_event(self, body: dict) -> dict:
-        # STUB: runtime/loop.py queues the surge into the next sim_tick (Phase B).
-        return {"ok": True}
 
     # ------------------------------------------------------------ decisions, escalations, proposals
 
@@ -251,7 +247,7 @@ class KitchenService:
 
     @_serialized
     def post_context(self, body: dict) -> dict:
-        # STUB: `ts` is stamped in sim time by the API once the clock exists (Phase B); forwarded unchanged for now.
+        """Both lanes; `RunLoop.post_context` has stamped `ts` in sim time."""
         for lane in LANES:
             self._lane(lane).set_context(body)
         return {"ok": True}
@@ -261,9 +257,4 @@ class KitchenService:
         crowd_effect = {"value": body["value"], "set_by": "claude", "reason": body["reason"]}
         for lane in LANES:
             self._lane(lane).set_context({"crowd_effect": crowd_effect})
-        return {"ok": True}
-
-    @_serialized
-    def post_agent_log(self, body: dict) -> dict:
-        # STUB: runtime broadcasts it as a /ws agent_log message (Phase B).
-        return {"ok": True}
+        return crowd_effect

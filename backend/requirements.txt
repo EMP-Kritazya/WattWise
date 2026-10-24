@@ -8,3 +8,4 @@ pytest-asyncio>=0.23
 anthropic>=0.40
 convex>=0.7
 websockets>=12
+tzdata>=2024.1  # zoneinfo data on Windows (opening hours in the tariff timezone)

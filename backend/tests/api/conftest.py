@@ -21,6 +21,7 @@ def app():
     )
     app = create_app(settings)
     app.state.sim_host_connected = True
+    app.state.runtime.hub_status = None  # as if the host were connected: the clock is not paused (no ticks are sent)
     return app
 
 
