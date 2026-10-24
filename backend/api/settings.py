@@ -13,6 +13,7 @@ _CHOICES = {
     "LIVE_TRANSPORT": ("spacetime", "ws"),
     "STORE": ("convex", "memory"),
     "HARDWARE": ("off", "sim_bridge", "esp32"),
+    "HUB_IMPL": ("browser", "fake"),
 }
 
 
@@ -29,6 +30,7 @@ class Settings:
     live_transport: str = "spacetime"
     store: str = "memory"
     hardware: str = "off"
+    hub_impl: str = "browser"
     agent_token: str | None = None
     fixtures_dir: Path = field(default_factory=lambda: REPO_ROOT / "contracts" / "fixtures")
 
@@ -39,6 +41,7 @@ class Settings:
             live_transport=_choice("LIVE_TRANSPORT", "spacetime"),
             store=_choice("STORE", "memory"),
             hardware=_choice("HARDWARE", "off"),
+            hub_impl=_choice("HUB_IMPL", "browser"),
             agent_token=os.environ.get("AGENT_TOKEN") or None,
             fixtures_dir=Path(os.environ.get("FIXTURES_DIR", REPO_ROOT / "contracts" / "fixtures")),
         )

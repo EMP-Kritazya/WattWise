@@ -11,9 +11,12 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Request, WebSocket
 from pydantic import BaseModel
 
+from runtime.kitchen_factory import load_engine
+from store import create_store
+
 from . import models as m
 from .errors import install_error_handlers
-from .service import FixtureService
+from .service import KitchenService, seed_fake_scenario
 from .settings import Settings
 from .ws import Broadcaster
 
@@ -26,7 +29,7 @@ def _body(model: BaseModel) -> dict[str, Any]:
     return model.model_dump(mode="json", by_alias=True, exclude_unset=True)
 
 
-def _service(request: Request) -> FixtureService:
+def _service(request: Request) -> KitchenService:
     return request.app.state.service
 
 
@@ -36,7 +39,7 @@ def _require_agent_token(request: Request, x_agent_token: Annotated[str | None, 
         raise HTTPException(status_code=401, detail="Missing or invalid X-Agent-Token")
 
 
-Service = Annotated[FixtureService, Depends(_service)]
+Service = Annotated[KitchenService, Depends(_service)]
 AgentOnly = [Depends(_require_agent_token)]
 
 router = APIRouter(
@@ -194,10 +197,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
     app = FastAPI(title="WattWise API", version="0.1.0", description="CONTRACTS.md §2 (REST + viewer /ws)")
     app.state.settings = settings
-    app.state.service = FixtureService(settings.fixtures_dir)
+    engine = load_engine(settings.kitchen_impl)
+    fake = settings.kitchen_impl == "fake"
+    # Fake mode starts from the recorded Demo Café records; the real engine starts from an empty store.
+    store = create_store(settings.store, seed_dir=settings.fixtures_dir / "convex" / "tables" if fake else None)
+    if fake:
+        seed_fake_scenario(store, settings.fixtures_dir)
+    app.state.store = store
+    app.state.service = KitchenService(settings.fixtures_dir, engine, store)
     app.state.broadcaster = Broadcaster()
     app.state.sim_host_connected = False
-    install_error_handlers(app)
+    install_error_handlers(app, engine.RuleError)
     app.include_router(router)
 
     @app.websocket("/ws")
