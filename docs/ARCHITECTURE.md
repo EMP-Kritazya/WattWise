@@ -1,94 +1,88 @@
 # Architecture
 
-## The whole system
+## The system
 ```
-  OWNER                                   OWNER + JUDGES
-  ASI:One chat (Fetch.ai)                 React dashboard (Azure Static Web Apps)
-      | Agent Chat Protocol                   | REST: config, clicks,        | live subscription
-      | via Agentverse                        | approvals, chat              | (every viewer, same kitchen)
- +----v---------------------------------------v----------+                   |
- |  API + AI   (Azure Container Apps, exactly 1 replica)  |                   |
- |  FastAPI · run loop (moves time) · two lanes           |                   |
- |  Claude agent + tools · Fetch.ai uAgent                |                   |
- |  store · SpacetimeDB publisher · device bridge · /ws   |                   |
- +----+-----------------------+---------------------+-----+                   |
-      | Seam 2:               | Seam 4:             | Seam 3:                 |
-      | engine facade         | records, commands,  | publish_ticks           |
-      | (Python calls)        | readings            | (HTTP reducers)         |
- +----v-------------------+  +v------------------+ +v-----------------+       |
- | ENGINE (Kritazya)      |  | Convex            | | SpacetimeDB      |       |
- | no I/O                 |  | durable records   | | live shared      <-------+
- | SIMULATION: devices    |  | + ESP32 bridge    | | kitchen          |
- |   -> HUB (sim ESP32)   |  +---------^---------+ +------------------+
- | BRAIN: meter ->        |            | convex-esp32 (WiFi)
- |   forecaster -> decider|  +---------+---------+
- |   -> executor -> hub   |  | ESP32 hub         |
- | PROOF: replay+backtest |  | (optional, real   |
- +------------------------+  |  low-voltage      |
-                             |  stand-in loads)  |
-                             +-------------------+
+ OWNER (phone)                          OWNER + JUDGES (browsers)
+ ASI:One chat                           React dashboard  ── Azure Static Web Apps          [Ashirwad]
+     │ Agent Chat Protocol                  │ REST: config, clicks,          ▲ live subscription (every viewer, same kitchen)
+     ▼                                      │ approvals, chat, authority     │ + judges' surge buttons (request reducer)
+ ┌──────────── FETCH AGENTS (Agentverse) ───┼─────────┐                      │
+ │ Concierge (chat, Claude) · Weather ·     │         │                      │
+ │ Grid prices · Events          [Suyog]    │         │                      │
+ └───────┬───────────────────────────────── │ ────────┘                      │
+         │ REST (context, chat relay)       ▼                                │
+ ┌───────▼──────── BACKEND · Azure Container Apps, 1 replica ─────────────┐  │
+ │ API (FastAPI)  ·  RUNTIME (loop, two lanes, escalations, device bridge)│  │   [Suyog]
+ │ AGENT (Claude: explain, answer, propose, resolve escalations)          │  │
+ │      │ engine facade (Python calls, plain objects)                     │  │
+ │ ┌────▼──────────────── ENGINE (no I/O) ─────────────────────────────┐ │  │
+ │ │ SIMULATION: devices → HUB ⇄ commands            [Ashirwad]        │ │  │
+ │ │ BRAIN: meter → forecaster(+context) → decider → escalation        │ │  │   [Kritazya]
+ │ │        → executor → hub ;  ledger · compare_lanes · replay/backtest│ │  │
+ │ └────────────────────────────────────────────────────────────────────┘ │  │
+ │ LIVE client ── HTTP reducers ──────────────────────────────────────────┼──┘──▶ SpacetimeDB (live)   [Kritazya]
+ │ STORE + DEVICE BRIDGE ─────────────────────────────────────────────────┼─────▶ Convex (records, devices) [Suyog]
+ └─────────────────────────────────────────────────────────────────────────┘          ▲ convex-esp32
+                                                                                ESP32 hub (optional, replaces the simulated hub)
 ```
 
 ## Who owns what
 | Part | Owner | Builds | Never does |
 |---|---|---|---|
-| Engine brain + proof | Kritazya | Facade, meter, forecaster, decider, executor, rules, owed-energy ledger, `compare_lanes`, replay, backtest, data loading, contracts models | Talk to users, to Claude or to the network |
-| Simulation | Ashirwad | Devices + power models, hub (simulated ESP32), customers, equipment catalog | Talk to users, to Claude or to the network |
-| API + AI + integrations | Suyog | Server, endpoints, WebSocket, run loop (calls `step()`), approvals relay, proposals, Claude agent + tools, Fetch.ai uAgent, store, `FakeKitchen`, SpacetimeDB module + publisher, Convex, device bridge, ESP32 firmware | Decide or compute numbers |
-| Frontend screens | Ashirwad | Kitchen Builder, Live floor + hub tile, two-lane chart, KPI row, decision feed, approval modal, banners, Proof page | Any calculation |
-| Frontend data + chat | Suyog | Generated types, live data hook (SpacetimeDB / `/ws`), mock server, chat drawer + proposal cards | Any calculation |
-| Cloud | Kritazya | Azure Container Apps (1 replica) + Static Web Apps, secrets, health probe | |
+| Engine brain + proof | Kritazya | Facade, meter, forecaster, context use, decider, escalation options, executor, rules, ledger, `compare_lanes`, replay, backtest, data, contracts models | Network, users, Claude |
+| Live layer | Kritazya | SpacetimeDB module + `backend/live/` client | Business logic in reducers |
+| Simulation | Ashirwad | Devices, power models, hub, customers, equipment catalog | Network, decisions |
+| Frontend | Ashirwad | Every screen, data hooks (SpacetimeDB + REST + `/ws` fallback), mocks, chat drawer | Any calculation |
+| API + runtime + AI | Suyog | FastAPI, run loop, lanes, escalation relay, proposals, Claude agent + tools, `/ws` fallback, FakeKitchen | Compute numbers |
+| Fetch agents | Suyog | Concierge (ASI:One), Weather, Grid, Events agents | Compute numbers, retype numbers |
+| Convex + ESP32 | Suyog | Records, device bridge, firmware | Decide |
+| Azure | Kritazya (Container Apps) · Ashirwad (Static Web Apps) | Deploy, secrets, health probe | |
 
-Simple test for any new task: **computes a number → engine. Moves data or talks to a person/AI → API. Visible on screen → frontend.
-Simulated device behaviour → simulation. Talks to SpacetimeDB, Convex or the ESP32 → Suyog. Azure infrastructure → Kritazya.**
+Quick test: **computes a number → engine. Simulated device behaviour → simulation. Moves data or talks to a person, AI or agent → Suyog.
+Visible on screen → Ashirwad. Live tables → Kritazya.**
 
-## How it works, one tick
-1. The run loop (API) calls `kitchen.step(1)` for both lanes with the same customer events.
-2. Each simulated device updates its power and reports to the **hub**.
-3. The hub sums the restaurant's state (total kW, per-device kW, states).
-4. The meter updates energy, the 15-minute demand average, the month peak and cost.
-5. Every 5 simulated minutes the **brain** runs: forecast → decide → execute inside rules
-   (outside rules → decision marked `awaiting_approval`).
-6. The runtime calls `compare_lanes(without, with)`, publishes both ticks + the comparison to SpacetimeDB (or `/ws`),
-   forwards the `with` lane's commands for ESP32 mapped devices to Convex, and buffers records for Convex.
-7. The API sends approval requests to the owner (UI and ASI:One) and asks the AI to explain notable decisions.
+## Seams
+| # | Seam | Form | Fake for independent work |
+|---|---|---|---|
+| S1 | Frontend ↔ API | REST (+ `/ws` fallback) | `frontend/src/mocks` (Ashirwad) |
+| S2 | API/runtime ↔ Engine | Python facade, plain objects | `fakes/fake_kitchen.py` (Suyog) |
+| S3 | Runtime → SpacetimeDB → browsers | `backend/live` client + tables/reducers + generated TS bindings | `fakes/fake_live.py` + seed script (Kritazya) |
+| S4 | Runtime ↔ Convex ↔ ESP32 | Convex functions | `STORE=memory`, `HARDWARE=off` (Suyog) |
+| S5 | Agents ↔ API and agent ↔ agent | REST + Fetch message models + Chat Protocol | `--recorded` mode per agent (Suyog) |
+| S6 | Simulation ↔ Brain (inside engine) | Hub interface: `report()` / `deliver(command)` | `engine/fake_hub.py` (Ashirwad) |
 
-A real ESP32 reading (when `HARDWARE=esp32`) enters through Convex → runtime → `kitchen.ingest_reading()` on the `with`
-lane before the next step. The engine never touches the network.
+## Four flows
+**1. Tick (reflexes).** Runtime collects surges (REST + SpacetimeDB requests), draws one set of customer events, passes the
+latest context and any fresh ESP32 readings, calls `step(1)` on both lanes → hub reports → meter → every 5 sim min forecast + decide
+inside rules → executor commands the hub → runtime gets `TickState` (+ `new_commands`, `new_escalations`) → `compare_lanes` →
+live client publishes one batch to SpacetimeDB → bridge forwards ESP32-mapped commands to Convex → store buffers records.
 
-## The two seams
-- **Seam 1 (Frontend ↔ API):** JSON over REST + WebSocket. Frontend builds against a mock server until the API is ready.
-- **Seam 2 (API ↔ Engine):** Python function calls with Pydantic objects (same shapes as the JSON). API builds against
-  `FakeKitchen` until the engine is ready; switch with `KITCHEN_IMPL=real`.
-- **Seam 3 (Runtime → SpacetimeDB → every browser):** live shared kitchen (CONTRACTS.md section 5). `LIVE_TRANSPORT=spacetime|ws`.
-- **Seam 4 (Runtime ↔ Convex ↔ ESP32):** durable records and the hardware bridge (CONTRACTS.md section 6).
-  `STORE=convex|memory`, `HARDWARE=off|esp32`.
+**2. Context (senses).** Every 10 real minutes (and on kitchen build) the Concierge asks the Weather, Grid and Events agents →
+they call their APIs → structured replies → `POST /api/context` unchanged → runtime `set_context` on both lanes → forecaster uses it.
+Claude classifies events into a `crowd_effect` category → `POST /api/context/crowd-effect`. Every agent message is logged → SpacetimeDB `live_agent_log`.
 
-Each backend owns one job: SpacetimeDB holds what ticks, Convex holds what is a record or a device. Nothing is the
-source of truth in both. The engine's in-memory lanes are the source of truth for the simulation itself.
+**3. Escalation (judgment).** Decider finds a block over the cap with no in-rules fix → builds an Escalation with 2–4 options
+(each with engine-computed peak, cost, comfort impact, rule breaks, `within_authority`) and a safe default → runtime asks Claude
+(context + owner preferences + options) → Claude returns an option id → runtime calls `resolve_escalation(id, option, "claude", rationale)`
+→ engine validates: inside authority → applies; outside → becomes an owner Proposal. Deadline passes with no answer → default applies.
+Demo mode pauses the clock while waiting.
 
-## Where the AI sits
-Outside the decision loop. It reads engine state through tools, explains decisions, answers questions, and turns
-owner requests ("never touch the fryer", "approve it") into **Proposals that the owner confirms**. Code, not the model,
-applies a confirmed Proposal. If the AI is down, the kitchen runs exactly the same; explanations fall back to templates (labeled).
+**4. Owner (control).** Dashboard REST or ASI:One chat → explanations and answers from engine tools → any change is a Proposal →
+owner confirms → code applies via the facade.
 
-Two doors, one agent: the dashboard chat drawer and ASI:One. ASI:One reaches us through a Fetch.ai uAgent
-(`agent/fetch_agent.py`, Agent Chat Protocol, registered on Agentverse). The full owner workflow (ask, see forecast and
-plan, approve/undo, change rules, see savings) must work inside ASI:One with no custom frontend.
+## Hub swap (simulated ESP32 → real ESP32)
+The brain only talks to the hub interface. Simulated hub: in-process. Real hub: runtime forwards the `with` lane's commands for
+mapped devices to Convex (`HARDWARE=esp32`), the ESP32 executes them and reports readings, which enter via `ingest_reading()`.
+Bridge test without hardware: `HARDWARE=sim_bridge` sends the simulated hub's readings and commands through the same Convex
+functions, so the real ESP32 is a drop-in. Every device's 15-min average is stored in Convex `device_blocks` whatever the source.
 
 ## Time
-The engine has no clock. It only moves when `step(minutes)` is called. The run loop decides speed:
-120× in the live demo, as fast as possible in backtest, paused while an approval is pending in demo mode.
-
-## Hardware
-The hub is simulated by default. With `HARDWARE=esp32`, a real ESP32 drives a few low-voltage stand-in loads mapped to
-`device_id`s: it subscribes to its commands in Convex and reports readings back (`measured`, scaled). The simulated hub
-calls the same Convex functions, so switching is one env var. The ESP32 starts only after the Phase 3 gate passes.
+The engine has no clock; the runtime calls `step(minutes)`. 120× live, max speed in backtest, paused while an approval or escalation
+waits in demo mode. Escalation deadlines are in sim time; Claude's timeout is in real time.
 
 ## Deploy
-Azure Container Apps runs one image (FastAPI + run loop + uAgent) with **min = max replicas = 1**: the lanes and the run
-loop live in memory, so scale to zero or scale out would break them. The frontend is on Azure Static Web Apps. SpacetimeDB
-and Convex use their hosted clouds. Details: `docs/design/INTEGRATIONS.md`.
+Azure Container Apps: `backend` (API + runtime + engine, min = max = 1 replica) and `agents` (uAgents, 1 replica, always on).
+Static Web Apps: frontend. SpacetimeDB and Convex: their hosted clouds. Claude: Anthropic API, or Microsoft Foundry via env.
 
 ## Out of scope
 Mains-powered equipment, real restaurant installs, multiple kitchens per deployment.

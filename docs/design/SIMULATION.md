@@ -1,5 +1,12 @@
 # Design: Simulation (owner: Ashirwad; lives in `engine/`, so every engine rule applies)
 
+## Principles
+- Physical, not clever: devices follow simple physics and usage; no optimisation here.
+- Deterministic: same config + seed + inputs → identical output. No clock: moves only on `step()`.
+- One hub: every reading out and every command in goes through the hub interface (the swap point for a real ESP32).
+- Sourced numbers: power values from FSTC / ENERGY STAR with `source_note`.
+- No I/O and no network: simulation files live in `engine/` and follow every engine rule.
+
 The simulated restaurant: devices that draw power, customers that drive them, and one hub box that every
 device reports to. The frontend **draws** this kitchen; the engine **is** this kitchen.
 
@@ -56,10 +63,21 @@ Each type also carries `default_limits` (CONTRACTS.md) that pass `rules.py`: e.g
 - Surge events from the UI ("+40 customers for 60 min") are added on top.
 - The run loop creates **one** source and passes identical events to both lanes.
 
-## Hub (simulated ESP32)
+## Hub (simulated ESP32) — the swap point
+Interface (CONTRACTS.md section 8): `report(ts)`, `deliver(command)`, `devices()`. The brain uses nothing else.
+- `engine/fake_hub.py` (Phase 1): same interface, constant/sine power, honours commands trivially. Kritazya builds the
+  brain against it until the real devices exist.
 - Each step: every device reports `{device_id, power_kw, state}`; the hub sums them into a HubReport.
 - Commands from the engine (or owner clicks) go **through the hub** to the device. The hub logs every command.
 - The hub is the only thing the brain reads from and writes to, which is exactly how a real ESP32 hub would work.
+
+### Context inputs
+`step()` receives the outdoor temperature (from context) for the thermal model and the crowd multiplier for customers.
+No context → the fixed summer-day curve and multiplier 1.0.
+
+### Bridge test without hardware (`HARDWARE=sim_bridge`)
+The runtime sends the simulated hub's readings for mapped devices to Convex `devices:report` and routes their commands
+through Convex `commands`, exactly as for a real ESP32. When this works, plugging in the ESP32 changes nothing upstream.
 
 ### Optional real ESP32 (`HARDWARE=esp32`)
 - A real ESP32 drives a few low-voltage stand-in loads (small 5 to 12 V fans or LED strips, never mains), each mapped to a
@@ -67,7 +85,7 @@ Each type also carries `default_limits` (CONTRACTS.md) that pass `rules.py`: e.g
 - The runtime forwards the `with` lane's Commands for mapped devices to Convex; the ESP32 receives them pushed through
   `convex-esp32` and acks. Its INA219 readings come back as Readings and enter the engine through `ingest_reading()`
   (`source: measured`, shown as "measured (scaled)").
-- The engine's hub interface does not change, and the engine never talks to the network. Design: `docs/design/INTEGRATIONS.md`.
+- The engine's hub interface does not change, and the engine never talks to the network. Design: `docs/design/CONVEX_AND_ESP32.md`.
 
 ## Warm-up history
 `warm_up(days=21)`: runs the configured kitchen for 21 simulated days with no control, at full speed, before the

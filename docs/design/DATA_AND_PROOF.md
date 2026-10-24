@@ -1,5 +1,9 @@
 # Design: Data and proof (owner: Kritazya)
 
+## Principles
+Same data, tariff and loop for every policy · no peeking · all 12 months (January partial) · strong timer baseline ·
+worst case shown · Claude never in the scored backtest · exact labels.
+
 Goal: show, on historical data, what WattWise would have saved — fairly, reproducibly, honestly.
 
 ## Data
@@ -59,7 +63,10 @@ Shares and windows are **assumptions**: keep them in `backtest/assumptions.yaml`
 |---|---|
 | `without` | Every device exactly as in the data |
 | `timer` | Best fixed daily schedule for deferrable jobs, chosen on the **previous** month (a fair, strong baseline). January has no previous month, so its timer is fitted on the warm-up weeks |
-| `with` | The WattWise engine |
+| `with` | The WattWise engine; escalations resolved by the **default** (no Claude), so results are reproducible and conservative |
+
+Context in replay: historical weather (Open-Meteo archive) and prices (CAISO history) for the same dates, labeled
+`real_measured`; crowd effect `none`. Optional, cut item: one replayed week with Claude resolving escalations, shown separately.
 
 ## Checks (all must pass before a number is shown)
 | Check | Expected |

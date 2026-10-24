@@ -1,5 +1,12 @@
 # Design: Engine brain (owner: Kritazya)
 
+## Principles
+- Every number is computed here and covered by a hand-computed test.
+- Routine moves every 5 sim minutes inside the owner's rules; escalations only when that's impossible.
+- Never waits for AI: escalations always carry a default and a deadline.
+- No I/O: context in and commands out as plain objects. No wall-clock time.
+- Energy moved, never deleted (ledger). Food-safety floor is absolute.
+
 Reads the hub, forecasts, decides, executes. Pure Python: no I/O, no wall-clock time, no AI calls, no Convex or
 SpacetimeDB. Real ESP32 readings arrive through `ingest_reading()`; commands leave as `TickState.new_commands`.
 
@@ -10,11 +17,19 @@ SpacetimeDB. Real ESP32 readings arrive through `ingest_reading()`; commands lea
 - Cost: energy charges (time-of-use if the tariff has them) + every demand charge the tariff defines
   (many commercial tariffs have more than one, e.g. monthly max and peak-period).
 
+## 1b. Context (`engine/context.py`)
+- `set_context(context)` merges structured context (CONTRACTS.md). Plain object; the engine never fetches it.
+- Weather → outdoor temperature for the HVAC model and an HVAC term in the forecast (hotter than history → more cooling load).
+- Prices → hourly energy price for costing; among moves with equal peak effect, prefer the cheaper hour.
+- Crowd effect → customer multiplier none 1.00 · small 1.10 · medium 1.25 · large 1.40 (passed to `CustomerSource`).
+- Missing or stale context → last known value, then tariff / historical defaults. Labels are carried through.
+
 ## 2. Forecaster (`engine/forecaster.py`)
 - For each 15-min block in the next 2 hours: average total kW of the same weekday + time over the previous 3 weeks.
 - Live adjustment: `ratio = actual_last_30min / forecast_last_30min` (clamped 0.5–2.0), applied to the next hour,
   fading back to 1.0 over the second hour.
 - Known future load is added on top: queued deferrable jobs at their scheduled times, flexible catch-up energy.
+- Context adjustments: crowd multiplier on customer-driven load; temperature delta on HVAC load.
 - Only uses history with timestamps before now.
 
 ## 3. Target
@@ -37,8 +52,8 @@ for each block over target_kw, earliest first:
            add the energy not used to that device's owed_kwh and schedule catch-up in a block with room
     3. never touch always_on
     stop when excess <= 0
-if a block is still over target and a move beyond the owner's limits would fix it:
-    create Decision(status="awaiting_approval", expires in 10 sim min)
+if a block is still over target_kw after every in-rules move:
+    create an Escalation (section 4b); the affected decisions get status "escalated"
 RELEASE: any delayed job whose block now has room (or whose deadline forces it) starts now
 ```
 Order matters: delaying is cheaper than reducing (no comfort impact), so it goes first.
@@ -46,16 +61,32 @@ Order matters: delaying is cheaper than reducing (no comfort impact), so it goes
 Every move becomes a **Decision** with `effect` computed by re-running the forecast with and without the move:
 `peak_before_kw`, `peak_after_kw`, `saving_usd = demand_rate × max(0, peak_before − max(peak_after, month_peak)) + energy cost change`.
 
+## 4b. Escalation (`engine/escalation.py`)
+Opened as soon as the forecast shows an unfixable block, ideally ≥ 30 sim min ahead, so there is time to choose.
+1. **Generate options** (2–4), each a concrete set of Commands that may break a rule by a stated amount:
+   `accept_overrun` (do nothing more; peak goes over the cap) · `deep_reduce_<device>` (a flexible device below its
+   minimum, never below the food-safety floor) · `extend_delay_<device>` (a deferrable job past its deadline) · `ask_owner`.
+2. **Project each option** by re-forecasting with it applied: `peak_kw`, `cost_delta_usd` (demand + energy, vs. accept_overrun),
+   `max_indoor_temp_change_c` (from the HVAC model), and `rule_breaks` with amounts.
+3. **Mark `within_authority`** against ClaudeAuthority (overrun kW, extra delay min, extra reduce min, below-min allowed).
+4. **Default** = least-harm option within authority (normally `accept_overrun`); if none is within authority, `ask_owner`.
+   At the deadline an unresolved escalation does nothing extra (physically the same as an overrun): `expired_default`.
+5. **Resolve:** `resolve_escalation(id, option, by, rationale)`.
+   `claude` + within authority → apply · `claude` + outside → status `awaiting_owner` (runtime creates a Proposal) ·
+   `owner` → apply any generated option · deadline reached while open or awaiting owner → apply the default (`expired_default`).
+6. Applying an option = executing its Commands through the hub, logged as Decisions with reason `escalation_choice`.
+The engine never calls Claude; the runtime brings the choice back. Replay/backtest always use the default (no Claude).
+
 ## 5. Executor (`engine/kitchen.py`)
 - Decisions inside the owner's limits: executed immediately → Command to the hub → `status: executed`.
 - Every Command the hub delivers in a step (engine or owner) is returned in `TickState.new_commands`, so the runtime can
   forward it to a real hub. The engine itself never sends anything.
-- Outside limits: `awaiting_approval`; executed only via `approve()`. Expired → `expired`, re-plan.
+- Anything outside the limits only happens through an Escalation (section 4b).
 - Owner clicks (`owner_command`) always win; the engine leaves that device alone for 30 sim min.
 - `undo(decision_id)`: reverts the command and protects the device for 30 sim min.
 
 ## 6. Rules check (`engine/rules.py`)
-Validates limits (`set_importance`) and every move. A move that breaks a limit is never executed without approval.
+Validates limits (`set_importance`) and every move. A move that breaks a limit only happens through an Escalation (Claude within authority, the owner, or never for food safety).
 Food-safety floor: refrigeration flexible devices can't be set below a safe `min_power_pct` (default 50).
 Every equipment type's `default_limits` in `equipment_catalog.json` must pass these rules (tested).
 
@@ -89,5 +120,11 @@ reduce HVAC by only the 4 kW needed, to 6 kW (60%, above the 40% minimum) → 40
 **Catalog:** every `default_limits` passes `rules.py` (walk-in cooler flexible ≥ 50%).
 **compare_lanes:** hand case without cost $61.20, with cost $42.80 → saved $18.40; peaks 46 / 40 → avoided 6.0 kW.
 **Commands out:** a delay decision appears exactly once in `new_commands` for the step it executes.
+**Escalation:** must-run 44 kW in one block, cap 40, no in-rules room → escalation opens.
+Authority `max_cap_overrun_kw` = 5 → `accept_overrun` (peak 44) is `within_authority` and is the default.
+Authority 3 → it is outside; default = `ask_owner`; if nobody resolves by the deadline, nothing extra is done (which is the
+overrun), status `expired_default`. Claude choosing `accept_overrun` with authority 3 → status `awaiting_owner`.
+**Food safety:** no option ever takes a refrigeration device below 50 %.
+**Context:** crowd effect `medium` → multiplier exactly 1.25; no context → identical run to before context existed.
 **Always-on:** no Command ever targets an always_on device (assert over a full simulated day).
 **No-peeking:** history view raises if anything reads ts ≥ now; a full replay day must not raise.
