@@ -1,0 +1,6 @@
+[tool.pytest.ini_options]
+# Lets `pytest` run from backend/ or the repo root (`pytest backend/tests/api`): backend/ is the import root.
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "--import-mode=importlib"
+asyncio_mode = "auto"
