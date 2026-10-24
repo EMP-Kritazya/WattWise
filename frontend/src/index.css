@@ -1,0 +1,112 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* WattWise colors carry meaning (docs/design/UI.md) */
+  --color-importance-always-on: var(--importance-always-on);
+  --color-importance-flexible: var(--importance-flexible);
+  --color-importance-deferrable: var(--importance-deferrable);
+  --color-lane-without: var(--lane-without);
+  --color-lane-with: var(--lane-with);
+  --color-cap-line: var(--cap-line);
+}
+
+/* Dark dashboard theme (the app is dark-only, like the design mockup). */
+:root {
+  color-scheme: dark;
+  --radius: 0.75rem;
+  --background: oklch(0.165 0.02 262);
+  --foreground: oklch(0.96 0.005 260);
+  --card: oklch(0.205 0.022 262);
+  --card-foreground: oklch(0.96 0.005 260);
+  --popover: oklch(0.23 0.024 262);
+  --popover-foreground: oklch(0.96 0.005 260);
+  --primary: oklch(0.74 0.17 152);
+  --primary-foreground: oklch(0.2 0.04 160);
+  --secondary: oklch(0.27 0.022 262);
+  --secondary-foreground: oklch(0.96 0.005 260);
+  --muted: oklch(0.27 0.02 262);
+  --muted-foreground: oklch(0.7 0.02 262);
+  --accent: oklch(0.29 0.025 262);
+  --accent-foreground: oklch(0.96 0.005 260);
+  --destructive: oklch(0.68 0.19 25);
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 13%);
+  --ring: oklch(0.74 0.17 152 / 60%);
+
+  --importance-always-on: oklch(0.74 0.01 260);
+  --importance-flexible: oklch(0.72 0.14 250);
+  --importance-deferrable: oklch(0.8 0.14 75);
+  --lane-without: oklch(0.68 0.17 25);
+  --lane-with: oklch(0.76 0.17 152);
+  --cap-line: oklch(0.88 0.01 260);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+/* Isometric floor: data flowing along the cables to the hub, spinning fans, rising steam, blinking LEDs. */
+@keyframes cable-flow {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+@keyframes fan-spin {
+  to {
+    stroke-dashoffset: -40;
+  }
+}
+@keyframes steam-rise {
+  from {
+    transform: translateY(0);
+    opacity: 0.55;
+  }
+  to {
+    transform: translateY(-18px);
+    opacity: 0;
+  }
+}
+@keyframes led-blink {
+  50% {
+    opacity: 0.2;
+  }
+}
+@keyframes hub-ring {
+  from {
+    r: 3;
+    opacity: 0.9;
+  }
+  to {
+    r: 16;
+    opacity: 0;
+  }
+}

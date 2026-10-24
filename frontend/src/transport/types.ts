@@ -1,0 +1,45 @@
+import type {
+  BacktestResult,
+  BacktestRunRequest,
+  ClockState,
+  Command,
+  CustomerEventRequest,
+  Decision,
+  Device,
+  DeviceCommandRequest,
+  EquipmentType,
+  ImportanceUpdate,
+  KitchenConfig,
+  KitchenView,
+  Meter,
+  SimControlRequest,
+  WsMessage,
+} from "@/types";
+
+export type ConnectionStatus = "connecting" | "open" | "closed";
+
+/**
+ * Everything the UI can ask of the server: one method per REST endpoint in CONTRACTS.md section 2,
+ * plus the /ws message stream. Implemented by the real server client and by src/mocks.
+ */
+export interface Transport {
+  readonly kind: "real" | "mock";
+
+  getCatalog(): Promise<EquipmentType[]>;
+  createKitchen(config: KitchenConfig): Promise<{ kitchen_id: string }>;
+  getKitchen(): Promise<KitchenView>;
+  setImportance(deviceId: string, body: ImportanceUpdate): Promise<Device>;
+  setPeakCap(peakCapKw: number): Promise<Meter>;
+  simControl(body: SimControlRequest): Promise<ClockState>;
+  deviceCommand(deviceId: string, body: DeviceCommandRequest): Promise<Command>;
+  addCustomers(body: CustomerEventRequest): Promise<void>;
+  approve(decisionId: string, approve: boolean): Promise<Decision>;
+  undo(decisionId: string): Promise<Decision>;
+  listDecisions(limit?: number): Promise<Decision[]>;
+  runBacktest(body: BacktestRunRequest): Promise<{ run_id: string }>;
+  getBacktest(runId: string): Promise<BacktestResult[]>;
+  chat(message: string): Promise<{ chat_id: string }>;
+
+  /** Listen to /ws. Returns an unsubscribe function. */
+  subscribe(onMessage: (msg: WsMessage) => void, onStatus: (status: ConnectionStatus) => void): () => void;
+}
