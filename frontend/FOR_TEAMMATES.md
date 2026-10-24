@@ -35,5 +35,5 @@ These are kept as written until you answer them. The full list is in PLAN.md §7
 - **SpacetimeDB bindings:** when they exist, I'll swap them in behind `useLive()`. No screen changes.
 
 ## Housekeeping
-My old Python simulation (`backend/engine/{devices,hub,customers,fake_hub}.py`, `backend/tests/simulation/`) exists only on `ashirwad`.
-It's now outside my scope and replaced by the TypeScript simulation. I plan to delete it from my branch, so nothing lands in `backend/engine/` when we merge.
+My old Python simulation (`backend/engine/{devices,hub,customers,fake_hub}.py`, `backend/tests/simulation/`) only ever existed on `ashirwad`.
+It was outside my scope and is replaced by the TypeScript simulation, so I've deleted it from my branch: nothing lands in `backend/engine/` when we merge.

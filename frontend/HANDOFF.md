@@ -34,8 +34,9 @@ WattWise keeps a restaurant's 15-minute electricity peak under the owner's cap.
 
 ## Repo and branch
 - `~/Downloads/WattWise` (github.com/EMP-Kritazya/WattWise). **Work only on `ashirwad`.**
-- `ashirwad` is still based on the older `main` commit `cb0d598`. The new docs and fixtures are on `main` at `0dc6a34`.
-- **Decision D1 in PLAN.md** (rebase onto `main`) must be made before coding against the fixtures. Until then, read new files with `git show origin/main:<path>`.
+- `ashirwad` is rebased onto `main` at `0dc6a34` (D1 done), so `contracts/fixtures/` and the new docs are in the branch. `main` itself is unchanged.
+- The old Python simulation is deleted from the branch (D2 done). Outside `frontend/`, the branch touches only `backend/data/equipment_catalog.json`.
+- Backups of the pre-rebase branch exist locally: `backup/ashirwad-before-rebase` and `backup/ashirwad-before-reword`.
 - **Commit rule:** no Claude co-author line on commits.
 
 ## Where the branch stands now (before the rework)
@@ -46,7 +47,6 @@ Earlier work, built for the previous design. Much of the UI carries over; see PL
   - Screens in `src/pages/`: Builder (location, preferences, Claude's authority, per-unit importance), Live (3D floor, KPIs, chart, decision feed, escalation card and dialog, context strip), Agent Network, Proof (with Replay month).
   - A hand-written mock server (`src/mocks/server.ts`), a transport layer, a Zustand store, and data hooks with a SpacetimeDB / ws switch.
   - **Obsolete:** the mock server is **not** fixture-driven, and the types follow the old contract.
-- **`backend/engine/{devices,hub,customers,fake_hub}.py` and `backend/tests/simulation/`:** the old Python simulation. It is **now outside Ashirwad's scope** and is replaced by TypeScript; removing it is decision D2 in PLAN.md.
 - **`backend/data/equipment_catalog.json`:** still Ashirwad's, but it needs the new `params` keys and `default_limits`, and `min_power_pct` removed (PLAN.md B1).
 
 ## Run
@@ -59,7 +59,7 @@ Earlier work, built for the previous design. Much of the UI carries over; see PL
 
 ## Next steps
 Exactly PLAN.md §5, in order:
-1. Settle D1, D2, D3.
+1. Settle D3 (D1 and D2 are done).
 2. Types → fixture mocks → data hooks.
 3. Catalog → simulation → hub → Vitest.
 4. Hub link with `mockHubServer` → `/sim` panel.

@@ -33,7 +33,7 @@ Status key: ☐ to do · ◐ partly there (existing code to rework) · ☑ done 
 
 ## 1. Decisions needed before coding
 
-**D1. Bring the new base into `ashirwad`.** `ashirwad` sits on `cb0d598`, but `contracts/fixtures/` and the new docs only exist on `main` (`0dc6a34`).
+**D1. Bring the new base into `ashirwad`.** ☑ Done: rebased onto `main` `0dc6a34`. `ashirwad` sits on `cb0d598`, but `contracts/fixtures/` and the new docs only exist on `main` (`0dc6a34`).
 - **Recommendation:** rebase `ashirwad` onto `origin/main`.
   - `main` is the shared base the task file says to branch from, not a teammate's branch.
   - The rebase is conflict-free: `0dc6a34` touches no file under `frontend/` or `backend/`.
@@ -41,7 +41,7 @@ Status key: ☐ to do · ◐ partly there (existing code to rework) · ☑ done 
   - (`architecture-separation`, which ASHIRWAD.md names, doesn't exist on GitHub; its content appears to be `0dc6a34`.)
 - **Alternative:** stay on the old base and read the fixtures from a local, gitignored copy taken with `git show`.
 
-**D2. Remove my old Python simulation from the branch.** These files are now outside my scope, and on merge they would add files to Kritazya's `backend/engine/`:
+**D2. Remove my old Python simulation from the branch.** ☑ Done. These files are now outside my scope, and on merge they would add files to Kritazya's `backend/engine/`:
 - `backend/engine/devices.py`, `hub.py`, `customers.py`, `fake_hub.py`;
 - `backend/tests/simulation/`.
 
