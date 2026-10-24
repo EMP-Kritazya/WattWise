@@ -47,6 +47,10 @@ class Store(ABC):
         """`bills:save`."""
 
     @abstractmethod
+    def bills(self) -> list[dict]:
+        """Saved engine Bills, each with its `lane`."""
+
+    @abstractmethod
     def save_backtest(self, run_id: str, results: list[dict]) -> None:
         """`backtest:save`: one row per BacktestResult + run_id."""
 

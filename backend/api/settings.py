@@ -16,6 +16,7 @@ _CHOICES = {
     "STORE": ("convex", "memory"),
     "HARDWARE": ("off", "sim_bridge", "esp32"),
     "HUB_IMPL": ("browser", "fake"),
+    "CLAUDE_PROVIDER": ("anthropic", "foundry"),
 }
 
 
@@ -35,6 +36,9 @@ class Settings:
     hub_impl: str = "browser"
     agent_token: str | None = None
     sim_start_ts: str = DEFAULT_SIM_START_TS
+    claude_provider: str = "anthropic"
+    anthropic_model: str | None = None  # None → agent/claude_agent.py DEFAULT_MODEL
+    anthropic_api_key: str | None = field(default=None, repr=False)  # None → Claude off, template text
     fixtures_dir: Path = field(default_factory=lambda: REPO_ROOT / "contracts" / "fixtures")
 
     @classmethod
@@ -47,5 +51,8 @@ class Settings:
             hub_impl=_choice("HUB_IMPL", "browser"),
             agent_token=os.environ.get("AGENT_TOKEN") or None,
             sim_start_ts=os.environ.get("SIM_START_TS", DEFAULT_SIM_START_TS),
+            claude_provider=_choice("CLAUDE_PROVIDER", "anthropic"),
+            anthropic_model=os.environ.get("ANTHROPIC_MODEL") or None,
+            anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY") or None,
             fixtures_dir=Path(os.environ.get("FIXTURES_DIR", REPO_ROOT / "contracts" / "fixtures")),
         )

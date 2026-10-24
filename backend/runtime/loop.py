@@ -175,6 +175,10 @@ class RunLoop:
         self.surges.add(body["customers"], body["duration_min"])
         return {"ok": True}
 
+    def schedule_customer_event(self, payload: dict) -> None:
+        """A confirmed `customer_event` proposal: a surge in the sim_tick of `start_sim_ts` (the next one if past)."""
+        self.surges.add_at(payload["start_sim_ts"], payload["customers"], payload["duration_min"])
+
     def post_context(self, body: dict) -> dict:
         """`POST /api/context`: stamp `ts` in sim time, merge, hand to both lanes, publish. Numbers pass unchanged."""
         stamped = {**body, "ts": self.sim_ts}
@@ -223,7 +227,7 @@ class RunLoop:
         tick_id, sim_ts = self.tick_id + 1, self.sim_ts
         for request_id in self.surges.add_requests(await self.live.read_surges()):
             self.live.send("consume_surge", request_id)
-        surges, commands = self.surges.drain(), self._commands
+        surges, commands = self.surges.drain(sim_ts), self._commands
         self._commands = []
         try:
             report = await self.hub.tick(tick_id, sim_ts, surges, self.inputs(sim_ts), commands)

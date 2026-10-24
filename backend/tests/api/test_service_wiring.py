@@ -69,20 +69,20 @@ def test_build_kitchen_records_it(app, client):
 
 
 def test_concurrent_confirmations_apply_once(app):
-    service = app.state.service
+    book = app.state.proposals
     applied, outcomes = [], []
-    real_apply = service._apply
+    real_apply = book._apply
 
     def slow_apply(proposal):
         time.sleep(0.05)  # widen the check-then-write window
         applied.append(proposal["proposal_id"])
         real_apply(proposal)
 
-    service._apply = slow_apply
+    book._apply = slow_apply
 
     def confirm():
         try:
-            outcomes.append(service.confirm_proposal("p_0001", {"confirm": True})["status"])
+            outcomes.append(book.confirm("p_0001", True)["status"])
         except RuleError:
             outcomes.append("rejected")
 

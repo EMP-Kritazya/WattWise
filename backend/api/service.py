@@ -4,7 +4,7 @@ Computes nothing. Every number comes from the engine (FakeKitchen in fake mode) 
 - an unknown id (device, decision, proposal, escalation, backtest run) → NotFoundError (404);
 - engine RuleError → 422; a call fake mode has no recording for → NotRecordedError (501), never a made-up answer.
 The clock, surges, owner commands, context stamping and agent logs live in `runtime/loop.py`, which calls in here.
-Chat still replays `contracts/fixtures/rest/` until the agent exists.
+Proposals live in `agent/proposals.py` and chat in `agent/claude_agent.py`; both call back in here to apply changes.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from runtime.kitchen_factory import EngineApi
 from runtime.lanes import LANES, Lanes
 from store import Store
 
-from .errors import NoKitchenError, NotFoundError, NotRecordedError, RuleError
+from .errors import NoKitchenError, NotFoundError
 
 KITCHEN_ID = "k_01"  # one kitchen per process (demo)
 SEED = 42
@@ -60,8 +60,6 @@ class KitchenService:
         # STUB: tariff and catalog come from backend/data/ (Kritazya / Ashirwad) once it exists on this branch.
         self._tariff = _load(fixtures_dir / "shapes" / "tariff.json")
         self._catalog = _load(fixtures_dir / "shapes" / "equipment_catalog.json")
-        # STUB: answered from rest fixtures until agent/ (chat) exists.
-        self._rest = [_load(f) for f in sorted((fixtures_dir / "rest").glob("*.json"))]
         self.lanes = Lanes(engine, self._tariff)
         kitchen = store.latest_kitchen()
         if kitchen is not None:
@@ -70,6 +68,10 @@ class KitchenService:
     @property
     def tariff(self) -> dict:
         return self._tariff
+
+    @property
+    def store(self) -> Store:
+        return self._store
 
     # ------------------------------------------------------------ helpers
 
@@ -84,13 +86,6 @@ class KitchenService:
     def _require_device(self, device_id: str) -> None:
         if device_id not in {d["device_id"] for d in self._lane().snapshot()["devices"]}:
             raise NotFoundError("device", device_id)
-
-    def _rest_replay(self, method: str, path: str, body: Any, *, body_independent: bool = False) -> Any:
-        for ex in self._rest:
-            same_body = body_independent or ex["request"] == body
-            if ex["method"] == method and ex["path"] == path and same_body and ex["status"] == 200:
-                return copy.deepcopy(ex["response"])
-        raise NotRecordedError(f"STUB: no fixture answer for {method} {path} with this body")
 
     @staticmethod
     def _now_utc() -> str:
@@ -141,7 +136,7 @@ class KitchenService:
         self._require_device(device_id)
         return self._lane().owner_command(device_id, body["action"], body.get("value"))
 
-    # ------------------------------------------------------------ decisions, escalations, proposals
+    # ------------------------------------------------------------ decisions, escalations
 
     @_serialized
     def decisions(self, limit: int) -> list[dict]:
@@ -168,50 +163,17 @@ class KitchenService:
         return [e for e in self._all_escalations() if status is None or e["status"] == status]
 
     @_serialized
-    def resolve_escalation(self, escalation_id: str, body: dict) -> dict:
+    def resolve_escalation(self, escalation_id: str, body: dict, resolved_by: str = "owner",
+                           rationale: str | None = None) -> dict:
+        """Owner choice (REST, or a confirmed proposal) or Claude's choice (`choose_escalation_option`)."""
         if escalation_id not in {e["escalation_id"] for e in self._all_escalations()}:
             raise NotFoundError("escalation", escalation_id)
-        escalation = self._lane().resolve_escalation(escalation_id, body["option_id"], "owner", None)
+        escalation = self._lane().resolve_escalation(escalation_id, body["option_id"], resolved_by, rationale)
         if escalation["status"] in FINAL_ESCALATION_STATUSES:
             self._store.record_escalation(escalation)
         return escalation
 
-    @_serialized
-    def proposals(self, status: str | None) -> list[dict]:
-        return self._store.proposals(status)
-
-    @_serialized
-    def confirm_proposal(self, proposal_id: str, body: dict) -> dict:
-        proposal = self._store.proposal(proposal_id)
-        if proposal is None:
-            raise NotFoundError("proposal", proposal_id)
-        if proposal["status"] != "pending":
-            raise RuleError(f"{proposal_id} is {proposal['status']}, not pending")
-        if body["confirm"]:
-            self._apply(proposal)  # applied by code, never by the model
-            proposal.update(status="confirmed", confirmed_via="ui")
-        else:
-            proposal["status"] = "cancelled"
-        self._store.upsert_proposal(proposal)
-        return proposal
-
-    def _apply(self, proposal: dict) -> None:
-        kind, payload = proposal["kind"], proposal["payload"]
-        if kind == "importance":
-            self.set_importance(payload["device_id"], payload)
-        elif kind == "peak_cap":
-            self.set_peak_cap(payload)
-        elif kind == "authority":
-            self.set_authority(payload)
-        elif kind == "undo_decision":
-            self.undo_decision(payload["decision_id"])
-        elif kind == "resolve_escalation":
-            self.resolve_escalation(payload["escalation_id"], payload)
-        else:
-            # STUB: customer_event proposals carry start_sim_ts; scheduling needs runtime/loop.py (Phase B).
-            raise NotRecordedError(f"STUB: confirming a {kind} proposal is not built yet")
-
-    # ------------------------------------------------------------ backtest, chat
+    # ------------------------------------------------------------ backtest
 
     @_serialized
     def run_backtest(self, body: dict) -> dict:
@@ -233,11 +195,6 @@ class KitchenService:
         if results is None:
             raise NotFoundError("backtest run", run_id)
         return results
-
-    @_serialized
-    def chat(self, body: dict) -> dict:
-        # STUB: agent/claude_agent.py streams the reply over /ws (Phase C).
-        return self._rest_replay("POST", "/api/chat", body, body_independent=True)
 
     # ------------------------------------------------------------ context + agents
 

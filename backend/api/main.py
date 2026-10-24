@@ -5,6 +5,7 @@ Thin layer: validate the body → call the service → return. Run from backend/
 
 from __future__ import annotations
 
+import asyncio
 import secrets
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
@@ -12,6 +13,9 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Request, WebSocket
 from pydantic import BaseModel
 
+from agent.claude_agent import ClaudeAgent, create_llm
+from agent.proposals import ProposalBook
+from agent.tools import AgentTools
 from runtime.hub_link import HubLink
 from runtime.kitchen_factory import load_engine
 from runtime.live_port import LivePublisher, WsLive, create_live
@@ -47,8 +51,18 @@ def _runtime(request: Request) -> RunLoop:
     return request.app.state.runtime
 
 
+def _proposals(request: Request) -> ProposalBook:
+    return request.app.state.proposals
+
+
+def _agent(request: Request) -> ClaudeAgent:
+    return request.app.state.agent
+
+
 Service = Annotated[KitchenService, Depends(_service)]
 Runtime = Annotated[RunLoop, Depends(_runtime)]
+Proposals = Annotated[ProposalBook, Depends(_proposals)]
+Agent = Annotated[ClaudeAgent, Depends(_agent)]
 AgentOnly = [Depends(_require_agent_token)]
 
 router = APIRouter(
@@ -137,13 +151,14 @@ def post_escalation_resolve(escalation_id: str, body: m.EscalationResolveRequest
 
 
 @router.get("/proposals", response_model=list[m.Proposal], **_exclude_unset)
-def get_proposals(svc: Service, status: m.ProposalStatus | None = None):
-    return svc.proposals(status)
+def get_proposals(book: Proposals, status: m.ProposalStatus | None = None):
+    return book.list(status)
 
 
+# async: applying a customer_event proposal schedules a surge in the run loop, which lives on the event loop.
 @router.post("/proposals/{proposal_id}/confirm", response_model=m.Proposal, responses=R404, **_exclude_unset)
-def post_proposal_confirm(proposal_id: str, body: m.ProposalConfirmRequest, svc: Service):
-    return svc.confirm_proposal(proposal_id, _body(body))
+async def post_proposal_confirm(proposal_id: str, body: m.ProposalConfirmRequest, book: Proposals):
+    return book.confirm(proposal_id, _body(body)["confirm"], via="ui")
 
 
 # ---------------------------------------------------------------- backtest, chat
@@ -159,8 +174,8 @@ def get_backtest(run_id: str, svc: Service):
 
 
 @router.post("/chat", response_model=m.ChatStarted, **_exclude_unset)
-def post_chat(body: m.ChatRequest, svc: Service):
-    return svc.chat(_body(body))
+async def post_chat(body: m.ChatRequest, agent: Agent):
+    return agent.start_chat(_body(body)["message"])
 
 
 # ---------------------------------------------------------------- context + agents (agents send X-Agent-Token)
@@ -208,7 +223,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        app.state.broadcaster.bind_loop(asyncio.get_running_loop())
         yield
+        await app.state.agent.wait_chats()
+        await app.state.broadcaster.stop()
         await app.state.runtime.stop()
 
     app = FastAPI(
@@ -239,7 +257,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     port, _ = create_live(settings.live_transport, broadcaster.broadcast)
     fallback = None if isinstance(port, WsLive) else WsLive(broadcaster.broadcast)
     live = LivePublisher(port, fallback=fallback, on_warning=broadcaster.broadcast)
-    app.state.runtime = RunLoop(service=service, hub=hub, live=live, store=store, start_sim_ts=settings.sim_start_ts)
+    app.state.runtime = runtime = RunLoop(service=service, hub=hub, live=live, store=store,
+                                          start_sim_ts=settings.sim_start_ts)
+    # Proposals and chat use /ws whatever the live transport (CONTRACTS.md §2).
+    app.state.proposals = proposals = ProposalBook(
+        service, clock=lambda: runtime.sim_ts, publish=broadcaster.send_soon,
+        schedule_customer_event=runtime.schedule_customer_event,
+    )
+    app.state.agent_tools = tools = AgentTools(service, proposals, runtime.set_crowd_effect)
+    app.state.agent = ClaudeAgent(
+        tools, create_llm(settings.claude_provider, settings.anthropic_api_key, settings.anthropic_model),
+        publish=broadcaster.send_soon, timezone=service.tariff["timezone"], engine_rule_error=engine.RuleError,
+    )
     install_error_handlers(app, engine.RuleError)
     app.include_router(router)
 

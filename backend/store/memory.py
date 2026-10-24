@@ -76,6 +76,9 @@ class MemoryStore(Store):
     def save_bill(self, bill: dict, lane: str) -> None:
         self._append("bills", {**bill, "lane": lane})
 
+    def bills(self) -> list[dict]:
+        return self.rows("bills")
+
     def save_backtest(self, run_id: str, results: list[dict]) -> None:
         self._append("backtest_results", *({**r, "run_id": run_id} for r in results))
 

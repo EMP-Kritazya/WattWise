@@ -6,23 +6,73 @@ Client → server frames are read only to notice disconnects; the viewer socket 
 
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 
+log = logging.getLogger("api.ws")
+
 
 class Broadcaster:
     def __init__(self) -> None:
         self._clients: set[WebSocket] = set()
+        self._loop: asyncio.AbstractEventLoop | None = None
+        self._queue: asyncio.Queue | None = None
+        self._sender: asyncio.Task | None = None
 
     @property
     def client_count(self) -> int:
         return len(self._clients)
 
+    def bind_loop(self, loop: asyncio.AbstractEventLoop) -> None:
+        self._loop = loop
+
+    def send_soon(self, message: BaseModel | dict[str, Any]) -> None:
+        """`broadcast` from sync code on any thread (REST threadpool, agent tools), in call order: one queue, one sender."""
+        try:
+            asyncio.get_running_loop()
+            on_loop = True
+        except RuntimeError:  # a worker thread
+            on_loop = False
+        if on_loop:
+            self._enqueue(message)
+        elif self._loop is not None and not self._loop.is_closed():
+            self._loop.call_soon_threadsafe(self._enqueue, message)
+        else:
+            log.debug("no event loop yet, so no viewer is connected; dropped one message")
+
+    def _enqueue(self, message: BaseModel | dict[str, Any]) -> None:
+        if self._queue is None or self._sender is None or self._sender.done():
+            self._queue = asyncio.Queue()
+            self._sender = asyncio.get_running_loop().create_task(self._send_queued(self._queue), name="ws-sender")
+        self._queue.put_nowait(message)
+
+    async def _send_queued(self, queue: asyncio.Queue) -> None:
+        while True:
+            message = await queue.get()
+            try:
+                await self.broadcast(message)
+            finally:
+                queue.task_done()
+
+    async def flush(self) -> None:
+        """Wait until every `send_soon` message has been sent (tests, shutdown)."""
+        if self._queue is not None:
+            await self._queue.join()
+
+    async def stop(self) -> None:
+        await self.flush()
+        if self._sender is not None:
+            self._sender.cancel()
+            self._sender = None
+
     async def serve(self, websocket: WebSocket) -> None:
+        self._loop = asyncio.get_running_loop()
         await websocket.accept()
         self._clients.add(websocket)
         try:
