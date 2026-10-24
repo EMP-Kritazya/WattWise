@@ -33,7 +33,11 @@ The whole restaurant in the current `plan.ts` layout, restyled as a toy miniatur
    Implemented in `Device3D.tsx`, `Restaurant.tsx` and `palette.ts`: running red LED; reduced teal outline/ring/LED and dashed
    teal cable; held faded body, dashed amber ring and 3D clock badge; off neutral grey. Added fryer baskets, four grill burners,
    oven/dishwasher handles, reach-in doors and ice-bin details.
-3. **Step 3, next:** toy diners (block body and round head) using the unused `Diners` in `Ambient.tsx`; a guest queue at the door after +40; a warm glow under each table; furniture in toy colours. Note that furniture is hidden while "Equipment focus" is on.
+3. **Step 3, done by Codex (checkpoint pending):** toy diners (block body and round head), a guest queue at the door after +40, warm table glows and toy-colour furniture.
+   - `Ambient.tsx` now supplies deterministic toy diners, a six-person entrance queue and table `LightPool`s.
+   - `Restaurant.tsx` derives visual seat occupancy from contract `customers_per_hour`; an unconsumed `surge_request` of +40 makes the queue appear immediately, even while paused. No derived business number is displayed.
+   - Furniture, diners and table glows remain hidden when **Equipment focus** is on; the table pools follow the lights device reading.
+   - Browser-verified at `/live` in demo mode after pressing **+40 customers** while the fixture was paused.
 4. **Step 4:** the right column. Use Fredoka and Nunito from Google Fonts; white cards with ink outline and 22 px corners.
    - **Gauge:** `live_tick.block_avg_kw` per lane against `target_kw`.
    - **Demand-charge card:** the escalation's `accept_overrun.projected.cost_delta_usd` (67.20 in the fixtures) against the chosen option's `cost_delta_usd` (0).
@@ -183,14 +187,17 @@ the browser simulation or hub work.
 - Verification: `npm test` passes 7 tests including replay-control coverage; `npm run build` passes. Browser-verified at `/live`:
   paused at 5:59 PM, stayed frozen for more than two seconds, then resumed from the same frame to 6:01 PM.
 
-### Active Codex Toy Box checkpoint — Step 2 complete, Step 3 next
+### Active Codex Toy Box checkpoint — Step 3 complete, Step 4 next
 - Preserved Claude's Step 1 toon materials, ink system, palette and warm lighting.
 - Device state is now intentionally sparse: ordinary running appliances do not get a floor halo; teal is reserved for a WattWise
   reduction, amber for a held job, and off devices are plain grey.
 - Browser-verified at the end-of-fixture state with HVAC 2 and the water heater reduced: both had teal outlines/rings and their
   hub cables changed to teal/dashed, while ordinary appliances retained pastel bodies and red LEDs.
-- Next: wire `Diners` into `Restaurant`, derive occupied seats from contract-provided `customers_per_hour`, show a fixture surge
-  queue without inventing numeric labels, and add the warm table pools controlled by the lights reading.
+- Added deterministic toy diners, contract-driven visual occupancy, table `LightPool`s controlled by the lights reading and a six-person
+  entrance queue for an unconsumed +40 surge request. Fixture surge updates now notify subscribers immediately while playback is paused.
+- Browser-verified the full-screen floor after pressing **+40 customers** at the paused end-of-fixture state.
+- Next: replace the Simulation view's duplicate KPI strip and appliance-list sidebar with the three-card Toy Box right rail (peak gauge,
+  demand-charge comparison and Claude card), using only contract values from `live_tick` and `live_escalation`.
 
 ## Demo focus: the judging round is the priority
 The live demo in judging is the main point. The app should **read as a simulation**: calm, clear, a few impactful moments.

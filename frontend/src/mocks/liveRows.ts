@@ -169,6 +169,7 @@ class FixtureLiveRows {
       created_at: new Date().toISOString(),
       consumed: false,
     });
+    this.notify([]);
   }
 
   private applyMessages(messages: WsMessage[]) {

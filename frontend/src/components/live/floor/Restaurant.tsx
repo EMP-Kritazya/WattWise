@@ -2,9 +2,10 @@ import { useMemo, type RefObject } from "react";
 import { Line } from "@react-three/drei";
 import type { Group } from "three";
 import type { Lane, TickState } from "@/types";
-import { Hub3D, LaneTitle, Lamps } from "./Ambient";
+import { useLive } from "@/data";
+import { Diners, GuestQueue, Hub3D, LaneTitle, Lamps } from "./Ambient";
 import { Device3D, type TagMode } from "./Device3D";
-import { TABLES, cableStart, cableRoute, type Placement } from "./plan";
+import { SEAT_ORDER, TABLES, cableStart, cableRoute, type Placement } from "./plan";
 import { Scenery } from "./Scenery";
 import { useLabelOffsets, type LabelAnchor } from "./useLabelOffsets";
 import { REDUCED_TEAL } from "./palette";
@@ -27,8 +28,16 @@ export interface RestaurantProps {
 
 /** One restaurant, drawn from one lane's tick. */
 export function Restaurant({ lane, tick, placement, detail, selected, onSelect, deviceRefs, position, labels, focus }: RestaurantProps) {
+  const requestedLargeSurge = useLive((state) => state.surge_request.some((request) => !request.consumed && request.customers >= 40));
   const readings = useMemo(() => new Map((tick?.hub.devices ?? []).map((r) => [r.device_id, r] as const)), [tick]);
   const deviceCount = placement.boxes.length + placement.lights.length;
+  const customersPerHour = tick?.customers_per_hour ?? 0;
+  // Visual occupancy only; the displayed customer number remains the engine-provided value in the HUD.
+  const occupied = useMemo(() => {
+    const seats = Math.min(SEAT_ORDER.length, Math.round(customersPerHour / 3));
+    return new Set(SEAT_ORDER.slice(0, seats));
+  }, [customersPerHour]);
+  const queueCount = requestedLargeSurge ? 6 : Math.min(6, Math.max(0, Math.ceil((customersPerHour - 82) / 7)));
 
   // Every working appliance is labelled (name + kW); WattWise's changes get the action label. Off: no label.
   const tags = useMemo(() => {
@@ -112,7 +121,7 @@ export function Restaurant({ lane, tick, placement, detail, selected, onSelect, 
               onSelect(selected === id ? null : id);
             }}
           >
-            <Lamps tables={l.tables} level={r && l.meta.device.rated_kw > 0 ? Math.min(1, r.power_kw / l.meta.device.rated_kw) : 0} />
+            {!focus && <Lamps tables={l.tables} level={r && l.meta.device.rated_kw > 0 ? Math.min(1, r.power_kw / l.meta.device.rated_kw) : 0} />}
             {selected === id &&
               l.tables.map((t) => (
                 <mesh key={t} position={[TABLES[t][0] + 0.5, 0.8, TABLES[t][1] + 0.5]} rotation-x={-Math.PI / 2}>
@@ -123,6 +132,8 @@ export function Restaurant({ lane, tick, placement, detail, selected, onSelect, 
           </group>
         );
       })}
+      {!focus && <Diners occupied={occupied} />}
+      {!focus && <GuestQueue count={queueCount} />}
       <Hub3D totalKw={tick?.hub.total_kw} deviceCount={deviceCount} showLabel={labels} />
       {detail === "compact" && <LaneTitle lane={lane} />}
     </group>

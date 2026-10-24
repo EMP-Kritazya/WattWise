@@ -45,4 +45,17 @@ describe("fixture simulation controls", () => {
     expect(fixtureLiveRows.snapshot().live_tick).toEqual([]);
     stop();
   });
+
+  it("publishes a surge request immediately while playback is paused", () => {
+    fixtureLiveRows.control({ action: "reset" });
+    let latest = fixtureLiveRows.snapshot();
+    const unsubscribe = fixtureLiveRows.subscribe((tables) => {
+      latest = tables;
+    });
+
+    fixtureLiveRows.requestSurge(40, 60);
+
+    expect(latest.surge_request.at(-1)).toMatchObject({ customers: 40, duration_min: 60, consumed: false });
+    unsubscribe();
+  });
 });
