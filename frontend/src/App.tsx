@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { BrowserRouter, Navigate, NavLink, Route, Routes } from "react-router";
-import { ChartColumn, ChefHat, LayoutDashboard, Leaf, Network } from "lucide-react";
+import { ChartColumn, ChefHat, LayoutDashboard, Leaf, Microscope, Network } from "lucide-react";
 import { ChatDrawer } from "@/components/ChatDrawer";
 import { EscalationDialog } from "@/components/live/EscalationDialog";
 import { StatusBar } from "@/components/StatusBar";
@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { AgentNetworkPage } from "@/pages/AgentNetworkPage";
 import { BuilderPage } from "@/pages/BuilderPage";
+import { EvalLabPage } from "@/pages/EvalLabPage";
 import { LivePage } from "@/pages/LivePage";
 import { ProofPage } from "@/pages/ProofPage";
 import { SimHostPage } from "@/pages/SimHostPage";
@@ -20,6 +21,7 @@ const NAV = [
   { to: "/agents", label: "Agent Network", icon: Network },
   { to: "/builder", label: "Kitchen Builder", icon: ChefHat },
   { to: "/proof", label: "Proof", icon: ChartColumn },
+  { to: "/eval", label: "Evaluation Lab", icon: Microscope },
 ];
 
 export default function App() {
@@ -48,6 +50,7 @@ export default function App() {
               <Route path="/live" element={<LivePage />} />
               <Route path="/agents" element={<AgentNetworkPage />} />
               <Route path="/proof" element={<ProofPage />} />
+              <Route path="/eval" element={<EvalLabPage />} />
               <Route path="/sim" element={<SimHostPage />} />
             </Routes>
             {/* On every screen: a waiting escalation pauses the clock, so the owner must always see it. */}
