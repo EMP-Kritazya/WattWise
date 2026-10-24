@@ -24,7 +24,7 @@ The whole restaurant in the current `plan.ts` layout, restyled as a toy miniatur
      - `Environment` removed (toon ignores it);
      - `ToneMappingMode.NEUTRAL`;
      - Street pose `pos [10.5,10,21] → target [10,0.4,4.5]`, looking down over the dining room as Ashirwad asked.
-2. **Step 2, done by Codex (pending checkpoint commit):** recognisable appliance shapes and the four states, on the appliance itself (UI_CONCEPTS.md §2):
+2. **Step 2, done by Codex (commit `57609e6`):** recognisable appliance shapes and the four states, on the appliance itself (UI_CONCEPTS.md §2):
    - **Running:** pastel, red LED, working detail lit.
    - **Reduced:** teal `#2EC4B6` floor ring, outline and LED; the cable to the hub turns teal and dashed.
    - **Held:** faded toward grey, dashed amber `#FFB703` ring, white clock badge.
@@ -33,17 +33,22 @@ The whole restaurant in the current `plan.ts` layout, restyled as a toy miniatur
    Implemented in `Device3D.tsx`, `Restaurant.tsx` and `palette.ts`: running red LED; reduced teal outline/ring/LED and dashed
    teal cable; held faded body, dashed amber ring and 3D clock badge; off neutral grey. Added fryer baskets, four grill burners,
    oven/dishwasher handles, reach-in doors and ice-bin details.
-3. **Step 3, done by Codex (checkpoint pending):** toy diners (block body and round head), a guest queue at the door after +40, warm table glows and toy-colour furniture.
+3. **Step 3, done by Codex (commit `56c1409`):** toy diners (block body and round head), a guest queue at the door after +40, warm table glows and toy-colour furniture.
    - `Ambient.tsx` now supplies deterministic toy diners, a six-person entrance queue and table `LightPool`s.
    - `Restaurant.tsx` derives visual seat occupancy from contract `customers_per_hour`; an unconsumed `surge_request` of +40 makes the queue appear immediately, even while paused. No derived business number is displayed.
    - Furniture, diners and table glows remain hidden when **Equipment focus** is on; the table pools follow the lights device reading.
    - Browser-verified at `/live` in demo mode after pressing **+40 customers** while the fixture was paused.
-4. **Step 4:** the right column. Use Fredoka and Nunito from Google Fonts; white cards with ink outline and 22 px corners.
+4. **Step 4, done by Codex (checkpoint pending):** the full-screen demo right column uses Fredoka and Nunito; white cards have ink outlines and 22 px corners.
    - **Gauge:** `live_tick.block_avg_kw` per lane against `target_kw`.
    - **Demand-charge card:** the escalation's `accept_overrun.projected.cost_delta_usd` (67.20 in the fixtures) against the chosen option's `cost_delta_usd` (0).
    - **Claude card:** from `live_escalation`.
-   - **Also:** hide the debug text in the sidebar and the duplicate KPI cards.
-5. **Step 5:** when WattWise acts, fade untouched objects about 30% and show pinned museum-style labels for a few seconds.
+   - **Also:** the demo hides the appliance/debug sidebar and duplicate KPI strip. Outside demo mode, the existing keyboard-accessible appliance inspector and owner controls remain available.
+   - `ToyBoxRail.tsx` reads typed `live_tick` and `live_escalation` rows directly. Gauge geometry is presentational only; every displayed kW and dollar value remains contract-provided.
+   - Browser-verified at `/live` in full-screen demo mode: 37.9 kW With, 33.2 kW ghost Without, 40.0 kW cap, +$67.20 projected overrun, $0 chosen-option cost and “Claude chose 3 of 3.”
+5. **Step 5, done by Codex (checkpoint pending):** when a new executed `live_feed` decision arrives, unrelated appliances fade 30% toward the Toy Box background, their secondary status effects and cables quiet down, and the changed appliance receives a brighter outline, cable and light.
+   - The pinned museum card stays for 6.5 seconds and uses only the engine decision: appliance/action plus `effect.peak_before_kw` → `effect.peak_after_kw`.
+   - It reuses each appliance's always-mounted drei `Html` anchor instead of adding another floating React root.
+   - Browser-verified during a 600× fixture replay: the walk-in cooler decision pinned to the appliance as “Turn down to 50% · 15-min peak 40.1 kW → 39.2 kW.”
 
 ### Rules
 - **No numbers from the browser:** never compute a number, e.g. kW × $/kW. If a figure isn't in the contract, show kW only and add a contract question.
@@ -187,7 +192,7 @@ the browser simulation or hub work.
 - Verification: `npm test` passes 7 tests including replay-control coverage; `npm run build` passes. Browser-verified at `/live`:
   paused at 5:59 PM, stayed frozen for more than two seconds, then resumed from the same frame to 6:01 PM.
 
-### Active Codex Toy Box checkpoint — Step 3 complete, Step 4 next
+### Active Codex Toy Box checkpoint — Steps 1–5 complete
 - Preserved Claude's Step 1 toon materials, ink system, palette and warm lighting.
 - Device state is now intentionally sparse: ordinary running appliances do not get a floor halo; teal is reserved for a WattWise
   reduction, amber for a held job, and off devices are plain grey.
@@ -196,8 +201,15 @@ the browser simulation or hub work.
 - Added deterministic toy diners, contract-driven visual occupancy, table `LightPool`s controlled by the lights reading and a six-person
   entrance queue for an unconsumed +40 surge request. Fixture surge updates now notify subscribers immediately while playback is paused.
 - Browser-verified the full-screen floor after pressing **+40 customers** at the paused end-of-fixture state.
-- Next: replace the Simulation view's duplicate KPI strip and appliance-list sidebar with the three-card Toy Box right rail (peak gauge,
-  demand-charge comparison and Claude card), using only contract values from `live_tick` and `live_escalation`.
+- Added `ToyBoxRail.tsx`: the judge-facing demo now has the semicircle With/Without/cap gauge, contract-backed demand-charge comparison,
+  and live Claude status/rationale card. The duplicate KPI strip and appliance/debug sidebar are hidden in demo mode; the inspector stays
+  available outside demo mode so appliance selection and owner controls are not removed.
+- The default floor view now shows the complete restaurant; **Equipment focus** remains available to hide furniture on demand.
+- Added the 6.5-second decision spotlight from executed `live_feed` rows: untouched appliances fade toward the background, non-target
+  effects/cables quiet down, and the changed appliance gets a bright outline, cable, local light and pinned museum card.
+- Browser-verified a fresh walk-in cooler decision during a 600× replay; the pin displayed only engine-provided action and peak-effect values.
+- The chosen Toy Box build order is complete. The remaining known cleanup is the older drei `Html` unmount warning noted above; it is not a
+  visible demo blocker, and the new decision pin does not create another `Html` root.
 
 ## Demo focus: the judging round is the priority
 The live demo in judging is the main point. The app should **read as a simulation**: calm, clear, a few impactful moments.

@@ -10,6 +10,7 @@ import {
   ACCENT,
   APPLIANCE,
   APPLIANCE_BY_CATEGORY,
+  BACKGROUND,
   HELD_AMBER,
   INK,
   OFF_TINT,
@@ -22,6 +23,12 @@ import { Ink, Toon } from "./toon";
 
 export type TagMode = "none" | "kw" | "action" | "status";
 
+export interface DecisionSpotlight {
+  deviceId: string;
+  title: string;
+  detail: string;
+}
+
 export interface DeviceProps {
   placed: PlacedDevice;
   reading?: HubDeviceReading;
@@ -29,6 +36,8 @@ export interface DeviceProps {
   /** Pixels to lift the label so it doesn't overlap a neighbour's (a leader line fills the gap). */
   labelLift?: number;
   selected: boolean;
+  dimmed?: boolean;
+  spotlight?: DecisionSpotlight | null;
   interactive: boolean;
   onSelect: (id: string | null) => void;
 }
@@ -39,7 +48,7 @@ const OFF_GREY = OFF_TINT;
 
 /** One piece of equipment: body, type details, status light, and glow that follows its live load. */
 export const Device3D = forwardRef<Group, DeviceProps>(function Device3D(
-  { placed, reading, tag, labelLift = 0, selected, interactive, onSelect },
+  { placed, reading, tag, labelLift = 0, selected, dimmed = false, spotlight, interactive, onSelect },
   ref,
 ) {
   const { meta, box } = placed;
@@ -58,12 +67,14 @@ export const Device3D = forwardRef<Group, DeviceProps>(function Device3D(
   const isWaiting = state === "waiting";
   // The body tells the operating state; intervention colours are reserved for reduced and held equipment.
   const statusColor = state ? STATE_HEX[state] : OFF_GREY;
-  const bodyColor = state == null || state === "off"
+  const baseBodyColor = state == null || state === "off"
     ? OFF_TINT
     : isWaiting
       ? new Color(pastel).lerp(new Color(OFF_TINT), 0.68).getStyle()
       : pastel;
-  const outlineColor = isReduced ? REDUCED_TEAL : isWaiting ? HELD_AMBER : INK;
+  const bodyColor = dimmed ? new Color(baseBodyColor).lerp(new Color(BACKGROUND), 0.3).getStyle() : baseBodyColor;
+  const baseOutlineColor = spotlight ? REDUCED_TEAL : isReduced ? REDUCED_TEAL : isWaiting ? HELD_AMBER : INK;
+  const outlineColor = dimmed ? new Color(baseOutlineColor).lerp(new Color(BACKGROUND), 0.45).getStyle() : baseOutlineColor;
   const ledColor = isReduced ? REDUCED_TEAL : RUNNING_LED;
 
   return (
@@ -89,23 +100,24 @@ export const Device3D = forwardRef<Group, DeviceProps>(function Device3D(
       {type === "water_heater" ? (
         <mesh position={[0, h / 2, 0]} castShadow receiveShadow>
           <cylinderGeometry args={[Math.min(w, d) * 0.45, Math.min(w, d) * 0.45, h, 32]} />
-          <Toon color={bodyColor} emissive={selected ? "#ffffff" : "#000000"} emissiveIntensity={selected ? 0.1 : 0} />
-          <Ink color={outlineColor} thickness={isReduced || isWaiting ? 3.2 : 2.2} />
+          <Toon color={bodyColor} transparent={dimmed} opacity={dimmed ? 0.7 : 1} emissive={selected || spotlight ? "#ffffff" : "#000000"} emissiveIntensity={spotlight ? 0.18 : selected ? 0.1 : 0} />
+          <Ink color={outlineColor} thickness={spotlight ? 4 : isReduced || isWaiting ? 3.2 : dimmed ? 1.3 : 2.2} />
         </mesh>
       ) : (
         <RoundedBox args={[w, h, d]} radius={Math.min(0.07, w / 6, d / 6)} smoothness={3} position={[0, h / 2, 0]} castShadow receiveShadow>
-          <Toon color={bodyColor} emissive={selected ? "#ffffff" : "#000000"} emissiveIntensity={selected ? 0.1 : 0} />
-          <Ink color={outlineColor} thickness={isReduced || isWaiting ? 3.2 : 2.2} />
+          <Toon color={bodyColor} transparent={dimmed} opacity={dimmed ? 0.7 : 1} emissive={selected || spotlight ? "#ffffff" : "#000000"} emissiveIntensity={spotlight ? 0.18 : selected ? 0.1 : 0} />
+          <Ink color={outlineColor} thickness={spotlight ? 4 : isReduced || isWaiting ? 3.2 : dimmed ? 1.3 : 2.2} />
         </RoundedBox>
       )}
 
       <Details type={type} w={w} d={d} h={h} load={load} accent={accent} state={state ?? "unknown"} category={meta.category} />
 
-      {(isRunning || isReduced) && <StatusLed position={[w / 2 - 0.13, h + 0.07, d / 2 - 0.13]} color={ledColor} />}
-      {(isReduced || isWaiting) && (
+      {!dimmed && (isRunning || isReduced) && <StatusLed position={[w / 2 - 0.13, h + 0.07, d / 2 - 0.13]} color={ledColor} />}
+      {!dimmed && (isReduced || isWaiting) && (
         <StateRing radius={Math.max(w, d) * 0.72 + 0.25} color={statusColor} dashed={isWaiting} />
       )}
-      {isWaiting && <ClockBadge position={[0, h + 0.55, 0]} />}
+      {!dimmed && isWaiting && <ClockBadge position={[0, h + 0.55, 0]} />}
+      {spotlight && <pointLight position={[0, h + 1.4, 0]} color="#FFF1DE" intensity={1.8} distance={5} />}
 
       {selected && (
         <mesh position={[0, h / 2, 0]}>
@@ -115,16 +127,18 @@ export const Device3D = forwardRef<Group, DeviceProps>(function Device3D(
         </mesh>
       )}
 
-      <Html position={[0, h + 0.3, 0]} zIndexRange={selected ? [60, 50] : [30, 10]} pointerEvents="none" style={{ transform: "translate(-50%, -100%)" }}>
+      <Html position={[0, h + 0.3, 0]} zIndexRange={spotlight ? [80, 70] : selected ? [60, 50] : [30, 10]} pointerEvents="none" style={{ transform: "translate(-50%, -100%)" }}>
         {/* Lifted clear of neighbouring labels (see useLabelOffsets), with a leader line back to the appliance. */}
         <div className="flex flex-col items-center">
-          {selected || hovered ? (
+          {spotlight ? (
+            <DecisionPin title={spotlight.title} detail={spotlight.detail} />
+          ) : selected || hovered ? (
             <HoverTag meta={meta} reading={reading} />
-          ) : tag === "action" && reading ? (
+          ) : !dimmed && tag === "action" && reading ? (
             <ActionTag text={meta.device.name} kw={power} state={state ?? "unknown"} />
-          ) : tag === "status" ? (
+          ) : !dimmed && tag === "status" ? (
             <StatusTag name={meta.device.name} kw={power} state={state ?? "off"} />
-          ) : tag === "kw" ? (
+          ) : !dimmed && tag === "kw" ? (
             <KwTag name={meta.device.name} kw={reading?.power_kw} color={state ? STATE_HEX[state] : "#64748b"} />
           ) : null}
           {tag !== "none" && !selected && !hovered && labelLift > 2 && (
@@ -369,6 +383,19 @@ function KwTag({ name, kw, color }: { name: string; kw?: number; color: string }
       <span className="size-1.5 rounded-full" style={{ background: color }} />
       <span className="text-white/70">{name}</span>
       <span className="font-semibold text-white tabular-nums">{fmtKw(kw)}</span>
+    </div>
+  );
+}
+
+function DecisionPin({ title, detail }: { title: string; detail: string }) {
+  return (
+    <div className="flex flex-col items-center font-['Nunito',sans-serif] text-[#22223B]">
+      <div className="w-[250px] rounded-[16px] border-2 border-[#22223B] border-l-[7px] border-l-[#2EC4B6] bg-white px-3 py-2.5 shadow-[0_4px_0_#22223B]">
+        <div className="font-['Fredoka',sans-serif] text-sm font-bold">{title}</div>
+        <div className="mt-0.5 text-[11px] font-bold text-[#5B5968]">{detail}</div>
+      </div>
+      <div className="h-9 w-0.5 bg-[#22223B]" />
+      <div className="size-2 rounded-full border-2 border-[#22223B] bg-[#2EC4B6]" />
     </div>
   );
 }

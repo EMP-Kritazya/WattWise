@@ -4,7 +4,7 @@ import type { Group } from "three";
 import type { Lane, TickState } from "@/types";
 import { useLive } from "@/data";
 import { Diners, GuestQueue, Hub3D, LaneTitle, Lamps } from "./Ambient";
-import { Device3D, type TagMode } from "./Device3D";
+import { Device3D, type DecisionSpotlight, type TagMode } from "./Device3D";
 import { SEAT_ORDER, TABLES, cableStart, cableRoute, type Placement } from "./plan";
 import { Scenery } from "./Scenery";
 import { useLabelOffsets, type LabelAnchor } from "./useLabelOffsets";
@@ -24,10 +24,12 @@ export interface RestaurantProps {
   labels: boolean;
   /** Equipment focus: hide furniture, darken floors, so only appliances stand out. */
   focus: boolean;
+  /** Short judge-facing focus moment driven by the newest executed engine decision. */
+  spotlight: DecisionSpotlight | null;
 }
 
 /** One restaurant, drawn from one lane's tick. */
-export function Restaurant({ lane, tick, placement, detail, selected, onSelect, deviceRefs, position, labels, focus }: RestaurantProps) {
+export function Restaurant({ lane, tick, placement, detail, selected, onSelect, deviceRefs, position, labels, focus, spotlight }: RestaurantProps) {
   const requestedLargeSurge = useLive((state) => state.surge_request.some((request) => !request.consumed && request.customers >= 40));
   const readings = useMemo(() => new Map((tick?.hub.devices ?? []).map((r) => [r.device_id, r] as const)), [tick]);
   const deviceCount = placement.boxes.length + placement.lights.length;
@@ -87,6 +89,8 @@ export function Restaurant({ lane, tick, placement, detail, selected, onSelect, 
             tag={tag}
             labelLift={lifts[id] ?? 0}
             selected={selected === id}
+            dimmed={spotlight != null && spotlight.deviceId !== id}
+            spotlight={spotlight?.deviceId === id ? spotlight : null}
             interactive={true}
             onSelect={onSelect}
           />
@@ -96,15 +100,16 @@ export function Restaurant({ lane, tick, placement, detail, selected, onSelect, 
       {placement.boxes.map((p) => {
         const id = p.meta.device.device_id;
         const reduced = readings.get(id)?.state === "reduced";
+        const highlighted = spotlight?.deviceId === id;
         return (
           <Line
             key={`cable:${id}`}
             points={cableRoute(cableStart(p)).map(([x, y]) => [x, 0.025, y] as [number, number, number])}
-            color={reduced ? REDUCED_TEAL : "#94a3b8"}
+            color={highlighted || reduced ? REDUCED_TEAL : "#94a3b8"}
             transparent
-            opacity={reduced ? 0.9 : selected === id ? 0.8 : 0.12}
-            lineWidth={reduced ? 2.4 : 1}
-            dashed={reduced}
+            opacity={spotlight ? (highlighted ? 1 : 0.04) : reduced ? 0.9 : selected === id ? 0.8 : 0.12}
+            lineWidth={highlighted || reduced ? 2.4 : 1}
+            dashed={highlighted || reduced}
             dashSize={0.22}
             gapSize={0.12}
           />

@@ -10,6 +10,7 @@ import { WarningBanner } from "@/components/live/WarningBanner";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useDeviceMeta } from "@/hooks/useDeviceMeta";
+import { fmtAction, fmtKw } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { requestSurge, useDashboardStore as useSim } from "@/data";
 import { transport } from "@/transport";
@@ -17,7 +18,9 @@ import { DemoBar, newestDecision } from "./Hud";
 import { BACKGROUND, STATE_HEX } from "./palette";
 import { placeDevices, type Placement } from "./plan";
 import { Restaurant } from "./Restaurant";
+import type { DecisionSpotlight } from "./Device3D";
 import { DemandSummary, OperationsPanel } from "./OperationsPanel";
+import { ToyBoxRail } from "./ToyBoxRail";
 
 type Vec3 = [number, number, number];
 type Mode = "with" | "without" | "compare";
@@ -74,7 +77,8 @@ export function LiveFloor({ demo, onDemoChange }: { demo: boolean; onDemoChange:
   const [mode, setMode] = useState<Mode>("with");
   const [view, setView] = useState<View>("iso");
   const [labels, setLabels] = useState(true);
-  const [focus, setFocus] = useState(true);
+  // The Toy Box restaurant is the judge-facing default; Equipment focus remains available for isolating appliances.
+  const [focus, setFocus] = useState(false);
   const [follow, setFollow] = useState(false);
   const perspective = view === "street" || view === "pov";
   // Side by side only works from above.
@@ -92,6 +96,23 @@ export function LiveFloor({ demo, onDemoChange }: { demo: boolean; onDemoChange:
   // Follow decisions: fly to the device WattWise just acted on, hold, then pull back.
   const newest = useMemo(() => newestDecision(feed), [feed]);
   const newestKey = newest ? `${newest.decision.decision_id}:${newest.decision.status}` : null;
+  const [spotlightEvent, setSpotlightEvent] = useState<typeof newest>(null);
+  useEffect(() => {
+    if (!newest || newest.decision.status !== "executed") return;
+    setSpotlightEvent(newest);
+    const timer = setTimeout(() => setSpotlightEvent(null), 6500);
+    return () => clearTimeout(timer);
+  }, [newestKey]);
+  const spotlight = useMemo<DecisionSpotlight | null>(() => {
+    if (!spotlightEvent) return null;
+    const decision = spotlightEvent.decision;
+    const name = metas.find((meta) => meta.device.device_id === decision.device_id)?.device.name ?? decision.device_id;
+    return {
+      deviceId: decision.device_id,
+      title: `${name} · ${fmtAction(decision.action, decision.value)}`,
+      detail: `15-min peak ${fmtKw(decision.effect.peak_before_kw)} → ${fmtKw(decision.effect.peak_after_kw)}`,
+    };
+  }, [spotlightEvent, metas]);
   useEffect(() => {
     if (!newest || !follow || mode !== "with" || selected) return;
     if (newest.decision.status !== "executed") return;
@@ -230,8 +251,13 @@ export function LiveFloor({ demo, onDemoChange }: { demo: boolean; onDemoChange:
           <WarningBanner />
         </div>
       )}
-      <DemandSummary />
-      <div className={cn("grid min-h-0 lg:grid-cols-[minmax(0,1fr)_360px]", demo ? "flex-1 lg:min-h-[560px]" : "lg:h-[620px]")}>
+      {!demo && <DemandSummary />}
+      <div
+        className={cn(
+          "grid min-h-0",
+          demo ? "flex-1 lg:min-h-[560px] lg:grid-cols-[minmax(0,1fr)_370px]" : "lg:h-[620px] lg:grid-cols-[minmax(0,1fr)_360px]",
+        )}
+      >
         <div
           ref={container}
           className={cn("relative min-w-0 overflow-hidden", demo ? "min-h-[400px] lg:min-h-[460px]" : "h-[420px] lg:h-[620px]")}
@@ -263,11 +289,17 @@ export function LiveFloor({ demo, onDemoChange }: { demo: boolean; onDemoChange:
 
             {mode === "compare" ? (
               <>
-                <Restaurant lane="without" tick={withoutTick} detail="compact" position={compare.without} {...shared} />
-                <Restaurant lane="with" tick={withTick} detail="compact" position={compare.with} {...shared} />
+                <Restaurant lane="without" tick={withoutTick} detail="compact" position={compare.without} spotlight={null} {...shared} />
+                <Restaurant lane="with" tick={withTick} detail="compact" position={compare.with} spotlight={spotlight} {...shared} />
               </>
             ) : (
-              <Restaurant lane={mode} tick={mode === "with" ? withTick : withoutTick} detail="full" {...shared} />
+              <Restaurant
+                lane={mode}
+                tick={mode === "with" ? withTick : withoutTick}
+                detail="full"
+                spotlight={mode === "with" ? spotlight : null}
+                {...shared}
+              />
             )}
             {perspective ? (
               <>
@@ -306,7 +338,7 @@ export function LiveFloor({ demo, onDemoChange }: { demo: boolean; onDemoChange:
             <span className="text-slate-500">· {mode === "compare" ? "same customers in both" : "click an appliance for details"} · simulated</span>
           </div>
         </div>
-        <OperationsPanel mode={mode} selected={selected} onSelect={setSelected} />
+        {demo ? <ToyBoxRail /> : <OperationsPanel mode={mode} selected={selected} onSelect={setSelected} />}
       </div>
     </section>
   );
