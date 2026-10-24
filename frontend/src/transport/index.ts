@@ -1,4 +1,3 @@
-import { mockTransport } from "@/mocks/server";
 import { realTransport } from "./real";
 import type { Transport } from "./types";
 
@@ -46,6 +45,5 @@ const lazyFixtureTransport: Transport = {
   },
 };
 
-/** Fixture mode is the contract source of truth; the old hand-written mock remains available only during screen migration. */
-export const transport: Transport =
-  import.meta.env.VITE_MOCKS === "1" ? lazyFixtureTransport : import.meta.env.VITE_MOCK === "1" ? mockTransport : realTransport;
+/** Fixture mode (`VITE_MOCKS=1`) serves `contracts/fixtures/`; otherwise the real FastAPI server. */
+export const transport: Transport = import.meta.env.VITE_MOCKS === "1" ? lazyFixtureTransport : realTransport;

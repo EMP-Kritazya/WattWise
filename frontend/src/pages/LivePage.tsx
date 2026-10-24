@@ -3,7 +3,6 @@ import { Link } from "react-router";
 import { ContextStrip } from "@/components/live/ContextStrip";
 import { DecisionFeed } from "@/components/live/DecisionFeed";
 import { EscalationCard } from "@/components/live/EscalationCard";
-import { DevicePowerCard } from "@/components/live/DevicePowerCard";
 import { LiveFloor } from "@/components/live/floor/LiveFloor";
 import { KpiRow } from "@/components/live/KpiRow";
 import { PowerTrendCard } from "@/components/live/LaneChart";
@@ -59,12 +58,9 @@ export function LivePage() {
         <EscalationCard />
         <LiveFloor demo={demo} onDemoChange={setDemoMode} />
         <KpiRow />
-        <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.3fr)_minmax(0,1fr)]">
-          <DevicePowerCard />
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
           <PowerTrendCard />
-          <div className="lg:col-span-2 2xl:col-span-1">
-            <DecisionFeed />
-          </div>
+          <DecisionFeed />
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { HubLink, useHubStatus, type HubConnectionState } from "@/hub";
 
-export const isFixtureHub = import.meta.env.VITE_MOCKS === "1" || import.meta.env.VITE_MOCK === "1";
+export const isFixtureHub = import.meta.env.VITE_MOCKS === "1";
 
 /** Data-boundary hook for the dedicated /sim screen; screens never import the simulation or hub directly. */
 export function useHubHost() {

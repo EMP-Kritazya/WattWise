@@ -5,7 +5,7 @@ React + TypeScript + Vite, Tailwind v4, shadcn/ui, Recharts, Zustand. Owner: Ash
 ## Run
 ```
 npm install
-npm run dev:mock   # in-browser fake server (src/mocks), no backend needed
+npm run dev:mocks  # fixture mode: serves contracts/fixtures/ in the browser, no backend needed
 npm run dev        # real FastAPI server; Vite proxies /api and /ws to http://localhost:8000 (override with API_TARGET)
 npm run build      # type-check + production build; run before calling anything done
 ```
@@ -16,7 +16,7 @@ Needs Node 20.19+ (Vite 7).
 |---|---|
 | `src/types/` | Contract types. `contracts.ts` is a **STUB** transcribed from `docs/CONTRACTS.md`; replace with generated types (below) |
 | `src/transport/` | One `Transport` interface: a method per REST endpoint + the `/ws` stream. `real.ts` talks to FastAPI |
-| `src/mocks/` | The same interface, faked in the browser: seeded ticks for both lanes, decisions, approvals, warnings, chat |
+| `src/mocks/` | The same interface, served from `contracts/fixtures/` (REST, viewer `/ws`, SpacetimeDB rows, mock `/ws/hub` server) |
 | `src/store/` | Zustand store. `ingest.ts` buffers `/ws` messages and flushes 4×/s |
 | `src/pages/` | Builder, Live, Proof |
 | `src/components/live/` | Top bar, kitchen floor + hub, KPI row, two-lane chart, decision feed, approval dialog, warning banner |

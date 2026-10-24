@@ -1,12 +1,12 @@
 import { useMemo } from "react";
-import { Bot, Cloud, Cpu, Network, Ticket, User, Users, Zap, type LucideIcon } from "lucide-react";
+import { Bot, Cloud, Cpu, Network, Ticket, Users, Zap, type LucideIcon } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAgentLog } from "@/data";
 import { cn } from "@/lib/utils";
 import type { AgentLog } from "@/types";
 
 // The agents talking (UI.md "Agent Network"): the Concierge in the centre, the Weather / Grid / Events agents around it,
-// Claude and the WattWise engine as nodes, and the owner. Each new agent_log row travels along its edge.
+// Claude and the WattWise engine as nodes (the contract's agent names). Each new agent_log row travels along its edge.
 
 interface Node {
   id: string;
@@ -25,7 +25,6 @@ const NODES: Node[] = [
   { id: "events", label: "Events", sub: "agent", x: 490, y: 80, icon: Ticket, color: "oklch(0.75 0.15 330)" },
   { id: "claude", label: "Claude", sub: "explains · resolves escalations", x: 490, y: 350, icon: Bot, color: "oklch(0.72 0.15 50)" },
   { id: "engine", label: "WattWise engine", sub: "decides · computes every number", x: 110, y: 350, icon: Cpu, color: "oklch(0.72 0.14 250)" },
-  { id: "owner", label: "Owner", sub: "ASI:One · this dashboard", x: 300, y: 400, icon: User, color: "oklch(0.85 0.02 260)" },
 ];
 const NODE = Object.fromEntries(NODES.map((n) => [n.id, n]));
 const EDGES: [string, string][] = [
@@ -33,11 +32,8 @@ const EDGES: [string, string][] = [
   ["concierge", "grid"],
   ["concierge", "events"],
   ["concierge", "claude"],
-  ["concierge", "owner"],
   ["engine", "claude"],
-  ["claude", "owner"],
   ["concierge", "engine"],
-  ["owner", "engine"],
 ];
 
 /** Agents not in the fixed layout still show up, parked near the Concierge. */

@@ -1,7 +1,5 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
-  Bar,
-  BarChart,
   CartesianGrid,
   Legend,
   Line,
@@ -13,7 +11,6 @@ import {
   YAxis,
 } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { fmtKw, fmtSimTime } from "@/lib/format";
 import { LANE_COLOR, LANE_LABEL } from "@/lib/theme";
 import { useDashboardStore as useSim } from "@/data";
@@ -33,31 +30,17 @@ interface Row {
   forecast?: number;
 }
 
-/** Both lanes over time: the last 3 sim hours as lines, or today's 15-minute demand blocks as bars. */
+/** Both lanes over the last 3 sim hours, with the cap, each lane's month peak and the forecast (UI.md two-lane chart). */
 export function PowerTrendCard() {
-  const [view, setView] = useState<"lines" | "blocks">("lines");
   return (
     <Card className="min-w-0 gap-2 py-4">
       <CardHeader className="px-4">
         <CardTitle>Without vs with WattWise</CardTitle>
-        <CardDescription>{view === "lines" ? "Total kW, last 3 sim hours + 2 h forecast" : "15-minute averages today: the highest one sets the demand charge"} · simulated</CardDescription>
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          size="sm"
-          className="mt-1"
-          value={view}
-          onValueChange={(v) => v && setView(v as "lines" | "blocks")}
-        >
-          <ToggleGroupItem value="lines" className="px-3">
-            Last 3 h
-          </ToggleGroupItem>
-          <ToggleGroupItem value="blocks" className="px-3">
-            15-min blocks
-          </ToggleGroupItem>
-        </ToggleGroup>
+        <CardDescription>Total kW, last 3 sim hours + 2 h forecast · simulated</CardDescription>
       </CardHeader>
-      <CardContent className="h-64 px-2">{view === "lines" ? <LanesLines /> : <DemandBlocks />}</CardContent>
+      <CardContent className="h-64 px-2">
+        <LanesLines />
+      </CardContent>
     </Card>
   );
 }
@@ -117,41 +100,6 @@ function LanesLines() {
         <Line name={`${LANE_LABEL.with} (simulated)`} dataKey="with" stroke={LANE_COLOR.with} strokeWidth={2} dot={false} isAnimationActive={false} connectNulls />
         <Line name="Forecast (simulated)" dataKey="forecast" stroke={LANE_COLOR.with} strokeDasharray="5 4" dot={false} isAnimationActive={false} connectNulls />
       </LineChart>
-    </ResponsiveContainer>
-  );
-}
-
-function DemandBlocks() {
-  const blocks = useSim((s) => s.blocks);
-  const cap = useSim((s) => s.latest.with?.meter.target_kw);
-
-  const data = useMemo(() => {
-    const rows = new Map<number, Row>();
-    const row = (t: number) => rows.get(t) ?? rows.set(t, { t }).get(t)!;
-    for (const b of blocks.without) row(b.start).without = b.avg_kw;
-    for (const b of blocks.with) row(b.start).with = b.avg_kw;
-    return [...rows.values()].sort((a, b) => a.t - b.t);
-  }, [blocks]);
-
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }} barGap={1} barCategoryGap="18%">
-        <CartesianGrid stroke={GRID} vertical={false} />
-        <XAxis dataKey="t" tickFormatter={(t: number) => fmtSimTime(t)} tick={AXIS_TICK} stroke={GRID} minTickGap={30} />
-        <YAxis tick={AXIS_TICK} stroke={GRID} width={36} domain={[0, "auto"]} />
-        <Tooltip {...TOOLTIP} cursor={{ fill: "oklch(1 0 0 / 5%)" }} labelFormatter={(t) => `Block from ${fmtSimTime(Number(t))}`} formatter={(v) => fmtKw(Number(v))} />
-        <Legend wrapperStyle={{ fontSize: 11 }} />
-        {cap != null && (
-          <ReferenceLine
-            y={cap}
-            stroke="var(--cap-line)"
-            strokeDasharray="6 4"
-            label={{ value: `Peak cap ${fmtKw(cap)}`, position: "insideTopLeft", fontSize: 11, fill: "var(--cap-line)" }}
-          />
-        )}
-        <Bar name={`${LANE_LABEL.without} (simulated)`} dataKey="without" fill={LANE_COLOR.without} radius={[3, 3, 0, 0]} isAnimationActive={false} />
-        <Bar name={`${LANE_LABEL.with} (simulated)`} dataKey="with" fill={LANE_COLOR.with} radius={[3, 3, 0, 0]} isAnimationActive={false} />
-      </BarChart>
     </ResponsiveContainer>
   );
 }
