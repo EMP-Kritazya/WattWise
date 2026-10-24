@@ -77,6 +77,10 @@ class Hub:
     def __init__(self, devices: list) -> None:  # list[devices.SimDevice]
         self._devices = {d.device_id: d for d in devices}
         self.log: list[Command] = []  # every command delivered, in order
+        # Food orders are split evenly across the cooking (demand_driven) equipment.
+        cooks = [d for d in devices if d.power_model == "demand_driven"]
+        for d in cooks:
+            d.cook_share = 1 / len(cooks)
 
     # ----- contract (section 8) -----
 
@@ -102,3 +106,11 @@ class Hub:
         """Step every device `minutes` forward. `orders`: new food orders this step (from customer arrivals)."""
         for d in self._devices.values():
             d.step(ts=ts, minutes=minutes, orders=orders, outdoor_temp_c=outdoor_temp_c)
+
+    def ingest_reading(self, device_id: str, power_kw: float) -> DeviceView:
+        """A real ESP32 reading: that device uses `power_kw` (source "measured") on the next advance only (ENGINE.md 6c)."""
+        device = self._devices.get(device_id)
+        if device is None:
+            raise UnknownDevice(device_id)
+        device.measured_kw = max(0.0, float(power_kw))
+        return device.view()

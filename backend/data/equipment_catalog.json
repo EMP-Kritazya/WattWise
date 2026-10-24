@@ -7,7 +7,7 @@
     "rated_kw": 12.0,
     "min_power_pct": 40,
     "power_model": "thermal",
-    "params": { "setpoint_c": 22.0, "r_c_per_kw": 2.5, "c_kwh_per_c": 1.5 },
+    "params": { "setpoint_c": 22.0, "r_c_per_kw": 0.25, "c_kwh_per_c": 3.0, "internal_gain_kw": 6.0 },
     "default_limits": { "min_power_pct": 40, "max_reduce_min": 30 },
     "source_note": "PLACEHOLDER typical ~10-ton rooftop unit; verify with ENERGY STAR light commercial HVAC data"
   },

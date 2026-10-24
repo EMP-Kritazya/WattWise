@@ -3,13 +3,19 @@
 The run loop creates ONE source and passes the same events to both lanes. Labelled "simulated customer flow".
 Deterministic: same seed + same calls → same arrivals.
 
-SKELETON (Phase 1): interface final; the Poisson draw and crowd multiplier are Phase 2.
+Rate (customers/hour) = profile at the local time (linear between hours, 0 when closed) × crowd multiplier
++ each active surge's customers spread evenly over its duration. Arrivals in a step are a seeded Poisson draw;
+each customer places one food order.
 """
 
 from __future__ import annotations
 
+import math
 import random
+from datetime import timedelta
 from typing import TypedDict
+
+from engine.devices import local_hour, parse_ts
 
 
 class Surge(TypedDict):
@@ -40,6 +46,41 @@ class CustomerSource:
         self.profile = dict(profile or DEFAULT_PROFILE)
         self.crowd_multiplier = crowd_multiplier  # from context (events nearby); 1.0 without context
 
+    def rate_per_hour(self, ts: str, surges: list[Surge]) -> float:
+        """Customers/hour at `ts`: the profile (× crowd multiplier) plus every active surge."""
+        h = local_hour(ts)
+        lo = int(math.floor(h))
+        base = 0.0
+        if lo in self.profile:  # closed hours aren't in the profile → 0; ramps toward the next hour's value
+            base = self.profile[lo] + (self.profile.get(lo + 1, 0.0) - self.profile[lo]) * (h - lo)
+        rate = base * self.crowd_multiplier
+        now = parse_ts(ts)
+        for s in surges:
+            start = parse_ts(s["start_ts"])
+            if start <= now < start + timedelta(minutes=s["duration_min"]):
+                rate += s["customers"] * 60 / s["duration_min"]
+        return rate
+
     def events(self, ts: str, minutes: int, surges: list[Surge]) -> list[CustomerEvent]:
         """Arrivals for the step starting at `ts` lasting `minutes`, including any active surges."""
-        raise NotImplementedError("Phase 2: seeded Poisson arrivals + surges + crowd multiplier")
+        rate = self.rate_per_hour(ts, surges)
+        arrivals = self._poisson(rate * minutes / 60)
+        return [
+            {
+                "ts": ts,
+                "minutes": minutes,
+                "arrivals": arrivals,
+                "orders": float(arrivals),
+                "customers_per_hour": round(rate, 2),
+            }
+        ]
+
+    def _poisson(self, mean: float) -> int:
+        # Knuth's method; means here are small (a few customers per minute), so this is fast and exact.
+        if mean <= 0:
+            return 0
+        limit, k, prod = math.exp(-mean), 0, self._rng.random()
+        while prod > limit:
+            k += 1
+            prod *= self._rng.random()
+        return k
