@@ -34,6 +34,7 @@ class Settings:
     store: str = "memory"
     hardware: str = "off"
     hub_impl: str = "browser"
+    convex_url: str | None = None  # STORE=convex: the deployment URL (`npx convex dev` writes it to .env.local)
     agent_token: str | None = None
     sim_start_ts: str = DEFAULT_SIM_START_TS
     claude_provider: str = "anthropic"
@@ -50,6 +51,7 @@ class Settings:
             store=_choice("STORE", "memory"),
             hardware=_choice("HARDWARE", "off"),
             hub_impl=_choice("HUB_IMPL", "browser"),
+            convex_url=os.environ.get("CONVEX_URL") or None,
             agent_token=os.environ.get("AGENT_TOKEN") or None,
             sim_start_ts=os.environ.get("SIM_START_TS", DEFAULT_SIM_START_TS),
             claude_provider=_choice("CLAUDE_PROVIDER", "anthropic"),

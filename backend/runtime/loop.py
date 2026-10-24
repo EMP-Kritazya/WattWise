@@ -21,6 +21,7 @@ from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
 from agent.templates import explain_decision
+from runtime.device_bridge import BlockAverager, DeviceBridge
 from runtime.escalations import Escalations
 from runtime.hub_link import HubLink, TickAborted
 from runtime.events import SurgeQueue
@@ -69,11 +70,14 @@ class RunLoop:
         autorun: bool = True,
         publish_ws: Callable[[dict], None] | None = None,
         demo_mode: bool = False,
+        bridge: DeviceBridge | None = None,
     ):
         self.service = service  # api.service.KitchenService: lanes, tariff, catalog, lock
         self.hub = hub
         self.live = live
         self.store = store
+        self.bridge = bridge or DeviceBridge("off", store)  # HARDWARE=sim_bridge|esp32: mapped devices through Convex
+        self.blocks = BlockAverager()  # closed 15-min device_blocks, every HARDWARE mode
         self.autorun = autorun
         self._start = _parse_ts(start_sim_ts)
         self.surges = SurgeQueue()
@@ -165,7 +169,9 @@ class RunLoop:
         self._owner_command_ids = set()
         self.surges.reset()
         self.escalations.reset()
+        self.blocks.reset()
         devices = self.service.get_kitchen()["devices"]
+        await self.bridge.reset({d["device_id"] for d in devices})
         await self.hub.send_build(KITCHEN_ID, config, self.service.catalog(), devices, self.service.lanes.seed,
                                   _iso(self._start))
         self.live.send("reset_all")
@@ -253,6 +259,7 @@ class RunLoop:
         self.tick_id = tick_id  # the simulation has stepped this minute, whatever the engine does with it
         try:
             with self.service.lock:
+                report = self.bridge.before_step(report, self.service.lanes["with"])  # Readings → ingest_reading
                 states = self.service.lanes.step(1, report)
                 comparison = self.service.lanes.compare(states)
         except Exception:
@@ -262,7 +269,9 @@ class RunLoop:
         self._queue_commands(states)
         self._publish(tick_id, states, comparison)
         self.escalations.after_tick()
-        self._buffer_records(states)
+        self.bridge.start()
+        self.bridge.after_step(report)
+        self._buffer_records(states, report, self.blocks.add(report, self.bridge.measured_kw()))
         self._maybe_flush_store()
         return True
 
@@ -286,7 +295,7 @@ class RunLoop:
 
     # ------------------------------------------------------------ store
 
-    def _buffer_records(self, states: dict[str, dict]) -> None:
+    def _buffer_records(self, states: dict[str, dict], report: dict, closed_blocks: list[dict]) -> None:
         for lane in LANES:
             st = states[lane]
             names = {d["device_id"]: d["name"] for d in st["hub"]["devices"]}
@@ -298,9 +307,12 @@ class RunLoop:
             if records:
                 self._store_buffer.append(lambda records=records: self.store.record_decisions(records))
             for command in st["new_commands"]:
-                # hub_id: the ESP32 hub for mapped devices (device bridge, Phase E); simulated devices have none.
-                self._store_buffer.append(lambda c=command, lane=lane: self.store.record_command(c, lane, None))
-        # STUB: command acks (Convex commands:ack) and closed device blocks need store methods that are not built yet.
+                # hub_id: the Convex hub of a mapped with-lane device (device bridge); simulated devices have none.
+                hub_id = self.bridge.track_command(command, lane)
+                self._store_buffer.append(lambda c=command, lane=lane, h=hub_id: self.store.record_command(c, lane, h))
+        self._store_buffer.extend(self.bridge.ack_writes(report))  # after this tick's enqueues
+        if closed_blocks:
+            self._store_buffer.append(lambda: self.store.record_device_blocks(closed_blocks))
 
     def _maybe_flush_store(self) -> None:
         if time.monotonic() - self._last_store_flush >= STORE_FLUSH_S:
@@ -317,7 +329,7 @@ class RunLoop:
                 try:
                     write()
                 except Exception:
-                    log.exception("store write failed")  # STUB: store_down fallback comes with the Convex store
+                    log.exception("store write failed")  # Convex unreachable is handled inside ConvexStore (store_down)
 
         self._store_task = asyncio.ensure_future(asyncio.to_thread(write_all))
         return self._store_task
@@ -368,6 +380,7 @@ class RunLoop:
 
     async def stop(self) -> None:
         await self.escalations.stop()
+        await self.bridge.stop()
         if self._task is not None:
             self._task.cancel()
             try:

@@ -1,0 +1,16 @@
+{
+  "name": "wattwise",
+  "private": true,
+  "description": "WattWise durable records + ESP32 bridge (CONTRACTS.md §6)",
+  "scripts": {
+    "dev": "convex dev",
+    "deploy": "convex deploy",
+    "typecheck": "tsc --noEmit -p convex"
+  },
+  "dependencies": {
+    "convex": "^1.27.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

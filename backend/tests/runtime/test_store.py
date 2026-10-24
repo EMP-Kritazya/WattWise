@@ -122,7 +122,53 @@ def test_reads_are_copies(seeded):
 
 def test_create_store():
     assert isinstance(create_store("memory"), MemoryStore)
-    # STUB until the Convex store exists: same fallback as Convex being unreachable.
+    # No CONVEX_URL: same fallback as Convex being unreachable.
     assert isinstance(create_store("convex"), MemoryStore)
     with pytest.raises(ValueError):
         create_store("sqlite")
+
+
+def test_command_ack_like_convex_function():
+    store = MemoryStore()
+    enqueue, ack = _fn("commands_enqueue"), _fn("commands_ack")
+    store.record_command(enqueue["command"], enqueue["lane"], "esp32_1")
+    assert store.commands_for_hub("esp32_1") == [enqueue["command"]]
+    assert store.ack_command(**ack) is None
+    assert store.rows("commands")[0]["delivery"] == "acked"
+    assert store.commands_for_hub("esp32_1") == []  # executed: no longer waiting
+    store.ack_command("c_9999", True, None, None)  # unknown id: ignored
+
+
+def test_failed_ack_marks_failed():
+    store = MemoryStore()
+    enqueue = _fn("commands_enqueue")
+    store.record_command(enqueue["command"], enqueue["lane"], "esp32_1")
+    store.ack_command(enqueue["command"]["command_id"], False, None, "job_running")
+    assert store.rows("commands")[0]["delivery"] == "failed"
+
+
+def test_commands_for_device_like_convex_function(seeded):
+    fixture = _load(CONVEX / "functions" / "commands_forDevice.json")
+    # The recorded commands are simulated only (hub_id null), so the ESP32 has nothing waiting.
+    assert seeded.commands_for_hub(**fixture["args"]) == fixture["returns"]
+
+
+def test_devices_report_and_latest_like_convex_function(seeded):
+    reading = _fn("devices_report")["reading"]
+    store = MemoryStore()
+    for row in _table("device_map"):
+        store.map_channel(row)
+    assert store.latest_readings("esp32_1") == []
+    store.report_reading({**reading, "ts": "2026-07-18T02:24:00Z", "raw_w": 5.1, "power_kw": 5.1})
+    assert store.report_reading(reading) is None
+    assert store.latest_readings("esp32_1") == [reading]
+    assert store.latest_readings("esp32_2") == []
+    assert seeded.latest_readings("esp32_1") == _table("readings")
+
+
+def test_map_channel_replaces_the_same_channel():
+    store = MemoryStore()
+    row = _table("device_map")[0]
+    store.map_channel(row)
+    store.map_channel({**row, "device_id": "ice_machine_1"})
+    assert store.device_map() == [{**row, "device_id": "ice_machine_1"}]

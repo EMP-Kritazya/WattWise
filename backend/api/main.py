@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from agent.claude_agent import ClaudeAgent, create_llm
 from agent.proposals import ProposalBook
 from agent.tools import AgentTools
+from runtime.device_bridge import DeviceBridge
 from runtime.hub_link import HubLink
 from runtime.kitchen_factory import load_engine
 from runtime.live_port import LivePublisher, WsLive, create_live
@@ -236,6 +237,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         await app.state.agent.wait_chats()
         await app.state.broadcaster.stop()
         await app.state.runtime.stop()
+        close = getattr(app.state.store, "close", None)  # Convex: send what is still queued
+        if close is not None:
+            await asyncio.to_thread(close)
 
     app = FastAPI(
         title="WattWise API", version="0.1.0", description="CONTRACTS.md §2 (REST + viewer /ws)", lifespan=lifespan
@@ -243,13 +247,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     engine = load_engine(settings.kitchen_impl)
     fake = settings.kitchen_impl == "fake"
+    app.state.broadcaster = broadcaster = Broadcaster()
     # Fake mode starts from the recorded Demo Café records; the real engine starts from an empty store.
-    store = create_store(settings.store, seed_dir=settings.fixtures_dir / "convex" / "tables" if fake else None)
+    # Warnings (store_down, hub_offline) are /ws messages whatever the live transport.
+    store = create_store(settings.store, seed_dir=settings.fixtures_dir / "convex" / "tables" if fake else None,
+                         convex_url=settings.convex_url, on_warning=broadcaster.send_soon)
     if fake:
         seed_fake_scenario(store, settings.fixtures_dir)
     app.state.store = store
     app.state.service = service = KitchenService(settings.fixtures_dir, engine, store)
-    app.state.broadcaster = broadcaster = Broadcaster()
     app.state.sim_host_connected = False
 
     def _sim_host_changed(connected: bool) -> None:
@@ -265,9 +271,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     port, _ = create_live(settings.live_transport, broadcaster.broadcast)
     fallback = None if isinstance(port, WsLive) else WsLive(broadcaster.broadcast)
     live = LivePublisher(port, fallback=fallback, on_warning=broadcaster.broadcast)
+    bridge = DeviceBridge(settings.hardware, store, on_warning=broadcaster.send_soon)
     app.state.runtime = runtime = RunLoop(service=service, hub=hub, live=live, store=store,
                                           start_sim_ts=settings.sim_start_ts, publish_ws=broadcaster.send_soon,
-                                          demo_mode=settings.demo_mode)
+                                          demo_mode=settings.demo_mode, bridge=bridge)
     service.on_escalation = runtime.escalations.changed
     # Proposals and chat use /ws whatever the live transport (CONTRACTS.md §2).
     app.state.proposals = proposals = ProposalBook(

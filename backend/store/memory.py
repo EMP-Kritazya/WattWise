@@ -60,6 +60,45 @@ class MemoryStore(Store):
     def record_command(self, command: dict, lane: str, hub_id: str | None) -> None:
         self._append("commands", {**command, "lane": lane, "hub_id": hub_id, "delivery": "queued"})
 
+    def ack_command(self, command_id: str, ok: bool, applied_value: float | None, reason: str | None) -> None:
+        with self._lock:
+            for row in reversed(self._tables.get("commands", [])):  # ids restart per kitchen build: newest wins
+                if row["command_id"] == command_id:
+                    row["delivery"] = "acked" if ok else "failed"
+                    return
+
+    def commands_for_hub(self, hub_id: str) -> list[dict]:
+        return [
+            {k: v for k, v in c.items() if k not in ("hub_id", "delivery")}
+            for c in self.rows("commands")
+            if c["hub_id"] == hub_id and c["delivery"] in ("queued", "sent")
+        ]
+
+    # ------------------------------------------------------------ device bridge
+
+    def report_reading(self, reading: dict) -> None:
+        self._append("readings", reading)
+
+    def latest_readings(self, hub_id: str) -> list[dict]:
+        readings = self.rows("readings")
+        latest = []
+        for row in self.device_map():
+            if row["hub_id"] != hub_id:
+                continue
+            mine = [r for r in readings if r["hub_id"] == hub_id and r["channel"] == row["channel"]]
+            if mine:
+                latest.append(mine[-1])
+        return latest
+
+    def device_map(self) -> list[dict]:
+        return self.rows("device_map")
+
+    def map_channel(self, row: dict) -> None:
+        with self._lock:
+            rows = self._tables.setdefault("device_map", [])
+            rows[:] = [r for r in rows if (r["hub_id"], r["channel"]) != (row["hub_id"], row["channel"])]
+            rows.append(copy.deepcopy(row))
+
     # ------------------------------------------------------------ proposals
 
     def upsert_proposal(self, proposal: dict) -> None:

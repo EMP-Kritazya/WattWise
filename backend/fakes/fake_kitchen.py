@@ -116,7 +116,9 @@ class FakeKitchen:
         return copy.deepcopy(line["returns"])
 
     def ingest_reading(self, reading: dict) -> dict:
-        return _answer(self._rec, "ingest_reading", {"reading": reading})
+        # STUB: any Reading is accepted (the device bridge relays a new one every tick); the recorded Device is returned
+        # for the recorded Reading, and as a stand-in otherwise. The runtime does not use the return value.
+        return _answer(self._rec, "ingest_reading", {"reading": reading}, any_args=True)
 
     def set_context(self, context: dict) -> None:
         return _answer(self._rec, "set_context", {"context": context}, any_args=True)

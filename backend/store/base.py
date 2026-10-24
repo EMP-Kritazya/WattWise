@@ -30,6 +30,31 @@ class Store(ABC):
     def record_command(self, command: dict, lane: str, hub_id: str | None) -> None:
         """`commands:enqueue`: stored with `delivery: "queued"`."""
 
+    @abstractmethod
+    def ack_command(self, command_id: str, ok: bool, applied_value: float | None, reason: str | None) -> None:
+        """`commands:ack` (CommandAck meaning): delivery → acked (ok) or failed. Unknown ids are ignored."""
+
+    @abstractmethod
+    def commands_for_hub(self, hub_id: str) -> list[dict]:
+        """`commands:forDevice`: the hub's queued / sent Commands, oldest first, as Command shapes."""
+
+    # ------------------------------------------------------------ device bridge (readings, device map)
+    @abstractmethod
+    def report_reading(self, reading: dict) -> None:
+        """`devices:report`."""
+
+    @abstractmethod
+    def latest_readings(self, hub_id: str) -> list[dict]:
+        """`devices:latest`: the newest Reading of every mapped channel of one hub."""
+
+    @abstractmethod
+    def device_map(self) -> list[dict]:
+        """`devices:map`: {hub_id, channel, device_id, scale} rows."""
+
+    @abstractmethod
+    def map_channel(self, row: dict) -> None:
+        """`devices:mapChannel`: set up once per demo kitchen; replaces the row of the same hub_id + channel."""
+
     # ------------------------------------------------------------ proposals
     @abstractmethod
     def upsert_proposal(self, proposal: dict) -> None:
