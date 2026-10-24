@@ -3,12 +3,13 @@
 Free tier = `ClaudeAuthority.enabled: false`: every escalation goes to the owner. Paid tier = the owner grants Claude
 the PAID_AUTHORITY bounds through the normal `authority` Proposal. The flow, all matched and run by code (no model call):
 
-  "let Claude handle tonight's decisions" → RequestPayment (embedded Stripe Checkout in `metadata["stripe"]`)
+  "let Claude handle tonight's decisions" → the upgrade card (Free vs Paid, [Upgrade] [Stay free]; text fallback:
+  "upgrade" / "stay free") → [Upgrade] → RequestPayment (embedded Stripe Checkout in `metadata["stripe"]`)
   → CommitPayment(transaction_id = Checkout Session id) → Stripe says `paid` → CompletePayment
-  → POST /api/proposals (kind `authority`) → the owner replies "confirm" (owner_chat) → set_authority.
+  → POST /api/proposals (kind `authority`) + its proposal card → the owner confirms (owner_chat) → set_authority.
 
 A commit that is not for this sender's open checkout, or not paid yet → CancelPayment (the owner may finish and commit
-again). RejectPayment, or "cancel" while a checkout is open → the open checkout is dropped. Every failure stays free.
+again). RejectPayment, [Stay free], or "cancel" while the card or a checkout is open → dropped. Every failure stays free.
 Paid but the API was down → the payment is kept: asking again retries the Proposal without a new charge.
 Per-sender state (only the Checkout Session id and whether it is paid; never card data) lives in the agent's storage.
 """
@@ -31,12 +32,15 @@ from uagents_core.contrib.protocols.payment import (
     RequestPayment,
 )
 
-from owner_chat import API_TIMEOUT_S, CONFIRM_HINT, _detail, _sentence, match_confirmation
+from cards import STAY_FREE, UPGRADE, Reply, parse_selection, proposal_card, upgrade_card
+from owner_chat import API_TIMEOUT_S, _detail, match_confirmation
 from stripe_checkout import StripeCheckout
 
 log = logging.getLogger("agents.upgrade")
 
 UPGRADE_PHRASES = ("let claude handle", "let claude decide", "paid plan", "upgrade to paid")
+START_WORD = "upgrade"  # the [Upgrade] button typed (whole message)
+STAY_FREE_WORDS = ("stay free",)
 PAYMENT_DEADLINE_S = 300
 STATE_PREFIX = "payment_state:"
 SERVICE = "wattwise_authority"
@@ -72,6 +76,10 @@ def match_upgrade(text: str) -> bool:
     return any(phrase in text for phrase in UPGRADE_PHRASES)
 
 
+def _word(text: str) -> str:
+    return " ".join(text.lower().split()).rstrip(".!")
+
+
 def authority_summary(authority: dict) -> str:
     return (f"Let Claude resolve escalations without asking, within {authority['max_cap_overrun_kw']:g} kW over the cap, "
             f"{authority['max_extra_delay_min']} min extra delay and {authority['max_extra_reduce_min']} min extra "
@@ -90,15 +98,24 @@ class Upgrade:
     # ------------------------------------------------------------ chat side
 
     def handles(self, sender: str, text: str) -> bool:
-        """This chat message belongs to the payment flow (an upgrade ask, or "cancel" while a checkout is open)."""
+        """This chat message belongs to the payment flow: an upgrade ask, an upgrade card button, or, while the card or
+        a checkout is open, "upgrade" / "stay free" / "cancel" typed."""
+        selection = parse_selection(text)
+        if selection is not None:
+            return selection.action in (UPGRADE, STAY_FREE)
         if match_upgrade(text):
             return True
-        return match_confirmation(text) is False and self._state(sender).get("status") == "awaiting_payment"
+        status = self._state(sender).get("status")
+        if status == "offered" and _word(text) in (START_WORD, *STAY_FREE_WORDS):
+            return True
+        return match_confirmation(text) is False and status in ("offered", "awaiting_payment")
 
     async def on_chat(self, sender: str, text: str, *, agent_address: str, chat_session: str) -> list[Any]:
-        """The messages to send back (payment protocol models and/or plain reply strings)."""
+        """The messages to send back (payment protocol models, Replies and/or plain reply strings)."""
         state = self._state(sender)
-        if not match_upgrade(text):  # "cancel" while the checkout is open
+        selection = parse_selection(text)
+        action = selection.action if selection is not None else None
+        if action == STAY_FREE or _word(text) in STAY_FREE_WORDS or match_confirmation(text) is False:
             self._clear(sender)
             return [STAYS_FREE]
         if self._checkout is None:
@@ -107,6 +124,11 @@ class Upgrade:
             return [await self._propose(sender)]
         if state.get("status") == "awaiting_payment":
             return [self._request(state["stripe"], agent_address, chat_session), STILL_PENDING]
+        if action != UPGRADE and _word(text) != START_WORD:  # an upgrade ask: what Free vs Paid means, first
+            self._save(sender, {"status": "offered"})
+            cfg = self._checkout.config
+            return [Reply.with_card("", upgrade_card(paid_summary=authority_summary(PAID_AUTHORITY),
+                                                     amount=cfg.amount, currency=cfg.currency.upper()))]
         try:
             stripe = await asyncio.to_thread(
                 self._checkout.create_session, user_address=sender, chat_session_id=chat_session,
@@ -158,7 +180,7 @@ class Upgrade:
 
     # ------------------------------------------------------------ the authority Proposal
 
-    async def _propose(self, sender: str) -> str:
+    async def _propose(self, sender: str) -> Reply | str:
         summary = authority_summary(PAID_AUTHORITY)
         body = {"kind": "authority", "payload": PAID_AUTHORITY, "summary": summary}
         try:
@@ -172,7 +194,7 @@ class Upgrade:
         proposal = r.json()
         self._clear(sender)  # paid and proposed: the owner's confirm / cancel is now the normal proposal path
         await self._log("concierge", "engine", "post", f"Paid plan: proposed Claude authority {proposal['proposal_id']}")
-        return f"Payment received. Waiting for your confirmation: {_sentence(proposal['summary'])} {CONFIRM_HINT}"
+        return Reply.with_card("Payment received.", proposal_card(proposal))
 
     # ------------------------------------------------------------ per-sender state
 

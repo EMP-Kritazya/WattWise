@@ -8,6 +8,7 @@ pending Proposal with `confirmed_via: "asi_one"`.
 import asyncio
 import importlib.util
 import json
+import sys
 import threading
 import time
 
@@ -20,6 +21,8 @@ from api.settings import REPO_ROOT
 
 from .conftest import ScriptedLLM, load, text_turn, tool_turn
 
+if str(REPO_ROOT / "agents") not in sys.path:  # owner_chat imports its sibling cards.py by name, as agents/ scripts do
+    sys.path.insert(0, str(REPO_ROOT / "agents"))
 _spec = importlib.util.spec_from_file_location("owner_chat", REPO_ROOT / "agents" / "owner_chat.py")
 owner_chat = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(owner_chat)
@@ -155,11 +158,15 @@ async def test_what_did_you_decide_then_choose_option_2_then_confirm(app, set_cl
         tool_turn(("t2", "get_escalation", {})), tool_turn(("t3", "propose_escalation_choice", pick)),
         text_turn(f"Option 2 it is: {options[1]['summary']}.")))
 
-    assert await concierge.answer(OWNER, "What did you decide about tonight?") == listing
+    reply = await concierge.answer_reply(OWNER, "What did you decide about tonight?")
+    card = reply.card  # the escalation card rides on Claude's answer; its fallback follows the answer in the text
+    assert reply.text == f"{listing}\n\n{card.fallback}"
+    assert json.loads(card.metadata()["card_payload"])["root"]["title"] == "Peak cap at risk"
     assert tool_results(llm, 1)["t1"] == escalations
 
-    reply = await concierge.answer(OWNER, "Choose option 2")
-    assert reply == f"Option 2 it is: {options[1]['summary']}." + hint(pick["summary"])
+    reply = await concierge.answer_reply(OWNER, "Choose option 2")  # typed: still Claude's propose → confirm flow
+    assert reply.text == f"Option 2 it is: {options[1]['summary']}." + hint(pick["summary"])
+    assert reply.card.kind == "review" and reply.card.payload["approve_cta"]["selection"]["proposal_id"] == "p_0002"
     assert f"2. {options[1]['summary']}" in owner_message(llm, 2)  # the numbered list it refers to
 
     assert await concierge.answer(OWNER, "YES") == f"Done: {pick['summary']}."
@@ -169,6 +176,36 @@ async def test_what_did_you_decide_then_choose_option_2_then_confirm(app, set_cl
     assert resolved["chosen_option_id"] == "deep_reduce_hvac"
     proposal = app.state.store.proposal("p_0002")
     assert proposal["kind"] == "resolve_escalation" and proposal["confirmed_via"] == "asi_one"
+
+
+async def test_escalation_card_button_resolves_it_and_typed_confirm_still_works(app, set_clock, facade_calls,
+                                                                               concierge):
+    set_clock("2026-07-18T01:32:00Z")  # e_0001 is open until 01:40Z
+    use_llm(app, ScriptedLLM(text_turn("Tonight's dinner rush needs your call.")))
+    card = (await concierge.answer_reply(OWNER, "What did you decide about tonight?")).card
+    root = json.loads(card.metadata()["card_payload"])["root"]
+    option_1 = next(el for el in root["children"] if el.get("title") == "Option 1")
+    selection = next(c for c in option_1["children"] if c["type"] == "button")["action"]["selection"]
+
+    # The tap arrives as the selection JSON (direct @mention); code resolves it, the model is never asked.
+    reply = await concierge.answer(OWNER, json.dumps(selection))
+    assert reply == "Done: Let the peak reach 42.4 kW for one block."
+    assert facade_calls == [("resolve_escalation", ("e_0001", "accept_overrun", "owner", None))]
+
+    assert await concierge.answer(OWNER, json.dumps({"action": "wattwise_launch"})) == "Sorry, that option expired."
+    set_clock("2026-07-18T02:30:00Z")
+    assert await concierge.answer(OWNER, "confirm") == "Done: Never touch the walk-in after 21:00."
+
+
+async def test_proposal_card_button_confirms_that_proposal(app, set_clock, facade_calls, concierge):
+    set_clock("2026-07-18T02:30:00Z")
+    fx = load("ai_tools/propose_importance_change.json")["input"]
+    use_llm(app, ScriptedLLM(tool_turn(("t1", "propose_importance_change", fx)), text_turn("Proposed.")))
+    card = (await concierge.answer_reply(OWNER, "Never touch the walk-in after 9 PM")).card
+    assert await concierge.answer(OWNER, json.dumps(card.payload["approve_cta"]["selection"])) == f"Done: {fx['summary']}."
+    assert app.state.store.proposal("p_0002")["confirmed_via"] == "asi_one"
+    assert app.state.store.proposal("p_0001")["status"] == "pending"
+    assert facade_calls == [("set_importance", ("walk_in_cooler_1", "always_on", {}))]
 
 
 # ---------------------------------------------------------------- confirmation edge cases

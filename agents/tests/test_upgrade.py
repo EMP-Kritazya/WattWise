@@ -1,5 +1,8 @@
-"""The paid plan (upgrade.py): RequestPayment → verified CommitPayment → CompletePayment → an `authority` Proposal; every
-failure stays on the free tier. Stripe is a stub here; the API is a MockTransport recording each POST."""
+"""The paid plan (upgrade.py): the upgrade card → RequestPayment → verified CommitPayment → CompletePayment → an
+`authority` Proposal; every failure stays on the free tier. Stripe is a stub here; the API is a MockTransport recording
+each POST."""
+
+import json
 
 import httpx
 import pytest
@@ -12,13 +15,15 @@ from uagents_core.contrib.protocols.payment import (
     RequestPayment,
 )
 
+from cards import STAY_FREE, UPGRADE, Reply
 from stripe_checkout import StripeConfig
-from upgrade import NOT_AVAILABLE, PAID_AUTHORITY, PROPOSE_FAILED, STAYS_FREE, Upgrade, match_upgrade
+from upgrade import NOT_AVAILABLE, PAID_AUTHORITY, PROPOSE_FAILED, STAYS_FREE, Upgrade, authority_summary, match_upgrade
 
 TOKEN = "test-agent-token"
 OWNER = "agent1qowner"
 OTHER = "agent1qsomeoneelse"
 ASK = "Let Claude handle tonight's decisions"
+START = "upgrade"  # the [Upgrade] button, typed
 CONFIG = StripeConfig(secret_key="sk_test_x", publishable_key="pk_test_x", amount_cents=100, currency="usd",
                       product_name="p", success_url="https://example.test/ok", expires_s=1800)
 
@@ -75,7 +80,7 @@ def make(stripe=None, api=None):
     return up, api, logs
 
 
-async def ask(up, sender=OWNER, text=ASK):
+async def ask(up, sender=OWNER, text=START):
     return await up.on_chat(sender, text, agent_address="agent1qconcierge", chat_session="sess-1")
 
 
@@ -89,6 +94,37 @@ def test_match_upgrade():
     assert match_upgrade("please  LET CLAUDE DECIDE for me")
     assert not match_upgrade("what will lunch cost me?")
     assert not match_upgrade("should I upgrade my HVAC")
+
+
+async def test_the_ask_shows_the_upgrade_card_first():
+    up, api, _ = make()
+    assert up.handles(OWNER, ASK) and not up.handles(OWNER, START)  # "upgrade" alone only after the card
+    [reply] = await ask(up, text=ASK)
+    assert isinstance(reply, Reply) and reply.card.kind == "review"
+    rows = {r["label"]: r["value"] for r in reply.card.payload["summary_rows"]}
+    assert rows["Price"] == "1.00 USD (Stripe test mode)"
+    assert rows["Paid plan"] == authority_summary(PAID_AUTHORITY) + "."
+    assert reply.text == reply.card.fallback and 'Reply "upgrade"' in reply.text
+    assert api.posts == [] and up.handles(OWNER, START) and up.handles(OWNER, "Stay free")
+
+
+@pytest.mark.parametrize("press", [json.dumps({"action": UPGRADE}), START,
+                                   "The user tapped wattwise_upgrade on the plan card."])
+async def test_upgrade_button_or_text_starts_the_checkout(press):
+    up, _, _ = make()
+    await ask(up, text=ASK)
+    assert up.handles(OWNER, press)
+    request, prompt = await ask(up, text=press)
+    assert isinstance(request, RequestPayment) and "1.00 USD" in prompt
+
+
+@pytest.mark.parametrize("press", [json.dumps({"action": STAY_FREE}), "stay free", "cancel"])
+async def test_stay_free_button_or_text_drops_the_offer(press):
+    up, _, _ = make()
+    await ask(up, text=ASK)
+    assert up.handles(OWNER, press)
+    assert await ask(up, text=press) == [STAYS_FREE]
+    assert not up.handles(OWNER, "cancel")  # nothing open: back to the normal proposal path
 
 
 async def test_paid_commit_completes_and_proposes_the_authority():
@@ -105,7 +141,9 @@ async def test_paid_commit_completes_and_proposes_the_authority():
     path, body, headers = api.posts[0]
     assert path == "/api/proposals" and headers["x-agent-token"] == TOKEN
     assert body["kind"] == "authority" and body["payload"] == PAID_AUTHORITY
-    assert "confirm" in reply and "Payment received" in reply
+    assert "confirm" in reply.text and reply.text.startswith("Payment received")
+    assert reply.card.payload["approve_cta"]["selection"] == {"action": "wattwise_proposal_confirm",
+                                                              "proposal_id": "p_0042"}
     assert logs[-1][:3] == ("concierge", "engine", "post")
     # A repeated commit confirms again but never makes a second Proposal.
     assert await up.on_commit(OWNER, commit()) == [CancelPayment(transaction_id="cs_test_1",
@@ -162,8 +200,8 @@ async def test_paid_but_api_down_retries_without_a_new_charge():
     _, reply = await up.on_commit(OWNER, commit())
     assert reply == PROPOSE_FAILED and logs[-1][2] == "error"
     api.status = 200
-    [reply] = await ask(up)
-    assert "Payment received" in reply and len(stripe.created) == 1 and len(api.posts) == 2
+    [reply] = await ask(up, text=ASK)
+    assert "Payment received" in reply.text and len(stripe.created) == 1 and len(api.posts) == 2
 
 
 async def test_without_stripe_or_when_stripe_fails_nothing_is_charged():

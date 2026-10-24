@@ -3,6 +3,8 @@
 Chat (`owner_chat.py`): every message is acknowledged, then answered through the API by the same Claude agent and engine
 tools as the dashboard chat (POST /api/chat, reply joined from /ws). `confirm` / `yes` / `no` / `cancel` are matched by
 code and confirm or cancel the newest pending Proposal; the model never confirms. Sessions stay open (no end-session).
+Interactive Cards (`cards.py`): escalation, proposal, forecast and upgrade replies carry one card (a MetadataContent)
+after the text; the text holds the card's fallback, and every button press is matched by code.
 
 Paid plan (`upgrade.py`, AgentPaymentProtocol seller role, Stripe TEST mode): "let Claude handle tonight's decisions"
 → RequestPayment → verified CommitPayment → CompletePayment → an `authority` Proposal the owner confirms. Without
@@ -31,11 +33,13 @@ from uagents import Agent, Context, Model, Protocol
 from uagents_core.contrib.protocols.chat import (
     ChatAcknowledgement,
     ChatMessage,
+    MetadataContent,
     TextContent,
     chat_protocol_spec,
 )
 from uagents_core.contrib.protocols.payment import CommitPayment, RejectPayment, payment_protocol_spec
 
+from cards import Reply
 from common import agent_address, load_dotenv, recorded_mode
 from context_loop import ApiClient, ContextLoop, Location
 from crowd import create_classifier
@@ -89,14 +93,19 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _text(reply: str) -> ChatMessage:
-    return ChatMessage(timestamp=_now(), msg_id=uuid4(), content=[TextContent(type="text", text=reply)])
+def _chat(reply: Reply | str) -> ChatMessage:
+    """The text first (it carries the card's fallback), then the card declaration when there is one."""
+    reply = Reply(reply) if isinstance(reply, str) else reply
+    content = [TextContent(type="text", text=reply.text)]
+    if reply.card is not None:
+        content.append(MetadataContent(type="metadata", metadata=reply.card.metadata()))
+    return ChatMessage(timestamp=_now(), msg_id=uuid4(), content=content)
 
 
 async def _send_all(ctx: Context, sender: str, messages: list) -> None:
-    """Payment protocol models as they are; plain strings as chat text."""
+    """Payment protocol models as they are; Replies and plain strings as chat messages."""
     for message in messages:
-        await ctx.send(sender, _text(message) if isinstance(message, str) else message)
+        await ctx.send(sender, _chat(message) if isinstance(message, (str, Reply)) else message)
 
 
 @chat_proto.on_message(ChatMessage)
@@ -114,8 +123,8 @@ async def handle_chat(ctx: Context, sender: str, msg: ChatMessage):
                                                            chat_session=str(ctx.session)))
         return
 
-    reply = await _owner_chat.answer(sender, text)
-    await ctx.send(sender, _text(reply))
+    reply = await _owner_chat.answer_reply(sender, text)
+    await ctx.send(sender, _chat(reply))
 
 
 @chat_proto.on_message(ChatAcknowledgement)
