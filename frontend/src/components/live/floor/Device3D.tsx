@@ -6,8 +6,9 @@ import type { DeviceMeta } from "@/hooks/useDeviceMeta";
 import { fmtKw } from "@/lib/format";
 import { DEVICE_STATE_LABEL } from "@/lib/theme";
 import type { HubDeviceReading } from "@/types";
-import { ACCENT, BODY, STATE_HEX } from "./palette";
+import { ACCENT, APPLIANCE, APPLIANCE_BY_CATEGORY, INK, OFF_TINT, STATE_HEX } from "./palette";
 import type { PlacedDevice } from "./plan";
+import { Ink, Toon } from "./toon";
 
 export type TagMode = "none" | "kw" | "action" | "status";
 
@@ -21,8 +22,6 @@ export interface DeviceProps {
   interactive: boolean;
   onSelect: (id: string | null) => void;
 }
-
-const WHITE_TYPES = new Set(["walk_in_cooler", "freezer", "reach_in_fridge", "ice_machine"]);
 
 /** Bright colors for things that should bloom (meshBasicMaterial with toneMapped off). */
 const glow = (hex: string, k: number) => new Color(hex).multiplyScalar(Math.min(k, 2.5));
@@ -42,14 +41,17 @@ export const Device3D = forwardRef<Group, DeviceProps>(function Device3D(
   // Visual intensity only (never shown as a number): how hard the unit is working right now.
   const load = running && meta.device.rated_kw > 0 ? Math.min(1, power / meta.device.rated_kw) : 0;
   const accent = state === "reduced" ? STATE_HEX.reduced : ACCENT[meta.category];
-  const body = WHITE_TYPES.has(type) ? BODY.white : meta.category === "cooling" ? BODY.unit : BODY.steel;
+  const pastel = APPLIANCE[type] ?? APPLIANCE_BY_CATEGORY[meta.category];
   const [hovered, setHovered] = useState(false);
   const isActive = !!state && state !== "off" && power > 0;
   const isAlert = state === "reduced" || state === "waiting";
-  // Running vs not must read at a glance: lit status pad + full colour when on, dimmed body when off.
+  // Running vs not must read at a glance: lit status pad + full pastel when on, faded toward grey when idle or off.
   const statusColor = state ? STATE_HEX[state] : OFF_GREY;
   const lit = isActive || isAlert;
-  const bodyColor = lit || selected ? body.color : new Color(body.color).multiplyScalar(0.45).getStyle();
+  const bodyColor = lit || selected ? pastel : new Color(pastel).lerp(new Color(OFF_TINT), 0.6).getStyle();
+  // Toon shading flattens light, so emissive stays a faint tint (state is carried by the LED, pad and ring).
+  const emissive = selected ? "#ffffff" : lit ? statusColor : "#000000";
+  const emissiveIntensity = selected ? 0.12 : lit ? 0.06 + load * 0.08 : 0;
 
   return (
     <group
@@ -74,23 +76,13 @@ export const Device3D = forwardRef<Group, DeviceProps>(function Device3D(
       {type === "water_heater" ? (
         <mesh position={[0, h / 2, 0]} castShadow receiveShadow>
           <cylinderGeometry args={[Math.min(w, d) * 0.45, Math.min(w, d) * 0.45, h, 32]} />
-          <meshStandardMaterial
-            color={lit || selected ? BODY.white.color : new Color(BODY.white.color).multiplyScalar(0.45).getStyle()}
-            metalness={0.2}
-            roughness={0.4}
-            emissive={selected ? "#ffffff" : lit ? statusColor : "#000000"}
-            emissiveIntensity={selected ? 0.25 : lit ? 0.45 + load * 0.35 : 0}
-          />
+          <Toon color={bodyColor} emissive={emissive} emissiveIntensity={emissiveIntensity} />
+          <Ink />
         </mesh>
       ) : (
         <RoundedBox args={[w, h, d]} radius={Math.min(0.07, w / 6, d / 6)} smoothness={3} position={[0, h / 2, 0]} castShadow receiveShadow>
-          <meshStandardMaterial
-            color={bodyColor}
-            metalness={body.metal}
-            roughness={body.rough}
-            emissive={selected ? "#ffffff" : lit ? statusColor : "#000000"}
-            emissiveIntensity={selected ? 0.25 : lit ? 0.45 + load * 0.35 : 0}
-          />
+          <Toon color={bodyColor} emissive={emissive} emissiveIntensity={emissiveIntensity} />
+          <Ink />
         </RoundedBox>
       )}
 
@@ -118,7 +110,7 @@ export const Device3D = forwardRef<Group, DeviceProps>(function Device3D(
         <mesh position={[0, h / 2, 0]}>
           <boxGeometry args={[w + 0.12, h + 0.12, d + 0.12]} />
           <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-          <Edges color="#ffffff" />
+          <Edges color={INK} />
         </mesh>
       )}
 
@@ -180,7 +172,7 @@ function Details({
         <>
           <mesh position={[0, h + 0.008, 0]} rotation-x={-Math.PI / 2}>
             <planeGeometry args={[w * 0.84, d * 0.72]} />
-            <meshStandardMaterial color="#1c1f27" roughness={0.6} />
+            <Toon color="#1c1f27" roughness={0.6} />
           </mesh>
           {[-0.3, -0.1, 0.1, 0.3].map((u) => (
             <mesh key={u} position={[u * w, h + 0.02, 0]}>
@@ -195,7 +187,7 @@ function Details({
         <>
           <mesh position={[0, h * 0.86, front]}>
             <planeGeometry args={[w * 0.85, h * 0.1]} />
-            <meshStandardMaterial color="#20242e" />
+            <Toon color="#20242e" />
           </mesh>
           <mesh position={[0, h * 0.47, front]}>
             <planeGeometry args={[w * 0.7, h * 0.4]} />
@@ -208,7 +200,7 @@ function Details({
         <>
           <mesh position={[0, h * 0.47, front]}>
             <planeGeometry args={[w * 0.8, h * 0.76]} />
-            <meshStandardMaterial color="#9aa1ad" metalness={0.6} roughness={0.35} />
+            <Toon color="#9aa1ad" metalness={0.6} roughness={0.35} />
           </mesh>
           <mesh position={[w * 0.32, h * 0.9, front + 0.001]}>
             <planeGeometry args={[0.12, 0.05]} />
@@ -222,11 +214,11 @@ function Details({
         <>
           <mesh position={[w * 0.05, h * 0.43, d / 2 + 0.02]} castShadow>
             <boxGeometry args={[w * 0.42, h * 0.86, 0.04]} />
-            <meshStandardMaterial color="#c3ccd7" metalness={0.2} roughness={0.45} />
+            <Toon color="#c3ccd7" metalness={0.2} roughness={0.45} />
           </mesh>
           <mesh position={[w * 0.21, h * 0.45, d / 2 + 0.05]}>
             <boxGeometry args={[0.04, h * 0.2, 0.04]} />
-            <meshStandardMaterial color="#5b6475" metalness={0.6} />
+            <Toon color="#5b6475" metalness={0.6} />
           </mesh>
           <mesh position={[-w * 0.3, h * 0.78, front]}>
             <planeGeometry args={[0.32, 0.16]} />
@@ -245,7 +237,7 @@ function Details({
       return (
         <mesh position={[0, h * 0.3, front]}>
           <planeGeometry args={[w * 0.7, h * 0.35]} />
-          <meshStandardMaterial color="#9fb0c2" metalness={0.3} roughness={0.4} />
+          <Toon color="#9fb0c2" metalness={0.3} roughness={0.4} />
         </mesh>
       );
     case "water_heater": {
@@ -268,13 +260,13 @@ function Fan({ w, d, h }: { w: number; d: number; h: number }) {
     <group position={[0, h, 0]}>
       <mesh position={[0, 0.03, 0]}>
         <cylinderGeometry args={[r + 0.06, r + 0.06, 0.06, 32]} />
-        <meshStandardMaterial color="#232834" roughness={0.6} />
+        <Toon color="#232834" roughness={0.6} />
       </mesh>
       <group position={[0, 0.07, 0]}>
         {[0, 1, 2, 3].map((i) => (
           <mesh key={i} rotation-y={(i * Math.PI) / 2}>
             <boxGeometry args={[r * 1.8, 0.015, 0.13]} />
-            <meshStandardMaterial color="#b9c3cf" metalness={0.5} roughness={0.35} />
+            <Toon color="#b9c3cf" metalness={0.5} roughness={0.35} />
           </mesh>
         ))}
       </group>

@@ -8,6 +8,7 @@ import { fmtKw } from "@/lib/format";
 import type { Lane, Meter } from "@/types";
 import { LANE_HEX, SHIRTS, SKIN } from "./palette";
 import { FOOTPRINT, HUB_BOX, HUB_FLOOR, SEATS, TABLES, type Pt, type Seat } from "./plan";
+import { Ink, Toon } from "./toon";
 
 const glow = (hex: string, k: number) => new Color(hex).multiplyScalar(k);
 
@@ -97,7 +98,8 @@ export function Hub3D({ totalKw, deviceCount, showLabel }: { totalKw?: number; d
   return (
     <group>
       <RoundedBox args={[w, h, d]} radius={0.05} position={[x + w / 2, z + h / 2, y + d / 2]} castShadow>
-        <meshStandardMaterial color="#232a3b" metalness={0.4} roughness={0.4} />
+        <Toon color="#22223B" />
+        <Ink thickness={1.6} />
       </RoundedBox>
       <mesh position={[x + w / 2, top + 0.005, y + d / 2]} rotation-x={-Math.PI / 2}>
         <planeGeometry args={[w * 0.8, 0.05]} />
@@ -105,7 +107,7 @@ export function Hub3D({ totalKw, deviceCount, showLabel }: { totalKw?: number; d
       </mesh>
       <mesh position={[x + 0.15, top + 0.35, y + 0.15]}>
         <cylinderGeometry args={[0.015, 0.015, 0.7, 8]} />
-        <meshStandardMaterial color="#9aa3b2" metalness={0.6} />
+        <Toon color="#9aa3b2" metalness={0.6} />
       </mesh>
       <mesh position={[x + 0.15, top + 0.72, y + 0.15]}>
         <sphereGeometry args={[0.05, 12, 10]} />
@@ -169,31 +171,31 @@ function Diner({ seat, index, visible }: { seat: Seat; index: number; visible: b
       {/* thighs on the seat, shins down */}
       <mesh position={[0, 0.54, 0.1]} castShadow>
         <boxGeometry args={[0.3, 0.12, 0.34]} />
-        <meshStandardMaterial color={PANTS[index % PANTS.length]} roughness={0.85} />
+        <Toon color={PANTS[index % PANTS.length]} roughness={0.85} />
       </mesh>
       <mesh position={[0, 0.27, 0.25]} castShadow>
         <boxGeometry args={[0.26, 0.5, 0.1]} />
-        <meshStandardMaterial color={PANTS[index % PANTS.length]} roughness={0.85} />
+        <Toon color={PANTS[index % PANTS.length]} roughness={0.85} />
       </mesh>
       {/* torso, leaning slightly toward the table */}
       <mesh position={[0, 0.84, -0.06]} rotation-x={0.12} castShadow>
         <capsuleGeometry args={[0.14, 0.24, 4, 12]} />
-        <meshStandardMaterial color={shirt} roughness={0.8} />
+        <Toon color={shirt} roughness={0.8} />
       </mesh>
       {/* arms resting toward the table */}
       {[-0.18, 0.18].map((x) => (
         <mesh key={x} position={[x, 0.86, 0.08]} rotation-x={-1.05} castShadow>
           <capsuleGeometry args={[0.045, 0.24, 4, 8]} />
-          <meshStandardMaterial color={shirt} roughness={0.8} />
+          <Toon color={shirt} roughness={0.8} />
         </mesh>
       ))}
       <mesh position={[0, 1.2, -0.03]} castShadow>
         <sphereGeometry args={[0.11, 16, 12]} />
-        <meshStandardMaterial color={SKIN[index % SKIN.length]} roughness={0.7} />
+        <Toon color={SKIN[index % SKIN.length]} roughness={0.7} />
       </mesh>
       <mesh position={[0, 1.24, -0.06]} castShadow>
         <sphereGeometry args={[0.115, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshStandardMaterial color={HAIR[index % HAIR.length]} roughness={0.9} />
+        <Toon color={HAIR[index % HAIR.length]} roughness={0.9} />
       </mesh>
     </group>
   );
@@ -216,11 +218,11 @@ export function Lamps({ tables, level }: { tables: number[]; level: number }) {
           <group key={t} position={[cx, 0, cz]}>
             <mesh position={[0, 2.95, 0]}>
               <cylinderGeometry args={[0.008, 0.008, 0.75, 6]} />
-              <meshStandardMaterial color="#2a2f3a" />
+              <Toon color="#2a2f3a" />
             </mesh>
             <mesh position={[0, 2.5, 0]}>
               <coneGeometry args={[0.24, 0.2, 24, 1, true]} />
-              <meshStandardMaterial color="#b8894a" metalness={0.6} roughness={0.35} side={DoubleSide} />
+              <Toon color="#b8894a" metalness={0.6} roughness={0.35} side={DoubleSide} />
             </mesh>
             <mesh position={[0, 2.41, 0]}>
               <sphereGeometry args={[0.07, 12, 10]} />

@@ -3,35 +3,58 @@ import type { FloorKind, PropKind } from "./plan";
 
 // three.js needs plain hex colors (no oklch / CSS variables). These mirror the app theme in index.css.
 
-export const BACKGROUND = "#0c1120";
+// Toy Box palette (frontend/UI_CONCEPTS.md): warm cream stage, pastel appliances, ink outlines.
+export const BACKGROUND = "#FFF6E9";
+export const INK = "#22223B";
+export const SLAB = "#E8B89A";
 
-export const FLOOR: Record<FloorKind, string> = {
-  kitchen: "#394151",
-  cold: "#33495c",
-  dish: "#364152",
-  office: "#34354d",
-  dining: "#6a4730",
-  pad: "#243029",
+/** Floor pattern per room: [pattern, colour A, colour B]. */
+export const FLOOR: Record<FloorKind, ["checker" | "planks", string, string]> = {
+  kitchen: ["checker", "#F7D9C4", "#F1C9AE"],
+  cold: ["checker", "#DCEBF7", "#CDE0F1"],
+  dish: ["checker", "#DDF2E3", "#CBE8D4"],
+  office: ["checker", "#EADFF6", "#E2D4F2"],
+  dining: ["planks", "#F3D3A6", "#E2BC88"],
+  pad: ["checker", "#DCD6CE", "#D3CCC3"],
 };
 
-export const WALL = "#485068";
-export const INNER_WALL = "#5a6382";
+export const WALL = "#FFF1E2";
+export const INNER_WALL = "#FFE7D1";
+export const WINDOW = "#BFE3FF";
 
 export const PROP: Record<PropKind, { color: string; metal?: number; rough?: number }> = {
-  steel: { color: "#c3c9d2", metal: 0.65, rough: 0.32 },
-  darkWood: { color: "#5b3c27", rough: 0.7 },
-  wood: { color: "#8c5c36", rough: 0.65 },
-  chair: { color: "#46301f", rough: 0.8 },
-  pot: { color: "#8a5940", rough: 0.9 },
-  leaves: { color: "#3d9a57", rough: 0.85 },
+  steel: { color: "#E9E4F0" },
+  darkWood: { color: "#9C6644" },
+  wood: { color: "#C98B5E" },
+  chair: { color: "#F4A261" },
+  pot: { color: "#D88C5A" },
+  leaves: { color: "#8BC34A" },
 };
 
-export const BODY = {
-  steel: { color: "#c3c9d2", metal: 0.7, rough: 0.28 },
-  white: { color: "#e1e7ee", metal: 0.1, rough: 0.45 },
-  unit: { color: "#8f99a6", metal: 0.4, rough: 0.5 },
-  dark: { color: "#1b202c", metal: 0.2, rough: 0.6 },
+/** One pastel per appliance type, so each is recognisable at a glance. */
+export const APPLIANCE: Record<string, string> = {
+  fryer: "#FFB4A2",
+  grill: "#FFD6A5",
+  oven: "#E5989B",
+  reach_in_fridge: "#BDE0FE",
+  walk_in_cooler: "#A9D6F5",
+  freezer: "#C3CEF6",
+  dishwasher: "#A2D2FF",
+  water_heater: "#FFC8DD",
+  ice_machine: "#CDEAC0",
+  hvac: "#E9EDC9",
 };
+/** Fallback per category for types the catalog adds later. */
+export const APPLIANCE_BY_CATEGORY: Record<Category, string> = {
+  cooking: "#FFB4A2",
+  refrigeration: "#BDE0FE",
+  water_heating: "#FFC8DD",
+  cooling: "#E9EDC9",
+  lighting: "#FFE08A",
+  other: "#E9E4F0",
+};
+/** Idle / off appliances fade toward this grey. */
+export const OFF_TINT = "#D9D4CC";
 
 /** Emissive glow per equipment category. */
 export const ACCENT: Record<Category, string> = {

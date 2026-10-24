@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Environment, Lightformer, OrbitControls, PerspectiveCamera } from "@react-three/drei";
+import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import { Bloom, EffectComposer, ToneMapping } from "@react-three/postprocessing";
 import { ToneMappingMode } from "postprocessing";
 import { Box3, Vector3, type Group, type OrthographicCamera } from "three";
@@ -50,8 +50,8 @@ const ORTHO_VIEWS: Record<"iso" | "top", { dir: Vector3; limits: Limits }> = {
 
 /** Perspective views: where the camera flies in from, where it settles, and what it looks at. */
 const POSES: Record<"street" | "pov", { from: Vec3; pos: Vec3; target: Vec3; fov: number }> = {
-  // Standing on the street, looking into the open front of the restaurant.
-  street: { from: [13.5, 9, 28], pos: [13.5, 1.8, 20.5], target: [10.5, 0.9, 6.5], fov: 42 },
+  // From above the street in front, looking down (~30°) over the dining room into the kitchen and back rooms.
+  street: { from: [11, 16, 30], pos: [10.5, 10, 21], target: [10, 0.4, 4.5], fov: 44 },
   // A diner's eyes near the front of the dining room, looking through the pass into the kitchen.
   pov: { from: [9.3, 6, 18], pos: [9.3, 1.2, 12.4], target: [6.2, 1.0, 2.2], fov: 58 },
 };
@@ -246,11 +246,13 @@ export function LiveFloor({ demo, onDemoChange }: { demo: boolean; onDemoChange:
             onPointerMissed={() => setSelected(null)}
           >
             <color attach="background" args={[BACKGROUND]} />
-            <ambientLight intensity={0.8} color="#ffffff" />
-            <hemisphereLight args={["#e5e7eb", "#374151", 0.65]} />
+            {/* Toy Box lighting: a soft warm fill and one warm key light with soft shadows (toon shading does the rest). */}
+            <ambientLight intensity={1.1} color="#FFF6E9" />
+            <hemisphereLight args={["#FFFFFF", "#E8B89A", 0.5]} />
             <directionalLight
               position={[26, 40, 30]}
-              intensity={1.8}
+              intensity={1.6}
+              color="#FFF1DE"
               castShadow
               shadow-mapSize={[2048, 2048]}
               shadow-bias={-0.0004}
@@ -258,11 +260,6 @@ export function LiveFloor({ demo, onDemoChange }: { demo: boolean; onDemoChange:
             >
               <orthographicCamera attach="shadow-camera" args={[-45, 45, 45, -45, 1, 160]} />
             </directionalLight>
-            <Environment resolution={256} environmentIntensity={0.45}>
-              <Lightformer form="rect" intensity={2} position={[0, 12, 0]} rotation-x={Math.PI / 2} scale={[40, 40, 1]} />
-              <Lightformer form="rect" intensity={1.4} color="#ffd8a8" position={[-12, 5, 12]} scale={[12, 5, 1]} />
-              <Lightformer form="rect" intensity={1.1} color="#9ec5ff" position={[16, 6, -12]} scale={[12, 5, 1]} />
-            </Environment>
 
             {mode === "compare" ? (
               <>
@@ -287,7 +284,7 @@ export function LiveFloor({ demo, onDemoChange }: { demo: boolean; onDemoChange:
             <EffectComposer multisampling={4}>
               {/* High threshold: only status lights, status pads and working heat elements glow, nothing else. */}
               <Bloom mipmapBlur intensity={0.7} luminanceThreshold={1} luminanceSmoothing={0.2} radius={0.6} />
-              <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+              <ToneMapping mode={ToneMappingMode.NEUTRAL} />
             </EffectComposer>
           </Canvas>
 
