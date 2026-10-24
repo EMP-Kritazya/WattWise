@@ -81,7 +81,7 @@ export function SimControls() {
         <Button size="sm" variant="outline" onClick={() => run(() => requestSurge(20))}>
           +20 customers
         </Button>
-        <Button size="sm" onClick={() => run(() => requestSurge(40))}>
+        <Button size="sm" variant="outline" onClick={() => run(() => requestSurge(40))}>
           +40 customers
         </Button>
         {/* The assistant is no longer docked on the Live page, so this is its entry point at every width. */}

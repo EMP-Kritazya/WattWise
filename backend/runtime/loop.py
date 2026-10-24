@@ -24,6 +24,7 @@ from agent.templates import explain_decision
 from runtime.device_bridge import BlockAverager, DeviceBridge
 from runtime.escalations import Escalations
 from runtime.hub_link import HubLink, TickAborted
+from runtime.kitchen_factory import NotRecordedError
 from runtime.events import SurgeQueue
 from runtime.lanes import LANES
 from runtime.live_port import LivePublisher
@@ -277,6 +278,12 @@ class RunLoop:
                 report = self.bridge.before_step(report, self.service.lanes["with"])  # Readings → ingest_reading
                 states = self.service.lanes.step(1, report)
                 comparison = self.service.lanes.compare(states)
+        except NotRecordedError:
+            # KITCHEN_IMPL=fake replays a fixed recording; past its last tick every step would fail, so stop the clock.
+            log.warning("fake engine has no recorded step for tick %s; pausing (reset to replay)", tick_id)
+            self.playing = False
+            self._publish_clock()
+            return False
         except Exception:
             log.exception("engine step failed at tick %s; the clock goes on", tick_id)
             self._publish_clock()
