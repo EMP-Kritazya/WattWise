@@ -158,6 +158,8 @@ class RunLoop:
         self.live.send("reset_all")
         self._publish_clock()
         if self.context is not None:
+            # New lanes start without context: hand them the last known until the Concierge's next round.
+            self.service.post_context(copy.deepcopy(self.context))
             self.live.send("publish_context", copy.deepcopy(self.context))
         return result
 

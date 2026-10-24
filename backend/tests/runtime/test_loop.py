@@ -139,6 +139,24 @@ async def test_inputs_without_context_use_simulation_defaults(serve):
         assert rt.inputs("2026-07-18T00:30:00Z")["crowd_multiplier"] == 1.40
 
 
+async def test_concierge_context_reaches_inputs_and_survives_a_rebuild(serve):
+    body = load("agents/context_post.json")["body"]
+    async with serve() as srv:
+        await built(srv)
+        rt = srv.runtime
+        assert (await srv.http.post("/api/context", json={k: v for k, v in body.items() if k != "ts"})).json() == {"ok": True}
+        assert rt.context == {**body, "ts": rt.sim_ts}  # merged unchanged, `ts` stamped in sim time
+        # The weather hour of that sim minute and the crowd effect go to the simulation unchanged.
+        assert rt.inputs("2026-07-18T02:30:00Z")["outdoor_temp_c"] == 27.2
+        assert rt.inputs("2026-07-18T02:30:00Z")["crowd_multiplier"] == 1.25
+
+        handed = []
+        post_context = rt.service.post_context
+        rt.service.post_context = lambda c: handed.append(c) or post_context(c)
+        assert (await srv.http.post("/api/kitchen", json=SCENARIO["config"])).status_code == 200
+        assert handed == [rt.context]  # the new lanes get the last known context
+
+
 async def test_ws_transport_sends_ticks_to_a_browser_viewer(serve, monkeypatch):
     monkeypatch.setattr(loop_module, "TICK_BASE_S", 0.01)
     async with serve(live_transport="ws") as srv:

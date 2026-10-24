@@ -3,18 +3,26 @@
 Step 1 (registration + discoverability): every chat message is acknowledged and answered with a fixed help text.
 Claude + engine tools through the API come next (docs/design/AGENTS.md, "Concierge loops").
 
-Run:  FETCH_AGENT_SEED="<long secret phrase>" python agents/concierge.py
+Context loop (`context_loop.py`): every CONTEXT_INTERVAL_S (600 real s) and whenever a kitchen is built (GET /api/kitchen
+polled every KITCHEN_POLL_S), ask Weather, Grid and Events over uAgents → Claude crowd effect → POST /api/context.
+Env: API_URL (default http://127.0.0.1:8000), AGENT_TOKEN, CONTEXT_LOOP=0 to switch it off, DEMO_MODE=1 / --recorded
+for the recorded crowd effect. The context agents' addresses come from their seeds (common.agent_address).
+
+Run:  FETCH_AGENT_SEED="<long secret phrase>" python agents/concierge.py [--recorded]
 Then open the printed inspector link -> Connect -> Mailbox (see agents/REGISTRATION.md).
 The profile (description, README, handle) is sent to Agentverse only on that Connect: after editing them, restart and Connect again.
 """
 
+import asyncio
+import json
 import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from uagents import Agent, Context, Protocol
+import httpx
+from uagents import Agent, Context, Model, Protocol
 from uagents_core.contrib.protocols.chat import (
     ChatAcknowledgement,
     ChatMessage,
@@ -22,6 +30,11 @@ from uagents_core.contrib.protocols.chat import (
     TextContent,
     chat_protocol_spec,
 )
+
+from common import agent_address, load_dotenv, recorded_mode
+from context_loop import ApiClient, ContextLoop, Location
+from crowd import create_classifier
+from models import EventsResponse, PriceResponse, WeatherResponse
 
 AGENT_NAME = "WattWise Concierge"
 DESCRIPTION = (
@@ -49,17 +62,7 @@ HELP_TEXT = (
 )
 
 
-def _load_dotenv(path: Path) -> None:
-    """KEY=VALUE lines from agents/.env (gitignored); variables already set in the shell win."""
-    if not path.is_file():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        key, sep, value = line.strip().partition("=")
-        if sep and key and not key.startswith("#"):
-            os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
-
-
-_load_dotenv(Path(__file__).resolve().parent / ".env")
+load_dotenv()
 seed = os.environ.get("FETCH_AGENT_SEED")
 if not seed:
     sys.exit("FETCH_AGENT_SEED is not set: it fixes the agent's address, so set it before starting the Concierge.")
@@ -113,6 +116,77 @@ agent.include(chat_proto, publish_manifest=True)
 @agent.on_event("startup")
 async def announce(ctx: Context):
     ctx.logger.info(f"{AGENT_NAME} address: {agent.address}")
+
+
+# ---------------------------------------------------------------- context loop
+
+API_URL = os.environ.get("API_URL", "http://127.0.0.1:8000")
+CONTEXT_INTERVAL_S = float(os.environ.get("CONTEXT_INTERVAL_S", "600"))
+KITCHEN_POLL_S = float(os.environ.get("KITCHEN_POLL_S", "10"))
+AGENT_REPLY_TIMEOUT_S = int(os.environ.get("AGENT_REPLY_TIMEOUT_S", "15"))
+RESPONSE_TYPES: dict[str, type[Model]] = {"weather": WeatherResponse, "grid": PriceResponse, "events": EventsResponse}
+
+_http = httpx.AsyncClient(base_url=API_URL)
+_loop = ContextLoop(ApiClient(_http, os.environ.get("AGENT_TOKEN")), create_classifier(recorded_mode()))
+_round_lock = asyncio.Lock()
+_kitchen_seen: str | None = None  # the last kitchen config seen (JSON), to spot a new build
+
+
+def _asker(ctx: Context):
+    async def ask(name: str, request: Model) -> Model | None:
+        address = agent_address(name)
+        if address is None:
+            ctx.logger.warning(f"no address for the {name} agent (set FETCH_AGENT_SEED or {name.upper()}_AGENT_ADDRESS)")
+            return None
+        reply, status = await ctx.send_and_receive(address, request, response_type=RESPONSE_TYPES[name],
+                                                   timeout=AGENT_REPLY_TIMEOUT_S)
+        if reply is None:
+            ctx.logger.warning(f"{name} did not answer: {status.detail}")
+        return reply
+
+    return ask
+
+
+async def _kitchen_config() -> dict | None:
+    """The built kitchen's config, or None (no kitchen yet, or the API is down)."""
+    try:
+        r = await _http.get("/api/kitchen", timeout=5.0)
+    except httpx.HTTPError:
+        return None
+    return r.json().get("config") if r.status_code == 200 else None
+
+
+async def _round(ctx: Context, config: dict) -> bool:
+    """One context round; False when another round is still running (the caller retries on its next trigger)."""
+    if _round_lock.locked():
+        return False
+    async with _round_lock:
+        loc = config.get("location") or {}
+        if "lat" not in loc or "lon" not in loc:
+            ctx.logger.warning("kitchen config has no location; skipping the context round")
+            return True
+        body = await _loop.run_once(Location(lat=loc["lat"], lon=loc["lon"]), _asker(ctx))
+        ctx.logger.info("context posted" if body else "context round posted nothing (last known kept)")
+        return True
+
+
+if os.environ.get("CONTEXT_LOOP", "1") != "0":
+
+    @agent.on_interval(period=CONTEXT_INTERVAL_S)
+    async def context_every_interval(ctx: Context):
+        config = await _kitchen_config()
+        if config is not None:
+            await _round(ctx, config)
+
+    @agent.on_interval(period=KITCHEN_POLL_S)
+    async def context_on_kitchen_build(ctx: Context):
+        global _kitchen_seen
+        config = await _kitchen_config()
+        if config is None:
+            return
+        seen = json.dumps(config, sort_keys=True)
+        if seen != _kitchen_seen and await _round(ctx, config):
+            _kitchen_seen = seen
 
 
 if __name__ == "__main__":
