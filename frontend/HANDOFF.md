@@ -83,6 +83,43 @@ Earlier work, built for the previous design. Much of the UI carries over; see PL
    - Verify with a temporary debug route that dumps every table, then remove it.
 4. **Before committing:** run `npm run build`; add Vitest in step 3 of PLAN.md §5. Commit to `ashirwad` and push. Never commit to `main`, never merge.
 
+## Demo focus: the judging round is the priority
+The live demo in judging is the main point. The app should **read as a simulation**: calm, clear, a few impactful moments.
+**Don't add anything outside UI.md / ASHIRWAD.md**; make the spec'd pieces look great instead.
+
+**The pitch (DEMO.md) shows, in order:**
+1. **Agent Network:** agents report a hot evening, high prices and a Giants game.
+2. **A judge taps +40 customers on their own phone.** The engine delays the dishwasher and trims HVAC; the Without lane breaks the cap while the With lane bends under it.
+3. **Escalation card:** *Claude is choosing…* → *Claude chose X: rationale*.
+4. **Proof tab.**
+
+The fixture scenario matches this: surge at tick 31, escalation at tick 60, choice delivered at tick 62. That's about 1 real minute at 120×.
+
+**Polish these five moments first:**
+- the **Hub tile** pulsing each tick, with a wire to every appliance tile;
+- **tiles visibly changing state** when a Command lands (dishwasher → *waiting*, HVAC → *reduced 40 %*), with live physical gauges (room temperature, dirty racks, ice level, job time left);
+- the **cap line** on the two-lane chart, with Without crossing it and With staying under, plus the month peak line and the dashed forecast;
+- the **escalation card** state changes, with the owner option buttons **inside the card** (no modal);
+- the **agent dots** moving on Agent Network.
+
+**Changes to the current UI:**
+
+| Today | Change to |
+|---|---|
+| Live page stacks everything: context strip, escalation card, 3D floor, KPIs, three cards | Centred **`Charts \| Simulation`** toggle, plus a **right rail** (decision feed with Undo + escalation card), plus the chat drawer |
+| 3D floor with camera views, Follow, demo HUD, labels toggle | **Not in the spec.** The Simulation view is appliance **tiles wired to a Hub tile** (decision D3; ask Ashirwad before keeping any 3D) |
+| No hub on screen, no physical gauges | Add both: "everything reports to one box" is a core story beat |
+| Chart without the month peak line | Add the cap line, month peak line and dashed `with` forecast from `live_tick.forecast_kw_json` |
+| No energy + cost strip | Add one from `live_tick`: energy today, price now, cost today and month, per lane |
+| Escalation decided in a pop-up dialog | Buttons inside the card; `POST /api/escalations/{id}/resolve` |
+| Context strip with hourly data and a sparkline | `live_context` has summaries only: show summaries and labels (contract question Q2) |
+| Builder without a peak goal | Add **Minimize peak \| Hard limit** (`peak_mode`) |
+| Desktop-only layout | **The phone view must work**: a judge presses +40 on their own phone (surge buttons + live view at ~375 px) |
+| No `/sim` tab | Add the sim host panel; the demo laptop keeps `/sim` open |
+| Proof uses the invented `ProofExtras` | Only what `BacktestResult` carries, labelled fake fixture data; keep Replay month (it's in UI.md) |
+
+**Simulation-first look without breaking the spec:** UI.md makes Charts the default, but the toggle is remembered per viewer (localStorage). Set the demo laptop to **Simulation** once and it stays.
+
 ## Next steps
 Exactly PLAN.md §5, in order:
 1. Settle D3 (D1 and D2 are done).
