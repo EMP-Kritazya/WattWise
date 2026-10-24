@@ -29,7 +29,7 @@
 - [ ] Category / tag: **Innovation Lab** (badge first line of the README) + hackathon badge
 - [x] Chat Protocol listed under the agent's protocols (manifest published)
 - [x] Starter prompts: the three cold queries
-- [ ] Setup checklist 100 % (86 % now; "Agent is Operating" still unticked while the status says Inactive)
+- [x] Status **active / mailbox** after the 10:57 local restart (index `last_updated` 17:52 UTC); avatar, handle, starter prompts kept
 
 ## Record
 - [x] Agent address: `agent1qgr6vxnyeewx8rdsxpdu896v9w8cv5q4jmf4aw4244vu2r2nhqn9zt3gdsn` (since 2026-10-24 17:35 UTC; the first test agent `agent1qdfre3wana69ra20cckqqut0sykr6ewfr0khnucvawrf094u8y98w2av8ge` is retired)
@@ -51,13 +51,16 @@
 - Still `status: inactive` in the index and the profile badge after all of that; expected fix: restart the agent so it
   re-sends its active status as a mailbox agent
 
+- `agents/.env` seed: the value first saved (in `.env.example`, which git tracks) was the agent address, not the seed;
+  moved out and blanked. The running agent still has the real seed only in its PowerShell window
+
 ## ASI:One cold queries (agent running, new chat each time)
 | Query | Reached the Concierge? | Description version |
 |---|---|---|
 | my restaurant electricity bill is too high | No: ASI1 answered itself with generic tips (2026-10-24 10:18) | v1 |
 | my restaurant electricity bill is too high | | v2 |
 | lower my demand charges | No: personal AI asked 2 clarifying questions, then answered itself; "Suggested AIs" = PG&E, PG&E customer service, Utilita (WattWise still Inactive) | v2 |
-| what will lunch cost me in power today | | v2 |
+| what will lunch cost me in power today | Discovered, not answered: personal AI asked 1 clarifying question, answered itself, then listed **WattWise Concierge first** under "Suggested AIs" ("Forecast lunch peak and shift load", ahead of Joe Kilowatt). After "Talk to" + adding @wattwise to the chat, the agent showed "Reasoning..." and no reply in ~4 min, while the mailbox probe got a reply in seconds | v2 active |
 | @wattwise my restaurant electricity bill is too high (direct, not cold) | | v2 |
 
 ASI:One routing note: "Messages without an @mention are routed to your personal AI by default" (Chat settings: All
