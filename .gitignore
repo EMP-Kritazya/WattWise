@@ -1,2 +1,17 @@
+# secrets
 .env
-.claude/
+.env.*
+!.env.example
+
+# Claude Code: subagents in .claude/agents/ are shared, personal settings are not
+.claude/settings.local.json
+
+# data and builds
+data/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+node_modules/
+dist/
+.DS_Store
