@@ -1,6 +1,7 @@
 import { ApiError } from "@/transport/errors";
 import type { ConnectionStatus, Transport } from "@/transport/types";
 import type {
+  ProofExtras,
   BacktestResult,
   ClaudeAuthority,
   Context,
@@ -8,7 +9,6 @@ import type {
   EscalationOption,
   Health,
   Proposal,
-  Bill,
   ClockState,
   Command,
   CommandAction,
@@ -32,6 +32,7 @@ import type {
   WsMessage,
 } from "@/types";
 import { mockCatalog } from "./catalog";
+import { DEMAND_USD_PER_KW, MOCK_MONTHS, mockBacktestMonth, mockProofExtras } from "./proof";
 import { mulberry32 } from "./rng";
 
 // MOCK: an in-browser stand-in for the FastAPI server + FakeKitchen (docs/design/API.md), so the UI can be built
@@ -44,7 +45,6 @@ const BLOCK_MS = 15 * MIN_MS;
 const START_MS = Date.parse("2026-07-17T18:30:00Z"); // Friday 11:30 in Los Angeles (DEMO.md)
 const LA_OFFSET_MS = -7 * 3_600_000; // PDT, fine for a July mock
 const ENERGY_USD_PER_KWH = 0.24;
-const DEMAND_USD_PER_KW = 20.5;
 const MONTH_ENERGY_USD_BEFORE_TODAY = 1_150;
 const START_ENERGY_KWH_TODAY = 95;
 const START_MONTH_PEAK_KW = 36;
@@ -353,6 +353,11 @@ class MockServer implements Transport {
   async getBacktest(): Promise<BacktestResult[]> {
     await latency();
     return MOCK_MONTHS.map(mockBacktestMonth);
+  }
+
+  async getProofExtras(runId: string): Promise<ProofExtras> {
+    await latency();
+    return mockProofExtras(runId, MOCK_MONTHS.map(mockBacktestMonth));
   }
 
   async chat(message: string): Promise<{ chat_id: string }> {
@@ -951,40 +956,6 @@ class MockServer implements Transport {
   private emit(msg: WsMessage) {
     for (const listener of this.listeners) listener(structuredClone(msg));
   }
-}
-
-// ---------- backtest ----------
-
-const MOCK_MONTHS = Array.from({ length: 12 }, (_, i) => `2025-${String(i + 1).padStart(2, "0")}`);
-
-function mockBill(period: string, energyKwh: number, peakKw: number): Bill {
-  const energyCost = round2(energyKwh * 0.19);
-  const demandCost = round2(peakKw * DEMAND_USD_PER_KW);
-  return {
-    period,
-    energy_kwh: round2(energyKwh),
-    energy_cost_usd: energyCost,
-    demand_charges: [{ name: "max_demand", peak_kw: round2(peakKw), cost_usd: demandCost }],
-    total_usd: round2(energyCost + demandCost),
-    tariff_id: "mock-tariff",
-  };
-}
-
-function mockBacktestMonth(month: string, i: number): BacktestResult {
-  const season = 1 + 0.25 * Math.sin((Math.PI * (i - 3)) / 6); // summer-heavy
-  const energyKwh = 21_000 * season;
-  const peakWithout = 44 * season;
-  return {
-    dataset: "MOCK DATA, not a real dataset",
-    month,
-    policies: {
-      without: mockBill(month, energyKwh, peakWithout),
-      timer: mockBill(month, energyKwh, peakWithout - 2.5),
-      with: mockBill(month, energyKwh, peakWithout - 6.5),
-    },
-    checks: { baseline_matches_raw: true, energy_conserved: true, rule_violations: 0 },
-    assumptions_id: "base",
-  };
 }
 
 // Pure so a real (non-mock) build drops the whole mock.

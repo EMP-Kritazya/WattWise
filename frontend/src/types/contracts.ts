@@ -303,6 +303,32 @@ export interface CustomerEventRequest {
   duration_min: number;
 }
 
+/**
+ * PROPOSED, not in CONTRACTS.md yet (raise with Kritazya): what the Proof screen needs beyond list[BacktestResult].
+ * Every number here comes from the engine, so the browser never subtracts bills. Served by GET /api/backtest/{run_id}/proof.
+ */
+export interface ProofExtras {
+  run_id: string;
+  tariff: { id: string; name: string };
+  /** DATA_AND_PROOF.md: no number is shown until backtest-auditor returns CLEARED. */
+  audit: "cleared" | "pending" | "failed";
+  months: { month: string; partial: boolean; saved_vs_without_usd: number; saved_vs_timer_usd: number }[];
+  totals: { without_usd: number; timer_usd: number; with_usd: number; saved_vs_without_usd: number; saved_vs_timer_usd: number };
+  busiest_day: {
+    date: string;
+    series: { ts: string; without_kw: number; with_kw: number }[];
+    peak_without_kw: number;
+    peak_with_kw: number;
+    peak_without_ts: string;
+  };
+  sensitivity: { id: string; label: string; kind: "assumptions" | "tariff"; saved_usd_year: number; saved_pct: number; worst: boolean }[];
+  /** One cached month, hourly: load per policy and each policy's running bill so far. */
+  replay: {
+    month: string;
+    steps: { ts: string; without_kw: number; timer_kw: number; with_kw: number; without_usd: number; timer_usd: number; with_usd: number }[];
+  };
+}
+
 export interface BacktestRunRequest {
   /** UNCLEAR in CONTRACTS.md: a list of "YYYY-MM" months or a count. */
   months: string[] | number;

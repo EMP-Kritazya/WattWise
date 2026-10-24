@@ -36,6 +36,8 @@ export const realTransport: Transport = {
   listDecisions: (limit = 50) => request("GET", `/api/decisions?limit=${limit}`),
   runBacktest: (body) => request("POST", "/api/backtest/run", body),
   getBacktest: (runId) => request("GET", `/api/backtest/${enc(runId)}`),
+  // STUB: proposed endpoint, not in CONTRACTS.md yet.
+  getProofExtras: (runId) => request("GET", `/api/backtest/${enc(runId)}/proof`),
   chat: (message) => request("POST", "/api/chat", { message }),
   listProposals: (status = "pending") => request("GET", `/api/proposals?status=${status}`),
   confirmProposal: (proposalId, confirm) => request("POST", `/api/proposals/${enc(proposalId)}/confirm`, { confirm }),

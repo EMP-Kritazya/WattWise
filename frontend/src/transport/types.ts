@@ -1,5 +1,6 @@
 import type {
   BacktestResult,
+  ProofExtras,
   BacktestRunRequest,
   ClaudeAuthority,
   ClockState,
@@ -42,6 +43,8 @@ export interface Transport {
   listDecisions(limit?: number): Promise<Decision[]>;
   runBacktest(body: BacktestRunRequest): Promise<{ run_id: string }>;
   getBacktest(runId: string): Promise<BacktestResult[]>;
+  /** PROPOSED endpoint, see ProofExtras. */
+  getProofExtras(runId: string): Promise<ProofExtras>;
   chat(message: string): Promise<{ chat_id: string }>;
   listProposals(status?: Proposal["status"]): Promise<Proposal[]>;
   confirmProposal(proposalId: string, confirm: boolean): Promise<Proposal>;

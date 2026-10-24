@@ -11,7 +11,8 @@ Read first: `CLAUDE.md`, `docs/ARCHITECTURE.md`, `docs/CONTRACTS.md`, `docs/desi
 - The whole `frontend/`.
 - The simulation: `backend/engine/devices.py`, `hub.py`, `customers.py`, `fake_hub.py`, `backend/data/equipment_catalog.json`, `backend/tests/simulation/`.
 - Azure Static Web Apps.
-- Stay inside these folders. `backend/engine/__init__.py`, the decision engine, the API and SpacetimeDB belong to Kritazya.
+- Stay inside these folders. Kritazya owns the engine brain, backtest / proof data, SpacetimeDB and Container Apps (incl. `backend/engine/__init__.py`). Suyog owns the FastAPI API, the run loop, Claude, the Fetch agents, Convex and the ESP32.
+- What the teammates need from my side is in **`frontend/FOR_TEAMMATES.md`**; keep it current too.
 
 ## Repo and branch
 - `~/Downloads/WattWise` (github.com/EMP-Kritazya/WattWise).
@@ -21,6 +22,7 @@ Read first: `CLAUDE.md`, `docs/ARCHITECTURE.md`, `docs/CONTRACTS.md`, `docs/desi
   - `1c9a9d6` Simulation Phase 2
   - `d1e5c15` Frontend data layer
   - `0d477ed` Step 4 UI
+  - Step 5a Proof screen (latest commit on `ashirwad`)
 - `backend/engine/__pycache__/` is untracked; leave it out of commits.
 
 ## Run
@@ -113,6 +115,17 @@ Read first: `CLAUDE.md`, `docs/ARCHITECTURE.md`, `docs/CONTRACTS.md`, `docs/desi
 - **`EquipmentType.default_limits`** is optional in the TS types. The mock catalog fills it, and mock `createKitchen` takes `config.authority`.
 - **AssistantPanel:** a ProposalCard with Confirm / Cancel. After Confirm it re-reads the kitchen.
 
+### Step 5a: Proof screen (frontend)
+- **`pages/ProofPage.tsx`:** runs `runBacktest({ months: 12, assumptions_id: "base" })` on first visit, shows progress from `backtest_progress`, then loads `getBacktest` + `getProofExtras`. The last run is cached in the module while the app is open; "Re-run backtest" starts a new one.
+  - Header badges: dataset label, tariff name, assumptions id, auditor status. **Numbers stay hidden unless `audit === "cleared"`** (DATA_AND_PROOF.md).
+  - Year totals (Without / Timer / With, saved vs without, saved vs timer).
+  - 12-month table: bill, peak kW and kWh per policy, both savings columns, January "partial (warm-up)", a checks icon with the details on hover.
+  - Busiest day chart (Recharts) with both peaks marked.
+  - Sensitivity table with the worst case highlighted.
+- **`components/proof/ReplayMonth.tsx`:** plays the cached month hour by hour in 15 s with three running bills (Without / Timer / With) and a load chart revealed as it plays; pause / resume / replay; ends with that month's savings.
+- **`ProofExtras` (types/contracts.ts) is PROPOSED, not in CONTRACTS.md.** It holds the tariff name, audit status, per-month savings, totals, busiest day, sensitivity and the replay series, so the browser never subtracts bills. Real endpoint (proposed): `GET /api/backtest/{run_id}/proof`.
+- **`mocks/proof.ts`:** the mock backtest (moved out of `server.ts`) and `mockProofExtras`. The replay's last hour equals the table's bill for that month.
+
 ### Earlier: 3D live floor (`src/components/live/floor/`)
 - Isometric R3F scene with Restaurant, Device3D, Ambient, Scenery, Furniture, Effects3D, Hud and OperationsPanel ("What is running?").
 - Equipment focus mode is on by default.
@@ -121,20 +134,18 @@ Read first: `CLAUDE.md`, `docs/ARCHITECTURE.md`, `docs/CONTRACTS.md`, `docs/desi
 - A labels toggle, Follow, side by side, and demo mode.
 - Demo keys: Space play/pause · C +40 customers · S side by side · V cycle views · L labels · F follow · Esc exit.
 
-## Next: Step 5 (Phase 4–5 in ASHIRWAD.md)
-1. **Proof screen** (`pages/ProofPage.tsx`, currently a shell): backtest results and the **Replay month** animation. Some proof data is still missing from the contract (see gaps).
-2. **Badges:** "measured (scaled)" on devices whose readings come from hardware, and a hardware badge. Use the `source` on Device and HubReport readings.
+## Next: rest of Step 5 (Phase 4–5 in ASHIRWAD.md)
+1. **Badges:** make the mock report one device as `source: "measured"` and the hub report as `mixed`; show "measured (scaled)" on that device in the 3D floor, DevicePowerCard and the "What is running?" panel, and a hardware badge in the StatusBar (from `/api/health` `hardware`).
+2. **Demo preset in the mock:** DEMO.md says Friday **17:30** (mock starts 11:30), 120×, Giants game 19:05 in recorded context, one escalation ~2 min in. Add a demo-mode Builder preset ("Demo Café", Marina SF).
 3. **Azure Static Web Apps:**
-   - deploy `frontend/dist`;
-   - add `staticwebapp.config.json` with an SPA fallback to `index.html`, so routes like `/agents` work on refresh;
-   - set the API / ws / SpacetimeDB env for the deployed build.
-4. **`DEMO_MODE` preset kitchen:**
-   - 5 clean demo runs;
-   - record and edit the 3–5 min video.
+   - `staticwebapp.config.json` with an SPA fallback to `index.html`, so `/agents` and `/proof` work on refresh;
+   - a GitHub Actions workflow that builds `frontend/` and deploys `dist`;
+   - deploy the mock build first (`VITE_MOCK=1`) so there is a working link, then switch the env to the real API / SpacetimeDB URLs.
+4. **Join up once teammates deliver** (see `FOR_TEAMMATES.md`): real API, SpacetimeDB bindings, real backtest, then 5 clean demo runs and the 3–5 min video.
 5. **Later:**
    - Replace the PLACEHOLDER kW figures with FSTC / ENERGY STAR values.
-   - Plug in the SpacetimeDB bindings when Kritazya ships them (`src/data/spacetime.ts`).
-   - Switch to generated types.
+   - Plug in the SpacetimeDB bindings in `src/data/spacetime.ts`.
+   - Switch to generated types (`npm run gen:types`).
    - Code-split the three.js bundle; the build warns about chunks over 500 kB.
 
 ## Rules (CLAUDE.md / UI.md)
@@ -152,9 +163,9 @@ Read first: `CLAUDE.md`, `docs/ARCHITECTURE.md`, `docs/CONTRACTS.md`, `docs/desi
 - **Contracts:** never hand-write contract shapes as final, and don't change `docs/CONTRACTS.md` without the team.
 
 ## Open questions and gaps (raise with the team)
-- Who calls `hub.advance` each tick (engine loop or API)?
+- Who calls `hub.advance` each tick? Probably Suyog's run loop (ARCHITECTURE.md: runtime = Suyog).
 - **SpacetimeDB:** the generated bindings, and the `request_surge` reducer signature.
-- **Proof data:** busiest-day series, tariff name, sensitivity, replay series, cached-run lookup.
+- **Proof data:** the PROPOSED `ProofExtras` / `GET /api/backtest/{run_id}/proof` needs Kritazya's agreement (or another shape), plus a cached-run lookup for demo mode.
 - **Endpoints:** no tariff list endpoint.
 - **Messages:** no state replay on `/ws` connect, and no "warning cleared" message.
 - **Importance:** it is per equipment type in KitchenConfig. Per-unit overrides go through `PUT /api/kitchen/devices/{id}/importance`.
@@ -168,4 +179,5 @@ Read first: `CLAUDE.md`, `docs/ARCHITECTURE.md`, `docs/CONTRACTS.md`, `docs/desi
 - **Lights:** mounting or unmounting three.js lights recompiles shaders. Keep lights mounted and change their intensity instead.
 - **Shaders:** custom shaders that can emit NaN black out the frame through Bloom. N8AO and SoftShadows also blanked it. Use standard materials.
 - **Stale HMR:** it can make the floor look wrong. Hard-reload (e.g. add `?fresh=1` to the URL).
+- **Replay animation:** a requestAnimationFrame timestamp can be earlier than the `performance.now()` taken at start; clamp progress at 0 or `steps[-1]` crashes the page.
 - **Edit-tool failures:** after shell / sed edits, re-read a file before using the Edit tool on it.
