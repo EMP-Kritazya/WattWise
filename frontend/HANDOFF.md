@@ -37,7 +37,7 @@ WattWise keeps a restaurant's 15-minute electricity peak under the owner's cap.
 - `ashirwad` is rebased onto `main` at `0dc6a34` (D1 done), so `contracts/fixtures/` and the new docs are in the branch. `main` itself is unchanged.
 - The old Python simulation is deleted from the branch (D2 done). Outside `frontend/`, the branch touches only `backend/data/equipment_catalog.json`.
 - Backups of the pre-rebase branch exist locally: `backup/ashirwad-before-rebase` and `backup/ashirwad-before-reword`.
-- **Commit rule:** no Claude co-author line on commits.
+- **Commit rule:** commit as Ashirwad; no AI co-author or attribution lines in commit messages.
 
 ## Where the branch stands now (before the rework)
 Earlier work, built for the previous design. Much of the UI carries over; see PLAN.md §6.
@@ -56,6 +56,32 @@ Earlier work, built for the previous design. Much of the UI carries over; see PL
   - After A3, `VITE_MOCKS=1 npm run dev` serves the fixtures.
 - **Later env vars:** `VITE_API_URL`, `VITE_HUB_WS_URL`, `VITE_LIVE_TRANSPORT` (`spacetime` or `ws`), `VITE_SPACETIME_URI`, `VITE_SPACETIME_DB`.
 - **Preview server:** `.claude/launch.json` in the `Assignment 3` folder has `wattwise-frontend-mock` on port 5173.
+
+## Status right now (Oct 24, after commit `f9b8585`)
+- **Done:**
+  - PLAN.md written;
+  - D1: `ashirwad` rebased onto `main` `0dc6a34`, force-pushed;
+  - D2: old Python simulation deleted;
+  - HANDOFF.md and FOR_TEAMMATES.md updated;
+  - `npm run build` passes.
+- **Not started:** every build step in PLAN.md §3. No code has been changed for the new design yet.
+- **Waiting on Ashirwad: D3**, what the Simulation view draws.
+  - Recommended: the tile floor per UI.md (a tile per device, wired to a pulsing Hub tile, with physical gauges).
+  - Or: also keep the existing 3D floor as an optional look that reads only `useDevices()`.
+  - Ask him before building C2's Simulation view. Steps A and B don't depend on it.
+
+## Immediate next task: PLAN.md step 2 (A2 → A3 → A4)
+1. **A2, types:** rewrite `frontend/src/types/contracts.ts` from CONTRACTS.md §1, §2, §5 and §8, marking every block `// STUB: replace with generated types`.
+   - Delete `ProofExtras`, plus `getProofExtras` in `src/transport/*` and `src/mocks/server.ts`; it isn't in the contract.
+   - Fix every compile error that follows.
+2. **A3, mocks:**
+   - In `vite.config.ts`, add the alias `@fixtures` → `../contracts/fixtures`, and set `server.fs.allow` to the repo root.
+   - Add `src/mocks/fixtures.ts`, which loads JSON and `.jsonl` (via `?raw`) read-only, then build `rest.ts`, `liveRows.ts`, `viewerWs.ts`, `spacetimeReducers.ts` and `mockHubServer.ts` exactly as PLAN.md A3 describes.
+   - The switch is `VITE_MOCKS=1`; also add an `.env.mocks` and the script `"dev:mocks": "vite --mode mocks"`.
+   - Keep the old `mocks/server.ts` working until the screens are moved over, then delete it.
+3. **A4, hooks:** in `src/data/`, add `useLive()` (typed rows per SpacetimeDB table), `useDevices()` (hub state in `/sim`, `live_device` rows elsewhere) and `useApi()` (CONTRACTS.md §2).
+   - Verify with a temporary debug route that dumps every table, then remove it.
+4. **Before committing:** run `npm run build`; add Vitest in step 3 of PLAN.md §5. Commit to `ashirwad` and push. Never commit to `main`, never merge.
 
 ## Next steps
 Exactly PLAN.md §5, in order:
