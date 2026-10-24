@@ -3,6 +3,56 @@
 You are taking over Ashirwad's work on **WattWise** (Cal Hacks 13.0, Oct 23–25 2026). Work carefully, keep the existing code style,
 and run `npm run build` and `npm test` (in `frontend/`) before calling anything done.
 
+## ⭐ CURRENT TASK (Oct 24, latest): build the Toy Box restaurant design
+**Spec:** `frontend/UI_CONCEPTS.md`, chosen by Ashirwad. **Visual target:** `frontend/design/toybox-restaurant-mockup.html`; open it in a browser.
+
+The whole restaurant in the current `plan.ts` layout, restyled as a toy miniature with ink outlines, plus a right column:
+- a 15-min peak gauge (With needle, plus a ghost needle for Without);
+- the **demand-charge card** (Without +$67.20 / With $0 extra);
+- a Claude card.
+
+### Build order (UI_CONCEPTS.md §5)
+1. **Step 1, done and pushed (commit `6ac918d`):** toon materials, ink outlines, Toy Box palette, warm lighting, raised Street view.
+   - `src/components/live/floor/toon.tsx`:
+     - `<Toon>` is a drop-in for `meshStandardMaterial`. It uses a 3-step gradient and ignores metalness / roughness.
+     - `<Ink>` is drei `Outlines`, with **thickness in screen pixels** (default 2.2). The drei default branch is pixel-based.
+     - `floorPattern()` draws checker or plank textures.
+   - `palette.ts`: `BACKGROUND #FFF6E9`, `INK #22223B`, `FLOOR` per room as `[pattern, a, b]`, `WALL`, `INNER_WALL`, `WINDOW`, `APPLIANCE` (one pastel per type), `APPLIANCE_BY_CATEGORY`, `OFF_TINT`.
+   - `Scenery`, `Device3D`, `Ambient` (hub, lamps), `Furniture`: all use `<Toon>`; walls, appliances and props have `<Ink>`.
+   - `LiveFloor`:
+     - warm ambient, hemisphere and key light;
+     - `Environment` removed (toon ignores it);
+     - `ToneMappingMode.NEUTRAL`;
+     - Street pose `pos [10.5,10,21] → target [10,0.4,4.5]`, looking down over the dining room as Ashirwad asked.
+2. **Step 2, next:** recognisable appliance shapes and the four states, on the appliance itself (UI_CONCEPTS.md §2):
+   - **Running:** pastel, red LED, working detail lit.
+   - **Reduced:** teal `#2EC4B6` floor ring, outline and LED; the cable to the hub turns teal and dashed.
+   - **Held:** faded toward grey, dashed amber `#FFB703` ring, white clock badge.
+   - **Off:** grey `#D9D4CC`.
+
+   Edit `Device3D.tsx` (`Details`, `StatusPad`, `StateRing`, `STATE_HEX` in `palette.ts`). The current status pads are green/blue/amber and need the new colours.
+3. **Step 3:** toy diners (block body and round head) using the unused `Diners` in `Ambient.tsx`; a guest queue at the door after +40; a warm glow under each table; furniture in toy colours. Note that furniture is hidden while "Equipment focus" is on.
+4. **Step 4:** the right column. Use Fredoka and Nunito from Google Fonts; white cards with ink outline and 22 px corners.
+   - **Gauge:** `live_tick.block_avg_kw` per lane against `target_kw`.
+   - **Demand-charge card:** the escalation's `accept_overrun.projected.cost_delta_usd` (67.20 in the fixtures) against the chosen option's `cost_delta_usd` (0).
+   - **Claude card:** from `live_escalation`.
+   - **Also:** hide the debug text in the sidebar and the duplicate KPI cards.
+5. **Step 5:** when WattWise acts, fade untouched objects about 30% and show pinned museum-style labels for a few seconds.
+
+### Rules
+- **No numbers from the browser:** never compute a number, e.g. kW × $/kW. If a figure isn't in the contract, show kW only and add a contract question.
+- **3D floor features:** keep them all. Camera views, demo mode and side by side stay; only the look changes.
+- **Checks:** run `npm run build` and `npm test`, then check in the browser with `npm run dev:mocks` (port 5174).
+
+### Uncommitted work in the tree (yours, ChatGPT's earlier session)
+- **The fixture pause/play/reset fix:** `src/mocks/liveRows.ts`, `rest.ts`, `viewerWs.ts`, plus `src/mocks/fixtureControl.test.ts`.
+- **Claude's added fix inside it:** in both `viewerWs.ts` and `liveRows.ts`, pressing Play after the 120-tick scenario ends now restarts it, where before it paused again at once. Keep that when you finish.
+- **Commit it** once it's verified, then commit this file.
+
+### Known issue
+- **Console warnings:** React logs many "synchronously unmount a root while React was already rendering" warnings from drei `<Html>` labels on the floor.
+- **Fix later:** keep the labels mounted and toggle their visibility instead.
+
 ## Read first, in this order
 1. **`docs/team/ASHIRWAD.md` on `main` (commit `0dc6a34`).** It is Ashirwad's instruction set; it wins over every other doc about what he builds or may touch.
 2. **`CLAUDE.md` golden rules**, especially:
@@ -121,6 +171,13 @@ the browser simulation or hub work.
   174 regenerated deterministic fixtures byte-identically; `git diff --check` passes.
 - **Next work is PLAN step 5.** D3 is settled: preserve the 3D floor, make its appliance states judge-readable, and layer in the
   Hub/reporting connections and physical gauges without adding distracting effects.
+
+### Active Codex bugfix — fixture pause/play/reset
+- Reported by Ashirwad: the Live pause button changed state but the fixture simulation kept advancing.
+- Root cause: `VITE_MOCKS=1` returned a canned `/api/sim/control` response while `viewerWs.ts` and `liveRows.ts` each ran an
+  independent interval with no control path.
+- In progress: route fixture controls into both replay sources, make speed affect actual frame cadence, and verify that tick/time
+  and device readings stay frozen while paused, resume from the same frame, and reset to tick 0.
 
 ## Demo focus: the judging round is the priority
 The live demo in judging is the main point. The app should **read as a simulation**: calm, clear, a few impactful moments.
