@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
-import { EscalationDialog } from "@/components/live/EscalationDialog";
+import { ContextStrip } from "@/components/live/ContextStrip";
 import { DecisionFeed } from "@/components/live/DecisionFeed";
+import { EscalationCard } from "@/components/live/EscalationCard";
 import { DevicePowerCard } from "@/components/live/DevicePowerCard";
 import { LiveFloor } from "@/components/live/floor/LiveFloor";
 import { KpiRow } from "@/components/live/KpiRow";
@@ -54,6 +55,8 @@ export function LivePage() {
       <div className="flex min-w-0 flex-col gap-4">
         <WarningBanner />
         <SimControls />
+        <ContextStrip />
+        <EscalationCard />
         <LiveFloor demo={demo} onDemoChange={setDemoMode} />
         <KpiRow />
         <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.3fr)_minmax(0,1fr)]">
@@ -64,7 +67,6 @@ export function LivePage() {
           </div>
         </div>
       </div>
-      <EscalationDialog />
     </div>
   );
 }

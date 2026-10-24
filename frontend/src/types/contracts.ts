@@ -20,6 +20,8 @@ export interface EquipmentType {
   min_power_pct: number | null;
   power_model: PowerModel;
   params: Record<string, unknown>;
+  /** Limits a new unit starts with (equipment_catalog.json). Optional until the generated types land. */
+  default_limits?: ImportanceLimits;
   source_note: string;
 }
 

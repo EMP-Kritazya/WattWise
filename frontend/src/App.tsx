@@ -1,10 +1,12 @@
 import { useEffect } from "react";
 import { BrowserRouter, Navigate, NavLink, Route, Routes } from "react-router";
-import { ChartColumn, ChefHat, LayoutDashboard, Leaf } from "lucide-react";
+import { ChartColumn, ChefHat, LayoutDashboard, Leaf, Network } from "lucide-react";
 import { ChatDrawer } from "@/components/ChatDrawer";
+import { EscalationDialog } from "@/components/live/EscalationDialog";
 import { StatusBar } from "@/components/StatusBar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { AgentNetworkPage } from "@/pages/AgentNetworkPage";
 import { BuilderPage } from "@/pages/BuilderPage";
 import { LivePage } from "@/pages/LivePage";
 import { ProofPage } from "@/pages/ProofPage";
@@ -14,6 +16,7 @@ import { transport } from "@/transport";
 
 const NAV = [
   { to: "/live", label: "Live", icon: LayoutDashboard },
+  { to: "/agents", label: "Agent Network", icon: Network },
   { to: "/builder", label: "Kitchen Builder", icon: ChefHat },
   { to: "/proof", label: "Proof", icon: ChartColumn },
 ];
@@ -42,8 +45,11 @@ export default function App() {
               <Route path="/" element={<Navigate to="/builder" replace />} />
               <Route path="/builder" element={<BuilderPage />} />
               <Route path="/live" element={<LivePage />} />
+              <Route path="/agents" element={<AgentNetworkPage />} />
               <Route path="/proof" element={<ProofPage />} />
             </Routes>
+            {/* On every screen: a waiting escalation pauses the clock, so the owner must always see it. */}
+            <EscalationDialog />
           </main>
           <StatusBar className="border-t px-4 py-2 lg:hidden" />
         </div>

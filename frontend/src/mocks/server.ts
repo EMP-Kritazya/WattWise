@@ -154,6 +154,7 @@ class MockServer implements Transport {
   async createKitchen(config: KitchenConfig): Promise<{ kitchen_id: string }> {
     this.stopLoop();
     this.config = structuredClone(config);
+    if (config.authority) this.authority = { ...config.authority };
     this.devices = [];
     for (const entry of config.equipment) {
       const type = mockCatalog.find((t) => t.type_id === entry.type_id);
