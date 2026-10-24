@@ -11,7 +11,7 @@ from api.ws import replay_fixture_stream
 
 FIXTURES = REPO_ROOT / "contracts" / "fixtures"
 
-# CONTRACTS.md §2 REST table, all 24 rows.
+# CONTRACTS.md §2 REST table, all 25 rows.
 CONTRACT_ROUTES = {
     ("GET", "/api/catalog"),
     ("POST", "/api/kitchen"),
@@ -27,6 +27,7 @@ CONTRACT_ROUTES = {
     ("GET", "/api/backtest/{run_id}"),
     ("POST", "/api/chat"),
     ("GET", "/api/proposals"),
+    ("POST", "/api/proposals"),
     ("POST", "/api/proposals/{proposal_id}/confirm"),
     ("PUT", "/api/kitchen/authority"),
     ("PUT", "/api/kitchen/preferences"),

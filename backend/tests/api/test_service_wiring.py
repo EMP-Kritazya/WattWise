@@ -93,3 +93,30 @@ def test_concurrent_confirmations_apply_once(app):
         t.join()
     assert applied == ["p_0001"]
     assert sorted(outcomes) == ["confirmed", "rejected"]
+
+
+PAID_AUTHORITY = {"enabled": True, "max_cap_overrun_kw": 3.0, "max_extra_delay_min": 20, "max_extra_reduce_min": 15,
+                  "may_go_below_min_power": False}
+
+
+def test_concierge_proposes_authority_and_the_owner_confirm_applies_it(app, client, agent_token):
+    body = {"kind": "authority", "payload": PAID_AUTHORITY, "summary": "Let Claude handle escalations"}
+    resp = client.post("/api/proposals", json=body, headers={"X-Agent-Token": agent_token})
+    assert resp.status_code == 200, resp.text
+    proposal = resp.json()
+    assert (proposal["kind"], proposal["payload"], proposal["status"]) == ("authority", PAID_AUTHORITY, "pending")
+
+    applied = []
+    real_set = app.state.service.set_authority
+    app.state.service.set_authority = lambda payload: (applied.append(payload), real_set(payload))[1]
+    done = client.post(f"/api/proposals/{proposal['proposal_id']}/confirm", json={"confirm": True},
+                       headers={"X-Agent-Token": agent_token})
+    assert done.json()["status"] == "confirmed" and done.json()["confirmed_via"] == "asi_one"
+    assert applied == [PAID_AUTHORITY]
+
+
+def test_create_proposal_needs_the_agent_token_and_only_takes_authority(client, agent_token):
+    body = {"kind": "authority", "payload": PAID_AUTHORITY, "summary": "x"}
+    assert client.post("/api/proposals", json=body).status_code == 401
+    other = {"kind": "peak_cap", "payload": {"peak_mode": "cap", "peak_cap_kw": 40.0}, "summary": "x"}
+    assert client.post("/api/proposals", json=other, headers={"X-Agent-Token": agent_token}).status_code == 422

@@ -157,6 +157,13 @@ def get_proposals(book: Proposals, status: m.ProposalStatus | None = None):
     return book.list(status)
 
 
+# The Concierge proposes the paid plan's authority (code-written payload, never the model); the owner still confirms.
+@router.post("/proposals", response_model=m.Proposal, dependencies=AgentOnly, responses={401: _ERR}, **_exclude_unset)
+def post_proposal(body: m.ProposalCreateRequest, book: Proposals):
+    req = _body(body)
+    return book.create(req["kind"], req["payload"], req["summary"])
+
+
 # async: applying a customer_event proposal schedules a surge in the run loop, which lives on the event loop.
 # The Concierge confirms with X-Agent-Token (an ASI:One reply or card) → `confirmed_via: asi_one`; the dashboard sends none.
 @router.post("/proposals/{proposal_id}/confirm", response_model=m.Proposal, responses={**R404, 401: _ERR},

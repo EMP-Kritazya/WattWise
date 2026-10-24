@@ -41,6 +41,15 @@ Input:  Never touch the walk-in after 9 PM
 Output: A proposed rule change; reply "confirm" to apply it.
 ```
 
+## Paid plan: let Claude handle tonight's decisions
+
+On the free plan every escalation (a moment when no move inside your rules can hold the peak cap) comes to you. Say
+**"Let Claude handle tonight's decisions"** to pay through Stripe (test mode) right in the chat. Once the payment
+clears you get a proposal listing exactly how far Claude may go (kW over the cap, extra delay, extra reduction; never
+below a device's minimum power, never past the food-safety floor). Reply "confirm" and Claude resolves the next
+escalations inside those bounds; anything beyond them still comes to you. Cancel or a failed payment keeps you on the
+free plan. WattWise never sees or stores card details.
+
 ## Use cases and example queries
 
 For restaurant, cafe and commercial kitchen owners whose utility bill has a demand charge:
@@ -53,6 +62,7 @@ For restaurant, cafe and commercial kitchen owners whose utility bill has a dema
 - What will the dinner rush do to my electricity peak tonight?
 - How much did we save on electricity this month?
 - What did you decide about tonight?
+- Let Claude handle tonight's decisions
 - Undo that
 - Choose option 2
 

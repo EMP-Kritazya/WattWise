@@ -106,7 +106,10 @@ Chat replies stream over WebSocket (`chat_delta`, `chat_done`).
 - Each chat message → the same Claude agent and tools as the dashboard chat → text reply (Interactive Cards if time).
 - Must work inside ASI:One with no custom frontend: ask forecast/plan, hear escalation choices, undo, change a rule, see savings.
 - A failed tool call returns a short plain message and the agent keeps the session alive. Never a stack trace.
-- Bonus only after Gate 3: Payment Protocol (Stripe test mode) for a monthly plan.
+- Bonus after Gate 3: Payment Protocol (Stripe test mode). Free tier = `ClaudeAuthority.enabled: false` (every
+  escalation goes to the owner). "Let Claude handle tonight's decisions" in ASI:One → `RequestPayment` (embedded Stripe
+  Checkout) → `CommitPayment` verified paid → `CompletePayment` → `POST /api/proposals` (kind `authority`, the plan's
+  code-set bounds) → the owner confirms → `set_authority`. Unpaid, rejected or cancelled → stays free. No card data stored.
 
 ## Store
 Convex tables: CONTRACTS.md section 6 (incl. `escalations`, `device_blocks`, `context_snapshots`). The Python side uses the Convex Python client (`pip install convex`).

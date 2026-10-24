@@ -514,6 +514,13 @@ class ProposalConfirmRequest(ContractModel):
     confirm: bool
 
 
+class ProposalCreateRequest(ContractModel):
+    """POST /api/proposals (Concierge only): today only `authority`, made after a paid ASI:One plan (API.md Payment)."""
+    kind: Literal["authority"]
+    payload: ClaudeAuthority
+    summary: str
+
+
 class PreferencesUpdate(ContractModel):
     text: str
 

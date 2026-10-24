@@ -118,16 +118,16 @@ class OwnerChat:
             return API_DOWN
         verb = "confirmed" if confirm else "cancelled"
         if r.status_code != 200:
-            await self._log("concierge", "engine", "error", f"Owner {verb} {proposal['proposal_id']}: {_detail(r)}")
+            await self.log("concierge", "engine", "error", f"Owner {verb} {proposal['proposal_id']}: {_detail(r)}")
             return f"I couldn't {'apply' if confirm else 'cancel'} that: {_sentence(_detail(r))}"
         done = r.json()
-        await self._log("concierge", "engine", "post", f"Owner {verb} {done['proposal_id']} in ASI:One")
+        await self.log("concierge", "engine", "post", f"Owner {verb} {done['proposal_id']} in ASI:One")
         return f"{'Done' if confirm else 'Cancelled'}: {_sentence(done['summary'])}"
 
     # ------------------------------------------------------------ questions (the Claude agent through the API)
 
     async def _ask(self, sender: str, text: str) -> str:
-        await self._log("concierge", "claude", "request", f"Owner asks: {_clip(text, LOG_SUMMARY_CHARS)}")
+        await self.log("concierge", "claude", "request", f"Owner asks: {_clip(text, LOG_SUMMARY_CHARS)}")
         try:
             async with asyncio.timeout(self._timeout):
                 # Open /ws first: the reply starts streaming as soon as the chat is posted.
@@ -135,17 +135,17 @@ class OwnerChat:
                     r = await self._http.post("/api/chat", json={"message": self._with_history(sender, text)},
                                               timeout=API_TIMEOUT_S)
                     if r.status_code != 200:
-                        await self._log("concierge", "claude", "error", f"Chat refused: {_detail(r)}")
+                        await self.log("concierge", "claude", "error", f"Chat refused: {_detail(r)}")
                         return NO_ANSWER
                     chat_id = r.json()["chat_id"]
                     reply, proposal = await self._collect(ws, chat_id)
         except TimeoutError:
-            await self._log("concierge", "claude", "error", "No answer in time")
+            await self.log("concierge", "claude", "error", "No answer in time")
             return TIMED_OUT
         except (OSError, httpx.HTTPError, websockets.WebSocketException) as e:
             log.warning("chat hop failed: %s", type(e).__name__)
             return API_DOWN
-        await self._log("claude", "concierge", "response", f"Answered {chat_id}")
+        await self.log("claude", "concierge", "response", f"Answered {chat_id}")
         reply = reply.strip() or NO_ANSWER
         if proposal is not None:
             reply += f"\n\nWaiting for your confirmation: {_sentence(proposal['summary'])} {CONFIRM_HINT}"
@@ -180,7 +180,7 @@ class OwnerChat:
 
     # ------------------------------------------------------------ agent log
 
-    async def _log(self, from_agent: str, to_agent: str, kind: str, summary: str) -> None:
+    async def log(self, from_agent: str, to_agent: str, kind: str, summary: str) -> None:
         body = {"ts_real": _ts_real(), "from_agent": from_agent, "to_agent": to_agent, "kind": kind,
                 "summary": summary}
         try:

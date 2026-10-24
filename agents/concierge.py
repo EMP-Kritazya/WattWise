@@ -4,6 +4,10 @@ Chat (`owner_chat.py`): every message is acknowledged, then answered through the
 tools as the dashboard chat (POST /api/chat, reply joined from /ws). `confirm` / `yes` / `no` / `cancel` are matched by
 code and confirm or cancel the newest pending Proposal; the model never confirms. Sessions stay open (no end-session).
 
+Paid plan (`upgrade.py`, AgentPaymentProtocol seller role, Stripe TEST mode): "let Claude handle tonight's decisions"
+→ RequestPayment → verified CommitPayment → CompletePayment → an `authority` Proposal the owner confirms. Without
+STRIPE_SECRET_KEY / STRIPE_PUBLISHABLE_KEY test keys the plan is unavailable and the kitchen stays on the free tier.
+
 Context loop (`context_loop.py`): every CONTEXT_INTERVAL_S (600 real s) and whenever a kitchen is built (GET /api/kitchen
 polled every KITCHEN_POLL_S), ask Weather, Grid and Events over uAgents → Claude crowd effect → POST /api/context.
 Env: API_URL (default http://127.0.0.1:8000), AGENT_TOKEN, CHAT_REPLY_TIMEOUT_S (30), CONTEXT_LOOP=0 to switch it off,
@@ -30,12 +34,15 @@ from uagents_core.contrib.protocols.chat import (
     TextContent,
     chat_protocol_spec,
 )
+from uagents_core.contrib.protocols.payment import CommitPayment, RejectPayment, payment_protocol_spec
 
 from common import agent_address, load_dotenv, recorded_mode
 from context_loop import ApiClient, ContextLoop, Location
 from crowd import create_classifier
 from models import EventsResponse, PriceResponse, WeatherResponse
 from owner_chat import OwnerChat, ws_url
+from stripe_checkout import StripeCheckout, StripeConfig
+from upgrade import Upgrade
 
 AGENT_NAME = "WattWise Concierge"
 DESCRIPTION = (
@@ -65,6 +72,7 @@ agent = Agent(
 )
 
 chat_proto = Protocol(spec=chat_protocol_spec)
+payment_proto = Protocol(spec=payment_protocol_spec, role="seller")
 
 API_URL = os.environ.get("API_URL", "http://127.0.0.1:8000")
 AGENT_TOKEN = os.environ.get("AGENT_TOKEN")
@@ -72,10 +80,23 @@ CHAT_REPLY_TIMEOUT_S = float(os.environ.get("CHAT_REPLY_TIMEOUT_S", "30"))
 
 _http = httpx.AsyncClient(base_url=API_URL)
 _owner_chat = OwnerChat(_http, ws_url(API_URL), AGENT_TOKEN, reply_timeout_s=CHAT_REPLY_TIMEOUT_S)
+_stripe_config = StripeConfig.from_env()
+_upgrade = Upgrade(_http, AGENT_TOKEN, StripeCheckout(_stripe_config) if _stripe_config else None, agent.storage,
+                   _owner_chat.log)
 
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _text(reply: str) -> ChatMessage:
+    return ChatMessage(timestamp=_now(), msg_id=uuid4(), content=[TextContent(type="text", text=reply)])
+
+
+async def _send_all(ctx: Context, sender: str, messages: list) -> None:
+    """Payment protocol models as they are; plain strings as chat text."""
+    for message in messages:
+        await ctx.send(sender, _text(message) if isinstance(message, str) else message)
 
 
 @chat_proto.on_message(ChatMessage)
@@ -88,8 +109,13 @@ async def handle_chat(ctx: Context, sender: str, msg: ChatMessage):
         return
     ctx.logger.info(f"chat from {sender}: {text!r}")
 
+    if _upgrade.handles(sender, text):
+        await _send_all(ctx, sender, await _upgrade.on_chat(sender, text, agent_address=agent.address,
+                                                           chat_session=str(ctx.session)))
+        return
+
     reply = await _owner_chat.answer(sender, text)
-    await ctx.send(sender, ChatMessage(timestamp=_now(), msg_id=uuid4(), content=[TextContent(type="text", text=reply)]))
+    await ctx.send(sender, _text(reply))
 
 
 @chat_proto.on_message(ChatAcknowledgement)
@@ -97,12 +123,26 @@ async def handle_ack(ctx: Context, sender: str, msg: ChatAcknowledgement):
     ctx.logger.debug(f"ack from {sender} for {msg.acknowledged_msg_id}")
 
 
+@payment_proto.on_message(CommitPayment)
+async def handle_commit(ctx: Context, sender: str, msg: CommitPayment):
+    ctx.logger.info(f"payment commit from {sender}: {msg.transaction_id}")
+    await _send_all(ctx, sender, await _upgrade.on_commit(sender, msg))
+
+
+@payment_proto.on_message(RejectPayment)
+async def handle_reject(ctx: Context, sender: str, msg: RejectPayment):
+    ctx.logger.info(f"payment rejected by {sender}: {msg.reason!r}")
+    await _send_all(ctx, sender, await _upgrade.on_reject(sender, msg))
+
+
 agent.include(chat_proto, publish_manifest=True)
+agent.include(payment_proto, publish_manifest=True)
 
 
 @agent.on_event("startup")
 async def announce(ctx: Context):
     ctx.logger.info(f"{AGENT_NAME} address: {agent.address}")
+    ctx.logger.info("paid plan: " + ("Stripe test mode" if _stripe_config else "off (no Stripe test keys)"))
 
 
 # ---------------------------------------------------------------- context loop
