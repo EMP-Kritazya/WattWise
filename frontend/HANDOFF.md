@@ -70,10 +70,11 @@ Earlier work, built for the previous design. Much of the UI carries over; see PL
   - `contracts/fixtures/check.py` passes all 177 files;
   - `npm run build` passes.
 - **Not started:** B1–B7 (catalog, browser simulation and hub), `/sim`, and the new screen layout.
-- **Waiting on Ashirwad: D3**, what the Simulation view draws.
-  - Recommended: the tile floor per UI.md (a tile per device, wired to a pulsing Hub tile, with physical gauges).
-  - Or: also keep the existing 3D floor as an optional look that reads only `useDevices()`.
-  - Ask him before building C2's Simulation view. Steps A and B don't depend on it.
+- **D3 decided by Ashirwad on Oct 24:** retain the existing 3D floor as the Simulation view.
+  - Do not build a second flat appliance-tile floor.
+  - Make each 3D appliance's live state obvious with a restrained glow/outline, and add the Hub, reporting links and physical
+    gauges as calm overlays. Remove or soften decorative lighting/motion that competes with device state.
+  - The floor continues to read only `useDevices()`; screens must not import `src/sim/` or `src/hub/`.
 
 ## Immediate next task: PLAN.md step 3 (B1 → B7 + Vitest)
 1. Bring `backend/data/equipment_catalog.json` to the current EquipmentType contract and replace placeholder power figures with sourced values.
@@ -89,7 +90,7 @@ the browser simulation or hub work.
 - **Complete:** B1 catalog → B2–B5 deterministic TypeScript simulation → B6 hub → B7 link, with Vitest alongside the modules.
 - **Files in scope:** `backend/data/equipment_catalog.json`, `frontend/src/sim/`, `frontend/src/hub/`, frontend test/config files.
 - **Fixtures used read-only:** `contracts/fixtures/hub_protocol/*`, `contracts/fixtures/shapes/*`, and the Demo Café scenario.
-- **Do not start C2 screen redesign yet:** D3 (tile simulation view versus retaining optional 3D) is still Ashirwad's decision.
+- **C2 is unblocked:** retain the 3D floor for the Simulation view and add the contract-required clarity around it.
 - **Gate passed:** deterministic repeated reports, exact hub totals, command ack coverage, power bounds, fixture shape compatibility,
   `npm test`, `npm run build`, and a fixture-mode browser smoke test of `/sim`.
 - **Latest completed commit before this work:** `35b9656` (A2–A4 handoff update). Working-tree changes after that commit belong to
@@ -118,8 +119,8 @@ the browser simulation or hub work.
   normal app entry bundle.
 - Verification: `npm test` = 5 passing tests; `npm run build` passes; `contracts/fixtures/check.py` passes all 177 files and all
   174 regenerated deterministic fixtures byte-identically; `git diff --check` passes.
-- **Next work is PLAN step 5, but D3 is still a user decision.** Do not replace the Live page's current floor until Ashirwad
-  confirms whether the contract-specified wired device tiles replace it entirely or the 3D floor remains as an optional view.
+- **Next work is PLAN step 5.** D3 is settled: preserve the 3D floor, make its appliance states judge-readable, and layer in the
+  Hub/reporting connections and physical gauges without adding distracting effects.
 
 ## Demo focus: the judging round is the priority
 The live demo in judging is the main point. The app should **read as a simulation**: calm, clear, a few impactful moments.
@@ -145,7 +146,7 @@ The fixture scenario matches this: surge at tick 31, escalation at tick 60, choi
 | Today | Change to |
 |---|---|
 | Live page stacks everything: context strip, escalation card, 3D floor, KPIs, three cards | Centred **`Charts \| Simulation`** toggle, plus a **right rail** (decision feed with Undo + escalation card), plus the chat drawer |
-| 3D floor with camera views, Follow, demo HUD, labels toggle | **Not in the spec.** The Simulation view is appliance **tiles wired to a Hub tile** (decision D3; ask Ashirwad before keeping any 3D) |
+| 3D floor with camera views, Follow, demo HUD, labels toggle | **Retain it.** Simplify decorative effects; make appliances act as the live device tiles with restrained state glow, Hub/reporting links and physical gauges |
 | No hub on screen, no physical gauges | Add both: "everything reports to one box" is a core story beat |
 | Chart without the month peak line | Add the cap line, month peak line and dashed `with` forecast from `live_tick.forecast_kw_json` |
 | No energy + cost strip | Add one from `live_tick`: energy today, price now, cost today and month, per lane |
@@ -160,7 +161,7 @@ The fixture scenario matches this: surge at tick 31, escalation at tick 60, choi
 
 ## Next steps
 Exactly PLAN.md §5, in order:
-1. Settle D3 (D1 and D2 are done).
+1. D1–D3 are settled. D3 retains the 3D floor. ☑
 2. Types → fixture mocks → data hooks. ☑
 3. Catalog → simulation → hub → Vitest.
 4. Hub link with `mockHubServer` → `/sim` panel.

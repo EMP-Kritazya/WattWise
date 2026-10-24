@@ -48,11 +48,12 @@ Status key: ☐ to do · ◐ partly there (existing code to rework) · ☑ done 
   Deleting my own additions restores his folder to exactly what `main` has; the physics moves to TypeScript (§3 B).
   **Recommendation:** delete them in one commit.
 
-**D3. What the Simulation view draws.**
-- UI.md specifies **one tile per device**, with a thin line to a **Hub tile** that pulses each tick, plus physical gauges.
-- **Recommendation:** build the tile floor exactly as specified.
-- The existing 3D floor is not in the spec. Either keep it as an optional "3D" look inside the Simulation view (reading only `useDevices()`), or retire it.
-- Your call; it's extra scope either way.
+**D3. What the Simulation view draws.** ☑ Decided by Ashirwad on Oct 24.
+- **Retain the existing 3D floor** as the Simulation view; do not replace it with a separate flat tile floor.
+- Treat each 3D appliance as the corresponding device tile: active/reduced/waiting states must be immediately legible through a
+  restrained glow or outline, not decorative lighting or constant motion.
+- Add the contract-required Hub presence, reporting connections and physical gauges as calm 2D overlays around the floor.
+- The 3D view must continue to read devices only through `useDevices()`; it must never import `src/sim/` or `src/hub/`.
 
 ---
 
@@ -297,7 +298,7 @@ Always 0 ≤ `power_kw` ≤ `rated_kw`.
   - `store/sim.ts` → `useLive()` row store;
   - `EscalationDialog` → buttons inside the card.
 - **Remove:** `ProofExtras` (not in the contract); the old Python simulation (D2).
-- **Decide (D3):** the 3D floor.
+- **D3 decided:** retain the 3D floor and layer the Hub/state/gauge clarity onto it.
 
 ## 7. Contract questions for Kritazya (kept as written until answered)
 - **Q1, Proof data:** `BacktestResult` has no savings columns, busiest-day series, sensitivity rows or replay series, yet UI.md asks for all four, and the browser may not compute them. What shape will carry them?
