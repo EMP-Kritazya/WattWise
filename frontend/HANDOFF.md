@@ -172,12 +172,14 @@ the browser simulation or hub work.
 - **Next work is PLAN step 5.** D3 is settled: preserve the 3D floor, make its appliance states judge-readable, and layer in the
   Hub/reporting connections and physical gauges without adding distracting effects.
 
-### Active Codex bugfix — fixture pause/play/reset
+### Codex checkpoint 3 — fixture pause/play/reset complete
 - Reported by Ashirwad: the Live pause button changed state but the fixture simulation kept advancing.
 - Root cause: `VITE_MOCKS=1` returned a canned `/api/sim/control` response while `viewerWs.ts` and `liveRows.ts` each ran an
   independent interval with no control path.
-- In progress: route fixture controls into both replay sources, make speed affect actual frame cadence, and verify that tick/time
-  and device readings stay frozen while paused, resume from the same frame, and reset to tick 0.
+- Fixed both replay sources so play, pause, reset and speed control their actual frame cadence. Play after tick 120 restarts the
+  scenario instead of stopping again immediately.
+- Verification: `npm test` passes 7 tests including replay-control coverage; `npm run build` passes. Browser-verified at `/live`:
+  paused at 5:59 PM, stayed frozen for more than two seconds, then resumed from the same frame to 6:01 PM.
 
 ## Demo focus: the judging round is the priority
 The live demo in judging is the main point. The app should **read as a simulation**: calm, clear, a few impactful moments.

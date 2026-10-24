@@ -1,7 +1,6 @@
-import type { Context, LiveTables, WsMessage } from "@/types";
+import type { ClockState, Context, LiveTables, SimControlRequest, WsMessage } from "@/types";
 import { liveRowFrames, seedLiveTables, viewerWsMessages } from "./fixtures";
 
-const FRAME_MS = 500;
 type Listener = (tables: LiveTables, messages: WsMessage[]) => void;
 
 const messageFrames = (() => {
@@ -42,8 +41,10 @@ const contextSummary = (context: Context): LiveTables["live_context"][number] =>
 class FixtureLiveRows {
   private tables = seedLiveTables();
   private listeners = new Set<Listener>();
-  private timer: ReturnType<typeof setInterval> | undefined;
+  private timer: ReturnType<typeof setTimeout> | undefined;
   private frame = 0;
+  private playing = true;
+  private speed = 120;
 
   snapshot(): LiveTables {
     return structuredClone(this.tables);
@@ -58,36 +59,104 @@ class FixtureLiveRows {
   start(): () => void {
     if (this.timer) return () => this.stop();
     this.frame = 0;
+    this.playing = true;
+    this.speed = 120;
     // The table fixtures are final-state seeds for static component work. Clear them before replay so the UI never sees
     // future decisions, agent messages, or the already-consumed surge.
     this.tables = {
       live_tick: [], tick_history: [], live_device: [], live_comparison: [], live_feed: [],
       live_clock: [], live_context: [], live_escalation: [], live_agent_log: [], surge_request: [],
     };
-    const advance = () => {
-      const payload = liveRowFrames[this.frame++];
-      if (!payload) {
-        this.stop();
-        return;
-      }
-      this.tables.live_tick = structuredClone(payload.live_tick);
-      this.tables.tick_history = upsert(this.tables.tick_history, payload.tick_history, (row) => `${row.lane}:${row.ts}`).slice(-360);
-      this.tables.live_device = upsert(this.tables.live_device, payload.live_device, (row) => row.key);
-      this.tables.live_comparison = [structuredClone(payload.live_comparison)];
-      const tickId = payload.live_tick[0]?.tick_id ?? 0;
-      const messages = [...(this.frame === 1 ? messageFrames.get(0) ?? [] : []), ...(messageFrames.get(tickId) ?? [])];
-      this.applyMessages(messages);
-      const snapshot = this.snapshot();
-      this.listeners.forEach((listener) => listener(snapshot, structuredClone(messages)));
-    };
-    advance();
-    this.timer = setInterval(advance, FRAME_MS);
+    this.advance();
     return () => this.stop();
   }
 
   stop() {
-    clearInterval(this.timer);
+    this.playing = false;
+    this.stopTimer();
+  }
+
+  /** Keeps Spacetime-shaped fixture rows synchronized with the viewer WebSocket replay controls. */
+  control(body: SimControlRequest): ClockState {
+    if (body.action === "reset") {
+      this.stopTimer();
+      this.frame = 0;
+      this.playing = false;
+      this.speed = body.speed ?? 120;
+      this.tables = {
+        live_tick: [], tick_history: [], live_device: [], live_comparison: [], live_feed: [],
+        live_clock: [], live_context: [], live_escalation: [], live_agent_log: [], surge_request: [],
+      };
+    } else {
+      // At the end of the 120-tick scenario, Play replays it from the start instead of stopping again at once.
+      if (body.action === "play" && this.frame >= liveRowFrames.length) {
+        this.frame = 0;
+        this.tables = {
+          live_tick: [], tick_history: [], live_device: [], live_comparison: [], live_feed: [],
+          live_clock: [], live_context: [], live_escalation: [], live_agent_log: [], surge_request: [],
+        };
+      }
+      if (body.speed != null) this.speed = body.speed;
+      this.playing = body.action === "play";
+      if (!this.playing) this.stopTimer();
+    }
+
+    const clock = this.clockState();
+    const message: WsMessage = { type: "clock", ...clock };
+    this.applyMessages([message]);
+    this.notify([message]);
+    this.schedule();
+    return clock;
+  }
+
+  private advance() {
+    const payload = liveRowFrames[this.frame++];
+    if (!payload) {
+      this.playing = false;
+      this.stopTimer();
+      return;
+    }
+    this.tables.live_tick = structuredClone(payload.live_tick);
+    this.tables.tick_history = upsert(this.tables.tick_history, payload.tick_history, (row) => `${row.lane}:${row.ts}`).slice(-360);
+    this.tables.live_device = upsert(this.tables.live_device, payload.live_device, (row) => row.key);
+    this.tables.live_comparison = [structuredClone(payload.live_comparison)];
+    const tickId = payload.live_tick[0]?.tick_id ?? 0;
+    const rawMessages = [...(this.frame === 1 ? messageFrames.get(0) ?? [] : []), ...(messageFrames.get(tickId) ?? [])];
+    const messages = rawMessages.map((message): WsMessage =>
+      message.type === "clock" ? { type: "clock", ...this.clockState(), slowed_reason: message.slowed_reason } : message,
+    );
+    this.applyMessages(messages);
+    this.notify(messages);
+    this.schedule();
+  }
+
+  private schedule() {
+    this.stopTimer();
+    if (!this.playing) return;
+    this.timer = setTimeout(() => this.advance(), 60_000 / this.speed);
+  }
+
+  private stopTimer() {
+    clearTimeout(this.timer);
     this.timer = undefined;
+  }
+
+  private notify(messages: WsMessage[]) {
+    const snapshot = this.snapshot();
+    this.listeners.forEach((listener) => listener(snapshot, structuredClone(messages)));
+  }
+
+  private clockState(): ClockState {
+    const tick = this.tables.live_tick.find((row) => row.lane === "with") ?? this.tables.live_tick[0];
+    const previous = this.tables.live_clock[0];
+    return {
+      playing: this.playing,
+      speed: this.speed,
+      sim_ts: tick?.ts ?? previous?.sim_ts ?? "2026-07-18T00:30:00Z",
+      tick_id: tick?.tick_id ?? previous?.tick_id ?? 0,
+      paused_reason: previous?.paused_reason ?? null,
+      slowed_reason: previous?.slowed_reason ?? null,
+    };
   }
 
   requestSurge(customers: number, durationMin: number) {

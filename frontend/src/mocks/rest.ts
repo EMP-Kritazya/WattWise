@@ -5,6 +5,8 @@ import type { Transport } from "@/transport/types";
 import type { WsMessage } from "@/types";
 import { restFixtures, type RestFixture } from "./fixtures";
 import { broadcastFixtureMessage, subscribeFixtureViewer } from "./viewerWs";
+import { controlFixtureViewer } from "./viewerWs";
+import { fixtureLiveRows } from "./liveRows";
 
 const clone = <T,>(value: T): T => structuredClone(value);
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -49,7 +51,12 @@ export const fixtureTransport: Transport = {
   getKitchen: () => fixtureRequest("GET", "/api/kitchen"),
   setImportance: (deviceId, body) => fixtureRequest("PUT", `/api/kitchen/devices/${enc(deviceId)}/importance`, body),
   setPeakCap: (body) => fixtureRequest("PUT", "/api/kitchen/peak-cap", body),
-  simControl: (body) => fixtureRequest("POST", "/api/sim/control", body),
+  async simControl(body) {
+    await fixtureRequest("POST", "/api/sim/control", body);
+    const clock = controlFixtureViewer(body);
+    fixtureLiveRows.control(body);
+    return clock;
+  },
   deviceCommand: (deviceId, body) => fixtureRequest("POST", `/api/devices/${enc(deviceId)}/command`, body),
   async addCustomers(body) {
     await fixtureRequest("POST", "/api/events/customers", body);
