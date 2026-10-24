@@ -240,6 +240,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.broadcaster.bind_loop(asyncio.get_running_loop())
+        await app.state.runtime.restore_build()  # a stored kitchen reaches the sim host before anyone presses play
         yield
         await app.state.agent.wait_chats()
         await app.state.broadcaster.stop()

@@ -214,6 +214,19 @@ async def test_failing_live_transport_falls_back_to_ws_with_a_warning():
     await publisher.stop()
 
 
+async def test_play_on_a_restored_kitchen_sends_sim_build_first(serve):
+    async with serve() as srv:
+        srv.runtime.autorun = False
+        srv.runtime.live.use(RecordingLive())
+        assert srv.app.state.service.lanes  # fake mode restores the Demo Café kitchen from the store
+        await srv.connect_fake_hub()
+        assert (await srv.http.post("/api/sim/control", json={"action": "play"})).status_code == 200
+        await until(lambda: any(m["type"] == "sim_build" for m in srv.hub_client.received))
+        assert await srv.runtime.tick_once() is True
+        assert [m["tick_id"] for m in sent_ticks(srv)] == [1]
+        assert await srv.runtime.restore_build() is False  # once only
+
+
 async def test_play_without_a_kitchen_is_404(serve):
     async with serve() as srv:
         srv.app.state.service.lanes._kitchens = {}
