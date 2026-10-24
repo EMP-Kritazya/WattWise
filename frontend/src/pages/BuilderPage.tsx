@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { fmtKw } from "@/lib/format";
 import { IMPORTANCE_BADGE, IMPORTANCE_LABEL } from "@/lib/theme";
 import { errorMessage } from "@/lib/utils";
-import { useSim } from "@/store/sim";
+import { useLive as useSim } from "@/data";
 import { transport } from "@/transport";
 import type { Category, EquipmentType, ImportanceLimits, KitchenConfig } from "@/types";
 

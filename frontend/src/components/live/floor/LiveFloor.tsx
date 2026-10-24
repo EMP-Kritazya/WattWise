@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useDeviceMeta } from "@/hooks/useDeviceMeta";
 import { cn } from "@/lib/utils";
-import { useSim } from "@/store/sim";
+import { requestSurge, useLive as useSim } from "@/data";
 import { transport } from "@/transport";
 import { DemoBar, newestDecision } from "./Hud";
 import { BACKGROUND, STATE_HEX } from "./palette";
@@ -94,7 +94,7 @@ export function LiveFloor({ demo, onDemoChange }: { demo: boolean; onDemoChange:
   const newestKey = newest ? `${newest.decision.decision_id}:${newest.decision.status}` : null;
   useEffect(() => {
     if (!newest || !follow || mode !== "with" || selected) return;
-    if (newest.decision.status !== "executed" && newest.decision.status !== "awaiting_approval") return;
+    if (newest.decision.status !== "executed" && newest.decision.status !== "escalated") return;
     if (Date.now() - lastFocusAt.current < FOLLOW_COOLDOWN_MS) return;
     lastFocusAt.current = Date.now();
     setAutoFocus(newest.decision.device_id);
@@ -486,10 +486,10 @@ function useDemoKeys(
       const { clock } = useSim.getState();
       if (e.code === "Space") {
         e.preventDefault();
-        if (clock?.paused_reason !== "awaiting_approval")
+        if (clock?.paused_reason !== "escalation")
           transport.simControl({ action: clock?.playing ? "pause" : "play" }).catch(() => {});
       } else if (e.key === "c" || e.key === "C") {
-        transport.addCustomers({ customers: 40, duration_min: 60 }).catch(() => {});
+        requestSurge(40).catch(() => {});
       } else if (e.key === "s" || e.key === "S") {
         handlers.current.compare();
       } else if (e.key === "v" || e.key === "V") {

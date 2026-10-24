@@ -8,7 +8,7 @@ import { useDeviceNames } from "@/hooks/useDeviceNames";
 import { fmtAction, fmtKw, fmtSimTime, fmtUsd } from "@/lib/format";
 import { STATUS_LABEL } from "@/lib/theme";
 import { cn } from "@/lib/utils";
-import { useSim, type FeedItem } from "@/store/sim";
+import { useLive as useSim, type FeedItem } from "@/data";
 import { transport } from "@/transport";
 import type { CommandAction, DecisionStatus } from "@/types";
 
@@ -23,10 +23,7 @@ const ACTION_ICON: Record<CommandAction, LucideIcon> = {
 
 const STATUS_CLASS: Record<DecisionStatus, string> = {
   executed: "border-lane-with/40 bg-lane-with/10 text-lane-with",
-  approved: "border-lane-with/40 bg-lane-with/10 text-lane-with",
-  awaiting_approval: "border-importance-deferrable/40 bg-importance-deferrable/10 text-importance-deferrable",
-  declined: "text-muted-foreground",
-  expired: "text-muted-foreground",
+  escalated: "border-importance-deferrable/40 bg-importance-deferrable/10 text-importance-deferrable",
   undone: "text-muted-foreground",
 };
 
@@ -66,9 +63,9 @@ function FeedRow({ item, name }: { item: FeedItem; name: string }) {
   const d = item.decision;
   const upsertDecisions = useSim((s) => s.upsertDecisions);
   const { run, busy, error } = useAction();
-  const canUndo = d.status === "executed" || d.status === "approved";
+  const canUndo = d.status === "executed";
   const Icon = ACTION_ICON[d.action];
-  const faded = d.status === "undone" || d.status === "declined" || d.status === "expired";
+  const faded = d.status === "undone";
 
   return (
     <div className={cn("flex gap-3 rounded-lg border bg-secondary/40 p-3 text-sm", faded && "opacity-60")}>

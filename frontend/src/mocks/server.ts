@@ -2,6 +2,12 @@ import { ApiError } from "@/transport/errors";
 import type { ConnectionStatus, Transport } from "@/transport/types";
 import type {
   BacktestResult,
+  ClaudeAuthority,
+  Context,
+  Escalation,
+  EscalationOption,
+  Health,
+  Proposal,
   Bill,
   ClockState,
   Command,
@@ -30,7 +36,8 @@ import { mulberry32 } from "./rng";
 
 // MOCK: an in-browser stand-in for the FastAPI server + FakeKitchen (docs/design/API.md), so the UI can be built
 // before the backend exists. Every number here is invented to look plausible; nothing is engine-computed, and the
-// "with" lane doesn't conserve energy. It copies demo-mode behaviour: the clock pauses while an approval is pending.
+// "with" lane doesn't conserve energy. It copies demo-mode behaviour: the clock pauses while an escalation waits for the
+// owner. Escalations alternate between one Claude settles within its authority and one that needs the owner.
 
 const MIN_MS = 60_000;
 const BLOCK_MS = 15 * MIN_MS;
@@ -42,8 +49,9 @@ const MONTH_ENERGY_USD_BEFORE_TODAY = 1_150;
 const START_ENERGY_KWH_TODAY = 95;
 const START_MONTH_PEAK_KW = 36;
 const REPLAN_EVERY_MIN = 5;
-const FIRST_APPROVAL_AT_MIN = 20;
-const APPROVAL_EVERY_MIN = 30;
+const FIRST_ESCALATION_AT_MIN = 20;
+const ESCALATION_EVERY_MIN = 30;
+const CLAUDE_THINKS_MS = 2_500;
 const ENGINE_REDUCE_MIN = 15;
 const OWNER_HOLD_MIN = 30;
 const AI_DELAY_MS = 1_500;
@@ -129,8 +137,12 @@ class MockServer implements Transport {
   private meters: Record<Lane, LaneMeter> = { without: freshMeter(), with: freshMeter() };
   private decisions = new Map<string, { decision: Decision; explanation: string }>();
   private withReadings = new Map<string, HubDeviceReading>();
-  private pendingApproval: string | null = null;
-  private seq = { decision: 0, command: 0, chat: 0, run: 0 };
+  private awaitingOwner: string | null = null; // escalation id the clock is paused for
+  private escalations = new Map<string, Escalation>();
+  private proposals = new Map<string, Proposal>();
+  private authority: ClaudeAuthority = { enabled: true, max_cap_overrun_kw: 3, max_extra_delay_min: 20, max_extra_reduce_min: 15, may_go_below_min_power: false };
+  private context: Context = { ts: iso(START_MS) };
+  private seq = { decision: 0, command: 0, chat: 0, run: 0, escalation: 0, proposal: 0 };
 
   // ---------- REST ----------
 
@@ -200,7 +212,7 @@ class MockServer implements Transport {
     } else if (body.action === "pause") {
       this.playing = false;
       this.stopLoop();
-    } else if (!this.pendingApproval) {
+    } else if (!this.awaitingOwner) {
       this.playing = true;
       this.startLoop();
     }
@@ -250,35 +262,70 @@ class MockServer implements Transport {
     this.surges.push({ perHour: (body.customers * 60) / body.duration_min, untilMs: this.simMs + body.duration_min * MIN_MS });
   }
 
-  async approve(decisionId: string, approve: boolean): Promise<Decision> {
+  async listEscalations(status: Escalation["status"] = "open"): Promise<Escalation[]> {
     await latency();
-    const entry = this.decisions.get(decisionId);
-    if (!entry) throw new ApiError(404, `Unknown decision ${decisionId}`);
-    if (entry.decision.status !== "awaiting_approval") throw new ApiError(409, `Decision ${decisionId} isn't waiting for approval.`);
-    entry.decision = { ...entry.decision, status: approve ? "approved" : "declined" };
-    if (approve && entry.decision.value != null) {
-      this.moves.set(entry.decision.device_id, {
-        kind: "reduce",
-        pct: entry.decision.value,
-        untilMs: this.simMs + ENGINE_REDUCE_MIN * MIN_MS,
-      });
+    return [...this.escalations.values()].filter((e) => e.status === status);
+  }
+
+  async resolveEscalation(escalationId: string, optionId: string): Promise<Escalation> {
+    await latency();
+    const e = this.escalations.get(escalationId);
+    if (!e) throw new ApiError(404, `Unknown escalation ${escalationId}`);
+    if (e.status !== "open" && e.status !== "awaiting_owner") throw new ApiError(409, `Escalation ${escalationId} is already ${e.status}.`);
+    if (!e.options.some((o) => o.option_id === optionId)) throw new ApiError(422, `Not an offered option: ${optionId}`);
+    this.settleEscalation(e, optionId, "owner", null);
+    return this.escalations.get(escalationId)!;
+  }
+
+  async listProposals(status: Proposal["status"] = "pending"): Promise<Proposal[]> {
+    await latency();
+    return [...this.proposals.values()].filter((p) => p.status === status);
+  }
+
+  async confirmProposal(proposalId: string, confirm: boolean): Promise<Proposal> {
+    await latency();
+    const p = this.proposals.get(proposalId);
+    if (!p) throw new ApiError(404, `Unknown proposal ${proposalId}`);
+    if (p.status !== "pending") throw new ApiError(409, `Proposal ${proposalId} is already ${p.status}.`);
+    if (confirm) {
+      // Applied by code, never by the model: the normal facade call.
+      if (p.kind === "importance") {
+        const pl = p.payload as { device_id: string; importance: Importance; limits: ImportanceLimits };
+        await this.setImportance(pl.device_id, { importance: pl.importance, limits: pl.limits });
+      } else if (p.kind === "peak_cap") {
+        await this.setPeakCap(Number((p.payload as { peak_cap_kw: number }).peak_cap_kw));
+      }
     }
-    this.emitDecision(entry.decision, entry.explanation, "template");
-    if (this.pendingApproval === decisionId) {
-      this.pendingApproval = null;
-      this.pausedReason = null;
-      this.playing = true;
-      this.startLoop();
-      this.emitClock();
-    }
-    return entry.decision;
+    const done: Proposal = { ...p, status: confirm ? "confirmed" : "cancelled", confirmed_via: confirm ? "ui" : null };
+    this.proposals.set(proposalId, done);
+    this.emit({ type: "proposal", data: done });
+    return done;
+  }
+
+  async setAuthority(authority: ClaudeAuthority): Promise<void> {
+    await latency();
+    this.authority = { ...authority };
+  }
+
+  async setPreferences(): Promise<void> {
+    await latency();
+  }
+
+  async getContext(): Promise<Context> {
+    await latency();
+    return structuredClone(this.context);
+  }
+
+  async health(): Promise<Health> {
+    await latency();
+    return { ok: true, kitchen_impl: "mock", live_transport: "ws", store: "memory", hardware: "none" };
   }
 
   async undo(decisionId: string): Promise<Decision> {
     await latency();
     const entry = this.decisions.get(decisionId);
     if (!entry) throw new ApiError(404, `Unknown decision ${decisionId}`);
-    if (entry.decision.status !== "executed" && entry.decision.status !== "approved") {
+    if (entry.decision.status !== "executed") {
       throw new ApiError(409, `Decision ${decisionId} can't be undone (${entry.decision.status}).`);
     }
     entry.decision = { ...entry.decision, status: "undone" };
@@ -316,7 +363,10 @@ class MockServer implements Transport {
     words.forEach((word, i) => {
       setTimeout(() => this.emit({ type: "chat_delta", chat_id, text: (i ? " " : "") + word }), 60 * (i + 1));
     });
-    setTimeout(() => this.emit({ type: "chat_done", chat_id }), 60 * (words.length + 1));
+    setTimeout(() => {
+      this.emit({ type: "chat_done", chat_id });
+      this.maybePropose(message);
+    }, 60 * (words.length + 1));
     await latency();
     return { chat_id };
   }
@@ -345,7 +395,9 @@ class MockServer implements Transport {
     this.simMs = START_MS;
     this.playing = false;
     this.pausedReason = null;
-    this.pendingApproval = null;
+    this.awaitingOwner = null;
+    this.escalations.clear();
+    this.proposals.clear();
     this.surges = [];
     this.moves.clear();
     this.overrides.clear();
@@ -358,6 +410,7 @@ class MockServer implements Transport {
     }
     this.tick(false); // so the UI has a first reading before Play
     this.emitClock();
+    this.refreshContext();
   }
 
   private startLoop() {
@@ -397,11 +450,13 @@ class MockServer implements Transport {
       const d = this.replan(ts, sumKw(withLane), config);
       if (d) newDecisions.push(d);
     }
-    const approvalDue = minute >= FIRST_APPROVAL_AT_MIN && (minute - FIRST_APPROVAL_AT_MIN) % APPROVAL_EVERY_MIN === 0;
-    if (advance && open && approvalDue && !this.pendingApproval) {
-      const d = this.proposeOutsideRules(ts, sumKw(withLane));
-      if (d) newDecisions.push(d);
+    const escalationDue = minute >= FIRST_ESCALATION_AT_MIN && (minute - FIRST_ESCALATION_AT_MIN) % ESCALATION_EVERY_MIN === 0;
+    const newEscalations: Escalation[] = [];
+    if (advance && open && escalationDue && !this.awaitingOwner) {
+      const e = this.raiseEscalation(ts, sumKw(withLane), config);
+      if (e) newEscalations.push(e);
     }
+    if (advance && minute % 60 === 0) this.refreshContext();
 
     for (const lane of ["without", "with"] as const) {
       const readings = lane === "without" ? without : withLane;
@@ -416,25 +471,214 @@ class MockServer implements Transport {
           meter: this.meterView(lane),
           customers_per_hour: Math.round(customersPerHour),
           new_decisions: lane === "with" ? newDecisions : [],
+          new_escalations: lane === "with" ? newEscalations : [],
           forecast_kw: lane === "with" && replanTick ? this.forecast(config) : null,
         },
       });
     }
 
+    // Lane differences come from the "engine" (here, the mock), never from the browser.
+    const w = this.meterView("without");
+    const m = this.meterView("with");
+    this.emit({
+      type: "comparison",
+      data: {
+        ts,
+        saved_today_usd: round2(w.cost_usd_today - m.cost_usd_today),
+        peak_avoided_kw: round2(w.month_peak_kw - m.month_peak_kw),
+        month_peak_without_kw: w.month_peak_kw,
+        month_peak_with_kw: m.month_peak_kw,
+      },
+    });
+
     for (const d of newDecisions) {
       const { explanation } = this.decisions.get(d.decision_id)!;
-      if (d.status === "awaiting_approval") {
-        this.pendingApproval = d.decision_id;
-        this.emit({ type: "approval_request", data: d, explanation, expires_at: iso(this.simMs + 10 * MIN_MS) });
-        this.playing = false;
-        this.pausedReason = "awaiting_approval";
-        this.stopLoop();
-        this.emitClock();
-      } else {
-        this.emitDecision(d, explanation, "template");
-        if (d.effect.saving_usd >= 1) setTimeout(() => this.upgradeToAi(d.decision_id), AI_DELAY_MS);
-      }
+      this.emitDecision(d, explanation, "template");
+      if (d.effect.saving_usd >= 1) setTimeout(() => this.upgradeToAi(d.decision_id), AI_DELAY_MS);
     }
+    for (const e of newEscalations) this.emit({ type: "escalation", data: e });
+  }
+
+  /**
+   * The engine's escalation: the with lane is heading over the cap and routine moves aren't enough. Options and every
+   * number in them come from the "engine". Odd ones Claude settles within its authority; even ones need the owner.
+   */
+  private raiseEscalation(ts: string, withTotalKw: number, config: KitchenConfig): Escalation | null {
+    const flex = this.largestFlexible((d) => !this.overrides.has(d.device_id));
+    const job = this.devices.find((d) => d.importance === "deferrable");
+    const cap = config.peak_cap_kw;
+    const forecastPeak = round2(Math.max(withTotalKw + 2.5, cap + 1.5));
+    const overrun = round2(forecastPeak - cap);
+    const n = ++this.seq.escalation;
+    const options: EscalationOption[] = [
+      {
+        option_id: "accept_overrun",
+        summary: `Let the peak reach ${forecastPeak.toFixed(1)} kW for one block`,
+        actions: [],
+        projected: { peak_kw: forecastPeak, cost_delta_usd: round2(overrun * DEMAND_USD_PER_KW), max_indoor_temp_change_c: 0 },
+        rule_breaks: [{ kind: "cap_overrun", amount: overrun, unit: "kW" }],
+        within_authority: this.authority.enabled && overrun <= this.authority.max_cap_overrun_kw,
+      },
+    ];
+    if (flex) {
+      options.push({
+        option_id: `deep_reduce_${flex.type.type_id}`,
+        summary: `${flex.name} to 30 % for 15 min`,
+        actions: [this.command(ts, flex.device_id, "reduce", 30)],
+        projected: { peak_kw: cap, cost_delta_usd: 0, max_indoor_temp_change_c: 1.5 },
+        rule_breaks: [{ kind: "below_min_power", device_id: flex.device_id, amount: 10, unit: "pct" }],
+        within_authority: this.authority.enabled && this.authority.may_go_below_min_power,
+      });
+    }
+    if (job) {
+      options.push({
+        option_id: `extend_delay_${job.type.type_id}`,
+        summary: `Delay the ${job.name.toLowerCase()} 20 min past its deadline`,
+        actions: [this.command(ts, job.device_id, "delay", 20)],
+        projected: { peak_kw: round2(forecastPeak - job.type.rated_kw), cost_delta_usd: 0, max_indoor_temp_change_c: 0 },
+        rule_breaks: [{ kind: "past_deadline", device_id: job.device_id, amount: 20, unit: "min" }],
+        // Even escalations stay outside Claude's authority so the demo shows the owner path.
+        within_authority: this.authority.enabled && n % 2 === 1 && 20 <= this.authority.max_extra_delay_min,
+      });
+    }
+    options.push({ option_id: "ask_owner", summary: "Ask the owner", actions: [], projected: null, rule_breaks: [], within_authority: true });
+
+    const e: Escalation = {
+      escalation_id: `e_${String(n).padStart(4, "0")}`,
+      lane: "with",
+      ts,
+      block_start: iso(Math.floor(this.simMs / BLOCK_MS) * BLOCK_MS),
+      problem: { forecast_peak_kw: forecastPeak, target_kw: cap, excess_kw: overrun, reason: n % 2 ? "lunch rush" : "dinner rush + hot evening" },
+      options,
+      default_option_id: options.find((o) => o.option_id === "accept_overrun" && o.within_authority) ? "accept_overrun" : "ask_owner",
+      deadline_sim_ts: iso(this.simMs + 10 * MIN_MS),
+      status: "open",
+      resolved_by: null,
+      chosen_option_id: null,
+      rationale: null,
+    };
+    this.escalations.set(e.escalation_id, e);
+    this.logAgent("engine", "claude", "escalation", `Forecast ${forecastPeak.toFixed(1)} kW vs cap ${cap.toFixed(1)} kW: ${options.length} options`);
+
+    // Claude thinks for a moment, then picks within authority or hands it to the owner.
+    setTimeout(() => {
+      const cur = this.escalations.get(e.escalation_id);
+      if (!cur || cur.status !== "open") return;
+      const pick = cur.options.find((o) => o.within_authority && o.actions.length) ?? cur.options.find((o) => o.within_authority && o.option_id !== "ask_owner");
+      if (n % 2 === 1 && pick) {
+        this.settleEscalation(cur, pick.option_id, "claude", `${pick.summary}: it keeps the kitchen running and stays inside your limits.`);
+      } else {
+        const waiting: Escalation = { ...cur, status: "awaiting_owner", rationale: "The fix that holds the cap breaks one of your limits, so I'm asking you." };
+        this.escalations.set(cur.escalation_id, waiting);
+        this.awaitingOwner = cur.escalation_id;
+        this.logAgent("claude", "owner", "escalation", "Outside my authority: asking the owner");
+        this.playing = false;
+        this.pausedReason = "escalation";
+        this.stopLoop();
+        this.emit({ type: "escalation", data: waiting });
+        this.emitClock();
+      }
+    }, CLAUDE_THINKS_MS);
+    return e;
+  }
+
+  private settleEscalation(e: Escalation, optionId: string, by: "claude" | "owner", rationale: string | null) {
+    const option = e.options.find((o) => o.option_id === optionId)!;
+    const ts = iso(this.simMs);
+    for (const c of option.actions) {
+      const d = this.devices.find((x) => x.device_id === c.device_id);
+      if (!d) continue;
+      if (c.action === "reduce") this.moves.set(d.device_id, { kind: "reduce", pct: Number(c.value), untilMs: this.simMs + ENGINE_REDUCE_MIN * MIN_MS });
+      if (c.action === "delay") this.moves.set(d.device_id, { kind: "delay", untilMs: this.simMs + Number(c.value) * MIN_MS, owedMin: Math.max(1, d.jobRemainingMin) });
+      const saved = c.action === "delay" ? d.type.rated_kw : (this.withReadings.get(d.device_id)?.power_kw ?? 0) * 0.7;
+      const dec = this.recordDecision(ts, d, c.action, Number(c.value), "escalation_choice", false, "executed", e.problem.forecast_peak_kw, saved);
+      this.emitDecision(dec, this.decisions.get(dec.decision_id)!.explanation, "template");
+    }
+    const done: Escalation = { ...e, status: "resolved", resolved_by: by, chosen_option_id: optionId, rationale: rationale ?? e.rationale };
+    this.escalations.set(e.escalation_id, done);
+    this.logAgent(by, "engine", "choice", `${option.summary}`);
+    this.emit({ type: "escalation", data: done });
+    if (this.awaitingOwner === e.escalation_id) {
+      this.awaitingOwner = null;
+      this.pausedReason = null;
+      this.playing = true;
+      this.startLoop();
+      this.emitClock();
+    }
+  }
+
+  private command(ts: string, deviceId: string, action: CommandAction, value: number | null): Command {
+    return { command_id: `c_${String(++this.seq.command).padStart(4, "0")}`, ts, device_id: deviceId, action, value, decision_id: null, issued_by: "engine" };
+  }
+
+  /** "Never touch the walk-in" / "set the cap to 45 kW" in chat → a proposal the owner confirms in the UI. */
+  private maybePropose(message: string) {
+    const text = message.toLowerCase();
+    let proposal: Proposal | null = null;
+    const base = { ts: iso(this.simMs), status: "pending" as const, created_by: "ai", confirmed_via: null, expires_at: iso(this.simMs + 30 * MIN_MS) };
+    const capMatch = text.match(/cap[^0-9]*(\d+(?:\.\d+)?)/);
+    if (/never touch|don.?t touch|leave .* alone/.test(text)) {
+      const d = this.devices.find((x) => text.includes(x.type.name.toLowerCase().split(" ")[0])) ?? this.devices.find((x) => x.type.type_id === "walk_in_cooler");
+      if (d) {
+        proposal = {
+          ...base,
+          proposal_id: `p_${String(++this.seq.proposal).padStart(4, "0")}`,
+          kind: "importance",
+          payload: { device_id: d.device_id, importance: "always_on", limits: {} },
+          summary: `Make ${d.name} always on, so WattWise never touches it`,
+        };
+      }
+    } else if (capMatch) {
+      proposal = {
+        ...base,
+        proposal_id: `p_${String(++this.seq.proposal).padStart(4, "0")}`,
+        kind: "peak_cap",
+        payload: { peak_cap_kw: Number(capMatch[1]) },
+        summary: `Set the peak cap to ${Number(capMatch[1]).toFixed(1)} kW`,
+      };
+    }
+    if (!proposal) return;
+    this.proposals.set(proposal.proposal_id, proposal);
+    this.emit({ type: "proposal", data: proposal });
+  }
+
+  /** Mock Fetch agents: weather, grid prices and nearby events, gathered by the Concierge (labels say "recorded"). */
+  private refreshContext() {
+    const hours = Array.from({ length: 6 }, (_, k) => this.simMs + k * 60 * MIN_MS);
+    const hourOf = (ms: number) => localHour(ms);
+    this.context = {
+      ts: iso(this.simMs),
+      weather: {
+        label: "recorded",
+        source: "mock (open-meteo shape)",
+        hourly: hours.map((ms) => ({ ts: iso(ms), temp_c: round2(22 + 6 * Math.sin((Math.PI * (hourOf(ms) - 9)) / 12)) })),
+      },
+      prices: {
+        label: "recorded",
+        source: "mock (caiso shape)",
+        hourly: hours.map((ms) => ({ ts: iso(ms), usd_per_kwh: round2(hourOf(ms) >= 16 && hourOf(ms) < 21 ? 0.41 : 0.24) })),
+        stress: hourOf(this.simMs) >= 16 && hourOf(this.simMs) < 21 ? "high" : "normal",
+      },
+      events: {
+        label: "recorded",
+        source: "mock (events shape)",
+        items: [{ name: "Giants vs Dodgers", venue: "Oracle Park", start: iso(START_MS + 7.5 * 60 * MIN_MS), distance_km: 1.8, expected_attendance: 40000 }],
+      },
+      crowd_effect: { value: "medium", set_by: "claude", reason: "Game ends late, 1.8 km away" },
+    };
+    for (const [agent, summary] of [
+      ["weather", "Forecast 6 h for Marina, San Francisco"],
+      ["grid", "Prices 6 h for CAISO"],
+      ["events", "Events within 3 km, next 6 h"],
+    ] as const) {
+      this.logAgent("concierge", agent, "request", summary);
+      this.logAgent(agent, "concierge", "response", `${summary}: ok`);
+    }
+    this.emit({ type: "context", data: structuredClone(this.context) });
+  }
+
+  private logAgent(from: string, to: string, kind: string, summary: string) {
+    this.emit({ type: "agent_log", data: { ts_real: new Date().toISOString(), from_agent: from, to_agent: to, kind, summary } });
   }
 
   private customersPerHour(hour: number, open: boolean): number {
@@ -534,15 +778,6 @@ class MockServer implements Transport {
     return null;
   }
 
-  /** Every 30 sim minutes: a move below the owner's minimum, so the approval flow has something to show. */
-  private proposeOutsideRules(ts: string, withTotalKw: number): Decision | null {
-    const flex = this.largestFlexible((d) => !this.overrides.has(d.device_id));
-    if (!flex) return null;
-    const pct = Math.max(10, limit(flex.limits, "min_power_pct", 40) - 20);
-    const nowKw = this.withReadings.get(flex.device_id)?.power_kw ?? 0;
-    return this.recordDecision(ts, flex, "reduce", pct, "stay_under_cap", false, "awaiting_approval", withTotalKw, (nowKw * (100 - pct)) / 100);
-  }
-
   private largestFlexible(ok: (d: MockDevice) => boolean): MockDevice | undefined {
     const power = (d: MockDevice) => this.withReadings.get(d.device_id)?.power_kw ?? 0;
     return this.devices.filter((d) => d.importance === "flexible" && ok(d)).sort((a, b) => power(b) - power(a))[0];
@@ -578,8 +813,8 @@ class MockServer implements Transport {
     };
     const kw = `(${before.toFixed(1)} → ${after.toFixed(1)} kW)`;
     const explanation =
-      status === "awaiting_approval"
-        ? `Turning ${d.name} down to ${value}% would keep you under the cap ${kw}, but that's below its ${limit(d.limits, "min_power_pct", 40)}% minimum.`
+      reason === "escalation_choice"
+        ? `${action === "delay" ? `Delayed ${d.name} ${value} min` : `Turned ${d.name} down to ${value}%`} as chosen in an escalation ${kw}.`
         : action === "delay"
           ? `Delayed ${d.name} ${value} min to avoid a new peak ${kw}.`
           : `Turned ${d.name} down to ${value}% to stay under the cap ${kw}.`;

@@ -1,19 +1,31 @@
 import { TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useSim } from "@/store/sim";
+import { useLive as useSim } from "@/data";
 
-/** e.g. cap_unreachable. CONTRACTS.md has no "warning cleared" message yet, so the owner dismisses it. */
+/**
+ * Active warnings (cap_unreachable, hub_offline, live_transport_down, store_down), one line each.
+ * CONTRACTS.md has no "warning cleared" message, so the owner dismisses them.
+ */
 export function WarningBanner() {
-  const warning = useSim((s) => s.warning);
+  const warnings = useSim((s) => s.warnings);
   const dismissWarning = useSim((s) => s.dismissWarning);
-  if (!warning) return null;
+  const list = Object.values(warnings);
+  if (!list.length) return null;
   return (
-    <div role="alert" className="flex items-start gap-3 rounded-lg border border-importance-deferrable/40 bg-importance-deferrable/10 px-4 py-3 text-sm">
-      <TriangleAlert className="mt-0.5 size-4 shrink-0 text-importance-deferrable" />
-      <p className="flex-1">{warning.message}</p>
-      <Button variant="ghost" size="sm" className="h-7" onClick={dismissWarning}>
-        Dismiss
-      </Button>
+    <div className="flex flex-col gap-2">
+      {list.map((w) => (
+        <div
+          key={w.code}
+          role="alert"
+          className="flex items-start gap-3 rounded-lg border border-importance-deferrable/40 bg-importance-deferrable/10 px-4 py-3 text-sm"
+        >
+          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-importance-deferrable" />
+          <p className="flex-1">{w.message}</p>
+          <Button variant="ghost" size="sm" className="h-7" onClick={() => dismissWarning(w.code)}>
+            Dismiss
+          </Button>
+        </div>
+      ))}
     </div>
   );
 }

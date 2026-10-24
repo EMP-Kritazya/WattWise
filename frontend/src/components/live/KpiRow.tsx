@@ -3,14 +3,14 @@ import { Gauge, Leaf, Receipt, Zap, type LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { fmtKw, fmtUsd } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { useSim } from "@/store/sim";
+import { useLive as useSim } from "@/data";
 
 /** Headline numbers for the `with` lane, with the `without` lane underneath for comparison. */
 export function KpiRow() {
   const without = useSim((s) => s.latest.without?.meter);
   const withLane = useSim((s) => s.latest.with?.meter);
-  // The one calculation the UI is allowed (UI.md): saved today = without cost − with cost, both straight from ticks.
-  const savedToday = without && withLane ? without.cost_usd_today - withLane.cost_usd_today : null;
+  // Lane differences come from the engine's LaneComparison; the browser never subtracts lanes (UI.md).
+  const comparison = useSim((s) => s.comparison);
   const overCap = withLane ? withLane.block_avg_kw > withLane.peak_cap_kw : false;
 
   return (
@@ -40,7 +40,14 @@ export function KpiRow() {
         value={fmtUsd(withLane?.cost_usd_month)}
         sub={`Without WattWise ${fmtUsd(without?.cost_usd_month)}`}
       />
-      <Kpi icon={Leaf} tone="var(--lane-with)" label="Saved today" value={fmtUsd(savedToday)} sub="With vs without WattWise" highlight />
+      <Kpi
+        icon={Leaf}
+        tone="var(--lane-with)"
+        label="Saved today"
+        value={fmtUsd(comparison?.saved_today_usd)}
+        sub={`Peak avoided ${fmtKw(comparison?.peak_avoided_kw)}`}
+        highlight
+      />
     </div>
   );
 }

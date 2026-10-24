@@ -5,7 +5,7 @@ import { useAction } from "@/hooks/useAction";
 import { useDeviceNames } from "@/hooks/useDeviceNames";
 import { fmtAction, fmtKw, fmtSimClock, fmtUsd } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { useSim, type FeedItem } from "@/store/sim";
+import { requestSurge, useLive as useSim, type FeedItem } from "@/data";
 import { transport } from "@/transport";
 import type { CommandAction } from "@/types";
 import { LANE_HEX } from "./palette";
@@ -90,7 +90,7 @@ export function DecisionToast({ className }: { className?: string }) {
   if (!newest || shownId !== id) return null;
   const d = newest.decision;
   const Icon = ACTION_ICON[d.action];
-  const waiting = d.status === "awaiting_approval";
+  const waiting = d.status === "escalated";
   return (
     <div key={id} className={cn(GLASS, "w-[380px] max-w-full p-3.5 animate-in fade-in slide-in-from-bottom-4 duration-500", className)}>
       <div className="flex items-start gap-3">
@@ -133,7 +133,7 @@ export function newestDecision(feed: Record<string, FeedItem>): FeedItem | null 
   let best: FeedItem | null = null;
   for (const item of Object.values(feed)) {
     const s = item.decision.status;
-    if (s !== "executed" && s !== "approved" && s !== "awaiting_approval") continue;
+    if (s !== "executed" && s !== "escalated") continue;
     if (!best || item.decision.ts > best.decision.ts || (item.decision.ts === best.decision.ts && item.decision.decision_id > best.decision.decision_id)) {
       best = item;
     }
@@ -147,13 +147,13 @@ export function newestDecision(feed: Record<string, FeedItem>): FeedItem | null 
 export function DemoBar({ onExit }: { onExit: () => void }) {
   const clock = useSim((s) => s.clock);
   const latest = useSim((s) => s.latest.with);
-  const without = useSim((s) => s.latest.without?.meter);
+  const comparison = useSim((s) => s.comparison);
   const { run, busy } = useAction();
   const simTs = latest?.ts ?? clock?.sim_ts;
   const playing = clock?.playing ?? false;
-  const waiting = clock?.paused_reason === "awaiting_approval";
-  // The one calculation the UI is allowed (UI.md): saved today = without cost − with cost.
-  const saved = without && latest ? without.cost_usd_today - latest.meter.cost_usd_today : null;
+  const waiting = clock?.paused_reason === "escalation";
+  // From the engine's LaneComparison; the browser never subtracts lanes.
+  const saved = comparison?.saved_today_usd ?? null;
 
   return (
     <div className={cn(GLASS, "flex flex-wrap items-center gap-3 px-3 py-2")}>
@@ -172,10 +172,10 @@ export function DemoBar({ onExit }: { onExit: () => void }) {
         {latest?.customers_per_hour ?? "–"}
         <span className="text-xs text-white/50">/ h</span>
       </span>
-      <Button size="sm" variant="outline" onClick={() => run(() => transport.addCustomers({ customers: 20, duration_min: 60 }))}>
+      <Button size="sm" variant="outline" onClick={() => run(() => requestSurge(20))}>
         +20 customers
       </Button>
-      <Button size="sm" className="bg-amber-400 text-amber-950 hover:bg-amber-300" onClick={() => run(() => transport.addCustomers({ customers: 40, duration_min: 60 }))}>
+      <Button size="sm" className="bg-amber-400 text-amber-950 hover:bg-amber-300" onClick={() => run(() => requestSurge(40))}>
         +40 customers
       </Button>
       <div className="px-2 text-right">

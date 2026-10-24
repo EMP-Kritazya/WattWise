@@ -53,9 +53,6 @@ export const DEVICE_STATE_LABEL: Record<DeviceState, string> = {
 
 export const STATUS_LABEL: Record<DecisionStatus, string> = {
   executed: "done",
-  awaiting_approval: "needs approval",
-  approved: "approved",
-  declined: "declined",
-  expired: "expired",
+  escalated: "escalated",
   undone: "undone",
 };

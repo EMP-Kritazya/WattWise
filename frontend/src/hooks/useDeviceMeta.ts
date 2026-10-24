@@ -12,7 +12,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { deviceColor } from "@/lib/theme";
-import { useSim } from "@/store/sim";
+import { useLive as useSim } from "@/data";
 import type { Category, Device } from "@/types";
 
 export interface DeviceMeta {

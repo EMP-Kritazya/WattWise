@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useSim } from "@/store/sim";
+import { useLive as useSim } from "@/data";
 
 /** device_id → display name ("HVAC 1"), from the kitchen the API returned. */
 export function useDeviceNames(): Record<string, string> {

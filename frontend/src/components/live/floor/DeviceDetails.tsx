@@ -5,7 +5,7 @@ import type { DeviceMeta } from "@/hooks/useDeviceMeta";
 import { fmtKw } from "@/lib/format";
 import { DEVICE_STATE_LABEL, IMPORTANCE_LABEL } from "@/lib/theme";
 import { cn } from "@/lib/utils";
-import { useSim } from "@/store/sim";
+import { useLive as useSim } from "@/data";
 import { transport } from "@/transport";
 import type { HubDeviceReading, Importance, ImportanceLimits } from "@/types";
 

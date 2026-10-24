@@ -3,7 +3,9 @@ import { Bot, Clock, Gauge, Send, Snowflake, Users, type LucideIcon } from "luci
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn, errorMessage } from "@/lib/utils";
-import { useSim } from "@/store/sim";
+import { useLive as useSim, usePendingProposals } from "@/data";
+import { useAction } from "@/hooks/useAction";
+import type { Proposal } from "@/types";
 import { transport } from "@/transport";
 
 const SUGGESTIONS: { icon: LucideIcon; text: string }[] = [
@@ -17,6 +19,7 @@ const SUGGESTIONS: { icon: LucideIcon; text: string }[] = [
 export function AssistantPanel({ className, bare }: { className?: string; bare?: boolean }) {
   const chat = useSim((s) => s.chat);
   const addOwnerChat = useSim((s) => s.addOwnerChat);
+  const proposals = usePendingProposals();
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -68,7 +71,9 @@ export function AssistantPanel({ className, bare }: { className?: string; bare?:
             <AssistantBubble key={m.id} text={m.text} streaming={!m.done} />
           ),
         )}
-        {/* Phase 2: Confirm / Cancel cards for AI proposals ("Apply this change"). Blocked on a `proposal` message in CONTRACTS.md. */}
+        {proposals.map((p) => (
+          <ProposalCard key={p.proposal_id} proposal={p} />
+        ))}
         <div ref={bottomRef} />
       </div>
 
@@ -110,6 +115,34 @@ function AssistantBubble({ text, streaming }: { text: string; streaming?: boolea
         {text}
         {streaming && <span className="animate-pulse">▍</span>}
       </div>
+    </div>
+  );
+}
+
+/** An AI suggestion that changes a setting. Nothing happens until the owner presses Confirm (CONTRACTS.md Proposal). */
+function ProposalCard({ proposal }: { proposal: Proposal }) {
+  const upsertProposals = useSim((s) => s.upsertProposals);
+  const setKitchen = useSim((s) => s.setKitchen);
+  const { run, busy, error } = useAction();
+  const answer = (confirm: boolean) =>
+    run(async () => {
+      upsertProposals([await transport.confirmProposal(proposal.proposal_id, confirm)]);
+      // A confirmed settings change (importance, cap, …) changes the kitchen: re-read it so every screen shows it.
+      if (confirm) setKitchen(await transport.getKitchen());
+    });
+  return (
+    <div className="ml-8 rounded-xl border border-importance-flexible/40 bg-importance-flexible/10 p-3 text-sm">
+      <div className="text-[11px] font-medium tracking-wide text-importance-flexible uppercase">Suggested change</div>
+      <div className="mt-1 font-medium">{proposal.summary}</div>
+      <div className="mt-2 flex gap-2">
+        <Button size="sm" disabled={busy} onClick={() => answer(true)}>
+          Confirm
+        </Button>
+        <Button size="sm" variant="ghost" disabled={busy} onClick={() => answer(false)}>
+          Cancel
+        </Button>
+      </div>
+      {error && <p className="mt-1 text-xs text-destructive">{error}</p>}
     </div>
   );
 }

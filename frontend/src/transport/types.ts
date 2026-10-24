@@ -1,7 +1,12 @@
 import type {
   BacktestResult,
   BacktestRunRequest,
+  ClaudeAuthority,
   ClockState,
+  Context,
+  Escalation,
+  Health,
+  Proposal,
   Command,
   CustomerEventRequest,
   Decision,
@@ -33,12 +38,20 @@ export interface Transport {
   simControl(body: SimControlRequest): Promise<ClockState>;
   deviceCommand(deviceId: string, body: DeviceCommandRequest): Promise<Command>;
   addCustomers(body: CustomerEventRequest): Promise<void>;
-  approve(decisionId: string, approve: boolean): Promise<Decision>;
   undo(decisionId: string): Promise<Decision>;
   listDecisions(limit?: number): Promise<Decision[]>;
   runBacktest(body: BacktestRunRequest): Promise<{ run_id: string }>;
   getBacktest(runId: string): Promise<BacktestResult[]>;
   chat(message: string): Promise<{ chat_id: string }>;
+  listProposals(status?: Proposal["status"]): Promise<Proposal[]>;
+  confirmProposal(proposalId: string, confirm: boolean): Promise<Proposal>;
+  setAuthority(authority: ClaudeAuthority): Promise<void>;
+  setPreferences(text: string): Promise<void>;
+  getContext(): Promise<Context>;
+  listEscalations(status?: Escalation["status"]): Promise<Escalation[]>;
+  /** Owner's choice from the UI; the engine validates it. */
+  resolveEscalation(escalationId: string, optionId: string): Promise<Escalation>;
+  health(): Promise<Health>;
 
   /** Listen to /ws. Returns an unsubscribe function. */
   subscribe(onMessage: (msg: WsMessage) => void, onStatus: (status: ConnectionStatus) => void): () => void;

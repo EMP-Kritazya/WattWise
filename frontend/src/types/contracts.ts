@@ -45,11 +45,22 @@ export interface EquipmentEntry {
   limits: ImportanceLimits;
 }
 
+export interface ClaudeAuthority {
+  enabled: boolean;
+  max_cap_overrun_kw: number;
+  max_extra_delay_min: number;
+  max_extra_reduce_min: number;
+  may_go_below_min_power: boolean;
+}
+
 export interface KitchenConfig {
   name: string;
   equipment: EquipmentEntry[];
   peak_cap_kw: number;
   operating_hours: { open: string; close: string };
+  location?: { lat: number; lon: number; label: string };
+  owner_preferences?: string;
+  authority?: ClaudeAuthority;
   tariff_id: string;
   seed: number;
 }
@@ -64,20 +75,23 @@ export interface Device {
   state: DeviceState;
   power_kw: number;
   rated_kw: number;
-  source: "simulated";
+  /** "measured" only when a real ESP32 reading fed this device. */
+  source: "simulated" | "measured";
 }
 
 export interface HubDeviceReading {
   device_id: string;
   power_kw: number;
   state: DeviceState;
+  source?: "simulated" | "measured";
 }
 
 export interface HubReport {
   ts: string;
   total_kw: number;
   devices: HubDeviceReading[];
-  source: "simulated";
+  /** "mixed" when at least one device is measured. */
+  source: "simulated" | "mixed";
 }
 
 export type CommandAction = "on" | "off" | "start" | "delay" | "reduce" | "restore";
@@ -93,9 +107,16 @@ export interface Command {
   issued_by: "engine" | "owner";
 }
 
-export type DecisionStatus = "executed" | "awaiting_approval" | "approved" | "declined" | "expired" | "undone";
+/** No per-decision approvals any more: anything outside the rules becomes an Escalation. */
+export type DecisionStatus = "executed" | "escalated" | "undone";
 
-export type ReasonCode = "avoid_new_peak" | "stay_under_cap" | "release_into_valley" | "catch_up" | "owner_override";
+export type ReasonCode =
+  | "avoid_new_peak"
+  | "stay_under_cap"
+  | "release_into_valley"
+  | "catch_up"
+  | "owner_override"
+  | "escalation_choice";
 
 export interface Effect {
   peak_before_kw: number;
@@ -136,8 +157,89 @@ export interface TickState {
   meter: Meter;
   customers_per_hour: number;
   new_decisions: Decision[];
-  /** Next 2 h in 15-min steps; only on re-plan ticks, otherwise null. */
+  new_commands?: Command[];
+  new_escalations?: Escalation[];
+  indoor_temp_c?: number;
+  /** Next 2 h in 15-min steps (8 values); only on re-plan ticks, otherwise null. */
   forecast_kw: number[] | null;
+}
+
+/** Lane differences, computed by the engine. The browser shows these; it never subtracts lanes itself. */
+export interface LaneComparison {
+  ts: string;
+  saved_today_usd: number;
+  peak_avoided_kw: number;
+  month_peak_without_kw: number;
+  month_peak_with_kw: number;
+}
+
+export interface RuleBreak {
+  kind: "cap_overrun" | "below_min_power" | "past_deadline" | (string & {});
+  device_id?: string;
+  amount: number;
+  unit: string;
+}
+
+export interface EscalationOption {
+  option_id: string;
+  summary: string;
+  actions: Command[];
+  projected: { peak_kw: number; cost_delta_usd: number; max_indoor_temp_change_c: number } | null;
+  rule_breaks: RuleBreak[];
+  within_authority: boolean;
+}
+
+export type EscalationStatus = "open" | "resolved" | "awaiting_owner" | "expired_default";
+
+export interface Escalation {
+  escalation_id: string;
+  lane: Lane;
+  ts: string;
+  block_start: string;
+  problem: { forecast_peak_kw: number; target_kw: number; excess_kw: number; reason: string };
+  options: EscalationOption[];
+  default_option_id: string;
+  deadline_sim_ts: string;
+  status: EscalationStatus;
+  resolved_by: "claude" | "owner" | "default" | null;
+  chosen_option_id: string | null;
+  rationale: string | null;
+}
+
+export type ProposalKind = "importance" | "peak_cap" | "authority" | "undo_decision" | "customer_event" | "resolve_escalation";
+
+export interface Proposal {
+  proposal_id: string;
+  ts: string;
+  kind: ProposalKind;
+  payload: Record<string, unknown>;
+  summary: string;
+  status: "pending" | "confirmed" | "cancelled" | "expired";
+  created_by: "ai" | (string & {});
+  confirmed_via: "ui" | "asi_one" | null;
+  expires_at: string;
+}
+
+export type DataLabel = "live_api" | "recorded";
+
+export interface Context {
+  ts: string;
+  weather?: { label: DataLabel; source: string; hourly: { ts: string; temp_c: number }[] };
+  prices?: { label: DataLabel; source: string; hourly: { ts: string; usd_per_kwh: number }[]; stress: "low" | "normal" | "high" };
+  events?: {
+    label: DataLabel;
+    source: string;
+    items: { name: string; venue: string; start: string; distance_km: number; expected_attendance: number }[];
+  };
+  crowd_effect?: { value: "none" | "small" | "medium" | "large"; set_by: string; reason: string };
+}
+
+export interface AgentLog {
+  ts_real: string;
+  from_agent: string;
+  to_agent: string;
+  kind: string;
+  summary: string;
 }
 
 export interface DemandCharge {
@@ -207,14 +309,28 @@ export interface BacktestRunRequest {
 
 // ---------- 2. Seam 1: WebSocket /ws (server → client) ----------
 
+export type WarningCode = "cap_unreachable" | "hub_offline" | "live_transport_down" | "store_down";
+
 export type WsMessage =
   | { type: "tick"; data: TickState }
   | { type: "decision"; data: Decision; explanation: string; explanation_source: "ai" | "template" }
-  | { type: "approval_request"; data: Decision; explanation: string; expires_at: string }
   | ({ type: "clock" } & ClockState)
-  | { type: "warning"; code: "cap_unreachable" | (string & {}); message: string; data: Record<string, unknown> }
+  | { type: "warning"; code: WarningCode | (string & {}); message: string; data: Record<string, unknown> }
   | { type: "chat_delta"; chat_id: string; text: string }
   | { type: "chat_done"; chat_id: string }
-  | { type: "backtest_progress"; run_id: string; month: string; pct: number };
+  | { type: "backtest_progress"; run_id: string; month: string; pct: number }
+  | { type: "comparison"; data: LaneComparison }
+  | { type: "proposal"; data: Proposal }
+  | { type: "escalation"; data: Escalation }
+  | { type: "context"; data: Context }
+  | { type: "agent_log"; data: AgentLog };
+
+export interface Health {
+  ok: boolean;
+  kitchen_impl: string;
+  live_transport: "spacetime" | "ws";
+  store: string;
+  hardware: string;
+}
 
 export type WsMessageType = WsMessage["type"];

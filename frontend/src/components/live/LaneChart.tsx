@@ -16,7 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { fmtKw, fmtSimTime } from "@/lib/format";
 import { LANE_COLOR, LANE_LABEL } from "@/lib/theme";
-import { useSim } from "@/store/sim";
+import { useLive as useSim } from "@/data";
 
 const BLOCK_MS = 15 * 60_000;
 const AXIS_TICK = { fontSize: 11, fill: "var(--muted-foreground)" };

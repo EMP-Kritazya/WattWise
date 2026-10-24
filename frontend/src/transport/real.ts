@@ -32,12 +32,19 @@ export const realTransport: Transport = {
   simControl: (body) => request("POST", "/api/sim/control", body),
   deviceCommand: (deviceId, body) => request("POST", `/api/devices/${enc(deviceId)}/command`, body),
   addCustomers: (body) => request("POST", "/api/events/customers", body),
-  approve: (decisionId, approve) => request("POST", `/api/decisions/${enc(decisionId)}/approve`, { approve }),
   undo: (decisionId) => request("POST", `/api/decisions/${enc(decisionId)}/undo`),
   listDecisions: (limit = 50) => request("GET", `/api/decisions?limit=${limit}`),
   runBacktest: (body) => request("POST", "/api/backtest/run", body),
   getBacktest: (runId) => request("GET", `/api/backtest/${enc(runId)}`),
   chat: (message) => request("POST", "/api/chat", { message }),
+  listProposals: (status = "pending") => request("GET", `/api/proposals?status=${status}`),
+  confirmProposal: (proposalId, confirm) => request("POST", `/api/proposals/${enc(proposalId)}/confirm`, { confirm }),
+  setAuthority: (authority) => request("PUT", "/api/kitchen/authority", authority),
+  setPreferences: (text) => request("PUT", "/api/kitchen/preferences", { text }),
+  getContext: () => request("GET", "/api/context"),
+  listEscalations: (status = "open") => request("GET", `/api/escalations?status=${status}`),
+  resolveEscalation: (escalationId, optionId) => request("POST", `/api/escalations/${enc(escalationId)}/resolve`, { option_id: optionId }),
+  health: () => request("GET", "/api/health"),
 
   subscribe(onMessage, onStatus) {
     let socket: WebSocket | null = null;

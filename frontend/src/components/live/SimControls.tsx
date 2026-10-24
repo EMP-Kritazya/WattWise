@@ -5,7 +5,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAction } from "@/hooks/useAction";
 import { fmtSimClock } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { useSim } from "@/store/sim";
+import { requestSurge, useLive as useSim } from "@/data";
 import { transport } from "@/transport";
 
 const SPEEDS = [1, 30, 120, 600];
@@ -21,7 +21,7 @@ export function SimControls() {
   // `clock` messages only come on play/pause/speed changes; ticks carry the current sim time.
   const simTs = latest?.ts ?? clock?.sim_ts;
   const playing = clock?.playing ?? false;
-  const waiting = clock?.paused_reason === "awaiting_approval";
+  const waiting = clock?.paused_reason === "escalation";
 
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border bg-card px-4 py-3">
@@ -77,10 +77,10 @@ export function SimControls() {
           {latest?.customers_per_hour ?? "–"}
           <span className="text-xs text-muted-foreground">/ h</span>
         </span>
-        <Button size="sm" variant="outline" onClick={() => run(() => transport.addCustomers({ customers: 20, duration_min: 60 }))}>
+        <Button size="sm" variant="outline" onClick={() => run(() => requestSurge(20))}>
           +20 customers
         </Button>
-        <Button size="sm" onClick={() => run(() => transport.addCustomers({ customers: 40, duration_min: 60 }))}>
+        <Button size="sm" onClick={() => run(() => requestSurge(40))}>
           +40 customers
         </Button>
         {/* The assistant is no longer docked on the Live page, so this is its entry point at every width. */}

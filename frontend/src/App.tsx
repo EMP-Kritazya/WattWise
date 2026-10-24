@@ -8,8 +8,8 @@ import { cn } from "@/lib/utils";
 import { BuilderPage } from "@/pages/BuilderPage";
 import { LivePage } from "@/pages/LivePage";
 import { ProofPage } from "@/pages/ProofPage";
-import { startIngest } from "@/store/ingest";
-import { useSim } from "@/store/sim";
+import { startLive } from "@/data";
+import { useLive as useSim } from "@/data";
 import { transport } from "@/transport";
 
 const NAV = [
@@ -21,7 +21,7 @@ const NAV = [
 export default function App() {
   const connection = useSim((s) => s.connection);
 
-  useEffect(() => startIngest(transport), []);
+  useEffect(() => startLive(), []);
 
   // The socket doesn't replay state on connect (contract gap), so catch up over REST after every (re)connect.
   useEffect(() => {

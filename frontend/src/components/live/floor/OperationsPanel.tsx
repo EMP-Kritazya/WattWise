@@ -4,7 +4,7 @@ import { useDeviceMeta } from "@/hooks/useDeviceMeta";
 import { fmtAction, fmtKw, fmtSimTime } from "@/lib/format";
 import { IMPORTANCE_LABEL, STATUS_LABEL } from "@/lib/theme";
 import { cn } from "@/lib/utils";
-import { useSim } from "@/store/sim";
+import { useLive as useSim } from "@/data";
 import { transport } from "@/transport";
 import type { HubDeviceReading, Lane } from "@/types";
 import { DeviceDetails } from "./DeviceDetails";
@@ -56,8 +56,8 @@ export function DemandSummary() {
             ? "Connection lost · showing last received readings"
             : !latest.with
               ? "Waiting for hub readings"
-              : clock?.paused_reason === "awaiting_approval"
-                ? "Paused · approval needed"
+              : clock?.paused_reason === "escalation"
+                ? "Paused · your decision needed"
                 : clock?.playing
                   ? "Simulation running"
                   : "Simulation paused"}{" "}

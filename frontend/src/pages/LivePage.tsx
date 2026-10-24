@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
-import { ApprovalDialog } from "@/components/live/ApprovalDialog";
+import { EscalationDialog } from "@/components/live/EscalationDialog";
 import { DecisionFeed } from "@/components/live/DecisionFeed";
 import { DevicePowerCard } from "@/components/live/DevicePowerCard";
 import { LiveFloor } from "@/components/live/floor/LiveFloor";
@@ -9,7 +9,7 @@ import { PowerTrendCard } from "@/components/live/LaneChart";
 import { SimControls } from "@/components/live/SimControls";
 import { WarningBanner } from "@/components/live/WarningBanner";
 import { Button } from "@/components/ui/button";
-import { useSim } from "@/store/sim";
+import { useLive as useSim } from "@/data";
 import { transport } from "@/transport";
 
 /** The main demo screen: controls · KPIs · the 3D floor · charts and decisions, with the assistant docked on the right. */
@@ -64,7 +64,7 @@ export function LivePage() {
           </div>
         </div>
       </div>
-      <ApprovalDialog />
+      <EscalationDialog />
     </div>
   );
 }
