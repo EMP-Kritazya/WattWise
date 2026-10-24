@@ -1,0 +1,8 @@
+{
+  "function": "commands:forDevice",
+  "type": "query",
+  "args": {
+    "hub_id": "esp32_1"
+  },
+  "returns": []
+}

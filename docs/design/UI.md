@@ -13,10 +13,18 @@ React + TypeScript + Vite, Tailwind, shadcn/ui, Recharts. Types generated from t
 SpacetimeDB generated bindings and Convex generated types. Builds against `src/mocks` (fake server streaming
 contract-shaped messages) until the real API is ready. Hosted on Azure Static Web Apps.
 
-**Where live data comes from.** With `LIVE_TRANSPORT=spacetime` (default) the Live screen subscribes to SpacetimeDB
-tables (`live_tick`, `tick_history`, `live_device`, `live_comparison`, `live_feed`, `live_clock`), so every viewer sees the
-same kitchen. Also `live_context`, `live_escalation`, `live_agent_log`. REST is used for config, clicks, escalation choices, proposals and chat;
-`/ws` carries chat streaming and proposals. With `LIVE_TRANSPORT=ws` everything comes over `/ws` (offline fallback). One data hook hides the switch.
+**Two halves of `frontend/`, kept apart.** `src/sim/` + `src/hub/` (SIMULATION.md) run only in the sim host tab (`/sim`) and talk
+only to FastAPI over `/ws/hub`. Screens never import them directly. The one bridge is the hook `src/data/useDevices()`: in the sim
+host tab it returns the hub's current `Device[]` (the appliances' React state, re-rendering on every applied Command); in every
+other tab it returns the `live_device` rows. Both are the same Device shape, so the Simulation view is one set of components.
+Charts, KPIs, energy and cost always come from SpacetimeDB in every tab (they are engine numbers, not appliance state).
+
+**Where live data comes from.** With `LIVE_TRANSPORT=spacetime` (default) screens subscribe to SpacetimeDB tables (`live_tick`,
+`tick_history`, `live_device`, `live_comparison`, `live_feed`, `live_clock`, `live_context`, `live_escalation`, `live_agent_log`):
+energy, current price, cost today/month, peaks, every device's state and physical gauges, decisions, escalations. Updates arrive
+as the runtime publishes each tick (≈ 2 per second at 120×). REST is used for config, clicks, escalation choices, proposals and
+chat; `/ws` carries chat streaming and proposals. With `LIVE_TRANSPORT=ws` everything comes over `/ws` (offline fallback).
+One data hook hides the switch. Until the backend exists, `src/mocks` serves the shared fixtures (`contracts/fixtures/`).
 
 ## Screens
 ### 1. Kitchen Builder (setup)
@@ -24,17 +32,27 @@ same kitchen. Also `live_context`, `live_escalation`, `live_agent_log`. REST is 
 - **Per device importance** (after counts are set, each unit is listed): segmented control
   `Always on | Flexible | Deferrable`, with its limits shown inline:
   flexible → min power % slider + max minutes; deferrable → max delay minutes + finish-by time.
-- **Peak cap** slider/input in **kW**, with a helper line: "Your highest 15-minute average power. Demand charges are based on this."
+- **Peak goal**: segmented control `Minimize peak | Hard limit`. *Minimize* → no number, the engine keeps the month's peak as low as
+  the rules allow. *Hard limit* → slider/input in **kW**, helper line: "Your highest 15-minute average power. Demand charges are based on this."
+  Sends `peak_mode` + `peak_cap_kw` (CONTRACTS.md KitchenConfig).
 - Location (preset "Marina, San Francisco"), owner preferences (free text), operating hours, tariff (preset), seed (hidden in demo mode).
 - **Claude's authority**: toggle + max cap overrun (kW), max extra delay (min), max extra reduce (min); food-safety note ("never below 50 % for refrigeration, whatever you set").
 - "Build kitchen" → `POST /api/kitchen` → shows a short "warming up 21 days of history…" state → Live screen.
 
 ### 2. Live Simulation (the main demo screen)
-Layout: top bar · kitchen floor (left, ~60%) · charts + feed (right, ~40%) · chat drawer (slide-in).
+Layout: top bar · a centred **view toggle `Charts | Simulation`** · the selected view · decision feed + escalation card (right rail) ·
+chat drawer (slide-in). The toggle is a per-viewer preference (remembered locally); both views stay subscribed so switching is instant.
+- **Charts view** (default): two-lane chart, forecast, KPI row, energy + cost strip, context strip — all from SpacetimeDB, updating
+  live every tick.
+- **Simulation view**: the kitchen floor below. In the sim host tab it renders the appliances' own React state (the hub's current
+  state, re-rendering when a Command changes it); in every other tab the same components render the `live_device` rows.
 - **Top bar:** sim clock + day, play/pause, speed (1× / 30× / 120× / 600×), `+20 customers` and `+40 customers` buttons,
   customers/hour now. Surge buttons call the SpacetimeDB reducer `request_surge` so a judge's phone can add customers to
   the shared kitchen (REST `/api/events/customers` when `LIVE_TRANSPORT=ws`).
-- **Kitchen floor:** one tile per device: icon, name, live kW, state (on / reduced / waiting / running), importance badge.
+- **Kitchen floor (Simulation view, from `useDevices()`):** one tile per device: icon, name, live kW, % of rated, state (on / reduced / waiting / running), importance badge,
+  and the device's `physical` gauge when present (indoor temp, box temp, dirty racks, ice level, job remaining).
+- **Energy + cost strip (from `live_tick`):** energy today (kWh), current price ($/kWh), cost today and this month ($), per lane.
+- **Sim host panel (`/sim` only):** hub connection state, last `tick_id`, ticks behind, "another sim host is running" when refused.
   Click a tile → menu: turn on/off, start job, change importance. All tiles have a thin line to a **Hub** tile
   (the ESP32 box) that shows total kW and pulses each tick — makes "everything reports to one box" visible.
   With `HARDWARE=esp32`, the Hub tile shows online/offline and mapped tiles carry a small "hardware" badge.
@@ -77,6 +95,7 @@ second door to the same agent, so proposals confirmed in ASI:One disappear here 
 Ticks arrive for two lanes at ~2/s each. Keep the last 3 sim hours in state; render at most ~4 times/s.
 
 ## Done when
-Builder → Live works end to end against the mock server; every message type in CONTRACTS.md is rendered;
+Builder → Live works end to end against the mocks (live rows + REST from the shared fixtures, and the simulation driven by
+`mockHubServer`); every message type in CONTRACTS.md is rendered; no screen imports `src/sim` or `src/hub`;
 nothing calculates numbers in the browser except formatting (saved today and peak avoided come from `LaneComparison`);
 the Live screen works over both SpacetimeDB and `/ws`.

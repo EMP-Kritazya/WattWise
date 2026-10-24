@@ -1,0 +1,179 @@
+{
+  "hub_id": "sim_hub",
+  "lane": "with",
+  "tick_id": 50,
+  "ts": "2026-07-18T01:20:00Z",
+  "total_kw": 40.39,
+  "customers_per_hour": 107,
+  "devices": [
+    {
+      "device_id": "hvac_1",
+      "type_id": "hvac",
+      "name": "HVAC 1",
+      "importance": "flexible",
+      "state": "reduced",
+      "power_kw": 5.28,
+      "rated_kw": 12.0,
+      "power_pct": 44,
+      "source": "simulated",
+      "physical": {
+        "indoor_temp_c": 22.6
+      }
+    },
+    {
+      "device_id": "hvac_2",
+      "type_id": "hvac",
+      "name": "HVAC 2",
+      "importance": "flexible",
+      "state": "on",
+      "power_kw": 8.11,
+      "rated_kw": 12.0,
+      "power_pct": 68,
+      "source": "simulated",
+      "physical": {
+        "indoor_temp_c": 22.6
+      }
+    },
+    {
+      "device_id": "walk_in_cooler_1",
+      "type_id": "walk_in_cooler",
+      "name": "Walk-in cooler 1",
+      "importance": "flexible",
+      "state": "on",
+      "power_kw": 3.5,
+      "rated_kw": 3.5,
+      "power_pct": 100,
+      "source": "simulated",
+      "physical": {
+        "box_temp_c": 3.2
+      }
+    },
+    {
+      "device_id": "reach_in_fridge_1",
+      "type_id": "reach_in_fridge",
+      "name": "Reach-in fridge 1",
+      "importance": "always_on",
+      "state": "on",
+      "power_kw": 0.8,
+      "rated_kw": 0.8,
+      "power_pct": 100,
+      "source": "simulated",
+      "physical": {
+        "box_temp_c": 4.0
+      }
+    },
+    {
+      "device_id": "freezer_1",
+      "type_id": "freezer",
+      "name": "Freezer 1",
+      "importance": "always_on",
+      "state": "on",
+      "power_kw": 1.4,
+      "rated_kw": 1.4,
+      "power_pct": 100,
+      "source": "simulated",
+      "physical": {
+        "box_temp_c": -18.2
+      }
+    },
+    {
+      "device_id": "ice_machine_1",
+      "type_id": "ice_machine",
+      "name": "Ice machine 1",
+      "importance": "deferrable",
+      "state": "running_job",
+      "power_kw": 1.6,
+      "rated_kw": 1.6,
+      "power_pct": 100,
+      "source": "simulated",
+      "physical": {
+        "ice_level_pct": 36,
+        "job_remaining_min": 16
+      }
+    },
+    {
+      "device_id": "fryer_1",
+      "type_id": "fryer",
+      "name": "Fryer 1",
+      "importance": "always_on",
+      "state": "on",
+      "power_kw": 6.96,
+      "rated_kw": 14.0,
+      "power_pct": 50,
+      "source": "simulated",
+      "physical": {
+        "orders_in_progress": 21
+      }
+    },
+    {
+      "device_id": "oven_1",
+      "type_id": "oven",
+      "name": "Oven 1",
+      "importance": "always_on",
+      "state": "on",
+      "power_kw": 4.52,
+      "rated_kw": 10.0,
+      "power_pct": 45,
+      "source": "simulated",
+      "physical": {
+        "orders_in_progress": 21
+      }
+    },
+    {
+      "device_id": "grill_1",
+      "type_id": "grill",
+      "name": "Grill 1",
+      "importance": "always_on",
+      "state": "on",
+      "power_kw": 4.02,
+      "rated_kw": 8.0,
+      "power_pct": 50,
+      "source": "simulated",
+      "physical": {
+        "orders_in_progress": 21
+      }
+    },
+    {
+      "device_id": "dishwasher_1",
+      "type_id": "dishwasher",
+      "name": "Dishwasher 1",
+      "importance": "deferrable",
+      "state": "waiting",
+      "power_kw": 0.0,
+      "rated_kw": 6.0,
+      "power_pct": 0,
+      "source": "simulated",
+      "physical": {
+        "dirty_racks": 9,
+        "job_remaining_min": 0
+      }
+    },
+    {
+      "device_id": "water_heater_1",
+      "type_id": "water_heater",
+      "name": "Water heater 1",
+      "importance": "flexible",
+      "state": "reduced",
+      "power_kw": 1.8,
+      "rated_kw": 4.5,
+      "power_pct": 40,
+      "source": "simulated",
+      "physical": {
+        "box_temp_c": 60.8
+      }
+    },
+    {
+      "device_id": "lights_1",
+      "type_id": "lights",
+      "name": "Lights 1",
+      "importance": "always_on",
+      "state": "on",
+      "power_kw": 2.4,
+      "rated_kw": 2.4,
+      "power_pct": 100,
+      "source": "simulated"
+    }
+  ],
+  "acks": [],
+  "source": "simulated"
+}

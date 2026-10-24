@@ -1,0 +1,6 @@
+{
+  "type": "hub_welcome",
+  "accepted": false,
+  "reason": "host_taken",
+  "tick_id": 0
+}

@@ -1,0 +1,16 @@
+{
+  "call": "set_importance",
+  "args": {
+    "device_id": "walk_in_cooler_1",
+    "importance": "flexible",
+    "limits": {
+      "min_power_pct": 30,
+      "max_reduce_min": 30
+    }
+  },
+  "returns": null,
+  "raises": {
+    "error": "RuleError",
+    "message": "walk_in_cooler_1: refrigeration set to flexible needs min_power_pct >= 50"
+  }
+}

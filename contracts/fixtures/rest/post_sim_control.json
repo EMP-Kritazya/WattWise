@@ -1,0 +1,17 @@
+{
+  "method": "POST",
+  "path": "/api/sim/control",
+  "status": 200,
+  "request": {
+    "action": "play",
+    "speed": 120
+  },
+  "response": {
+    "playing": true,
+    "speed": 120,
+    "sim_ts": "2026-07-18T00:30:00Z",
+    "tick_id": 0,
+    "paused_reason": null,
+    "slowed_reason": null
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "device_id": "hvac_1",
+  "type_id": "hvac",
+  "name": "HVAC 1",
+  "importance": "flexible",
+  "state": "reduced",
+  "power_kw": 5.28,
+  "rated_kw": 12.0,
+  "power_pct": 44,
+  "source": "simulated",
+  "physical": {
+    "indoor_temp_c": 22.6
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "tool": "propose_escalation_choice",
+  "input": {
+    "escalation_id": "e_0001",
+    "option_id": "deep_reduce_hvac",
+    "summary": "Claude suggests the deep HVAC cut (outside its authority)"
+  },
+  "output": {
+    "proposal_id": "p_0006",
+    "ts": "2026-07-18T01:30:00Z",
+    "kind": "resolve_escalation",
+    "payload": {
+      "escalation_id": "e_0001",
+      "option_id": "deep_reduce_hvac"
+    },
+    "summary": "Claude suggests the deep HVAC cut (outside its authority)",
+    "status": "pending",
+    "created_by": "ai",
+    "confirmed_via": null,
+    "expires_at": "2026-07-18T01:40:00Z"
+  }
+}

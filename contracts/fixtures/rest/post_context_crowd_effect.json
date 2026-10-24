@@ -1,0 +1,12 @@
+{
+  "method": "POST",
+  "path": "/api/context/crowd-effect",
+  "status": 200,
+  "request": {
+    "value": "medium",
+    "reason": "Game ends 22:00, 1.8 km away"
+  },
+  "response": {
+    "ok": true
+  }
+}

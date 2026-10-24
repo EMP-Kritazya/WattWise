@@ -1,0 +1,13 @@
+{
+  "call": "set_authority",
+  "args": {
+    "authority": {
+      "enabled": true,
+      "max_cap_overrun_kw": 3.0,
+      "max_extra_delay_min": 20,
+      "max_extra_reduce_min": 15,
+      "may_go_below_min_power": false
+    }
+  },
+  "returns": null
+}

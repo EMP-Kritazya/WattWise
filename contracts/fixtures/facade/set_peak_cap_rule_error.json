@@ -1,0 +1,12 @@
+{
+  "call": "set_peak_cap",
+  "args": {
+    "peak_mode": "cap",
+    "peak_cap_kw": null
+  },
+  "returns": null,
+  "raises": {
+    "error": "RuleError",
+    "message": "peak_mode cap needs a peak_cap_kw"
+  }
+}

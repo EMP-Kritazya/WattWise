@@ -1,0 +1,146 @@
+[
+  {
+    "id": 1,
+    "ts_real": "2026-10-25T17:30:00.040Z",
+    "from_agent": "concierge",
+    "to_agent": "weather",
+    "kind": "request",
+    "summary": "Forecast 6 h for 37.80,-122.44"
+  },
+  {
+    "id": 2,
+    "ts_real": "2026-10-25T17:30:00.080Z",
+    "from_agent": "weather",
+    "to_agent": "concierge",
+    "kind": "response",
+    "summary": "6 hourly temperatures (recorded)"
+  },
+  {
+    "id": 3,
+    "ts_real": "2026-10-25T17:30:00.120Z",
+    "from_agent": "concierge",
+    "to_agent": "grid",
+    "kind": "request",
+    "summary": "Prices 6 h for caiso_np15"
+  },
+  {
+    "id": 4,
+    "ts_real": "2026-10-25T17:30:00.160Z",
+    "from_agent": "grid",
+    "to_agent": "concierge",
+    "kind": "response",
+    "summary": "6 hourly prices, stress high (recorded)"
+  },
+  {
+    "id": 5,
+    "ts_real": "2026-10-25T17:30:00.200Z",
+    "from_agent": "concierge",
+    "to_agent": "events",
+    "kind": "request",
+    "summary": "Events within 5 km in the next 12 h"
+  },
+  {
+    "id": 6,
+    "ts_real": "2026-10-25T17:30:00.240Z",
+    "from_agent": "events",
+    "to_agent": "concierge",
+    "kind": "response",
+    "summary": "1 event: Giants vs Dodgers"
+  },
+  {
+    "id": 7,
+    "ts_real": "2026-10-25T17:30:00.280Z",
+    "from_agent": "concierge",
+    "to_agent": "claude",
+    "kind": "request",
+    "summary": "Classify crowd effect for 1 event"
+  },
+  {
+    "id": 8,
+    "ts_real": "2026-10-25T17:30:00.320Z",
+    "from_agent": "claude",
+    "to_agent": "concierge",
+    "kind": "response",
+    "summary": "crowd_effect medium"
+  },
+  {
+    "id": 9,
+    "ts_real": "2026-10-25T17:30:00.360Z",
+    "from_agent": "concierge",
+    "to_agent": "engine",
+    "kind": "post",
+    "summary": "Context posted to /api/context"
+  },
+  {
+    "id": 10,
+    "ts_real": "2026-10-25T17:30:30.040Z",
+    "from_agent": "concierge",
+    "to_agent": "weather",
+    "kind": "request",
+    "summary": "Forecast 6 h for 37.80,-122.44"
+  },
+  {
+    "id": 11,
+    "ts_real": "2026-10-25T17:30:30.080Z",
+    "from_agent": "weather",
+    "to_agent": "concierge",
+    "kind": "response",
+    "summary": "6 hourly temperatures (recorded)"
+  },
+  {
+    "id": 12,
+    "ts_real": "2026-10-25T17:30:30.120Z",
+    "from_agent": "concierge",
+    "to_agent": "grid",
+    "kind": "request",
+    "summary": "Prices 6 h for caiso_np15"
+  },
+  {
+    "id": 13,
+    "ts_real": "2026-10-25T17:30:30.160Z",
+    "from_agent": "grid",
+    "to_agent": "concierge",
+    "kind": "response",
+    "summary": "6 hourly prices, stress high (recorded)"
+  },
+  {
+    "id": 14,
+    "ts_real": "2026-10-25T17:30:30.200Z",
+    "from_agent": "concierge",
+    "to_agent": "events",
+    "kind": "request",
+    "summary": "Events within 5 km in the next 12 h"
+  },
+  {
+    "id": 15,
+    "ts_real": "2026-10-25T17:30:30.240Z",
+    "from_agent": "events",
+    "to_agent": "concierge",
+    "kind": "response",
+    "summary": "1 event: Giants vs Dodgers"
+  },
+  {
+    "id": 16,
+    "ts_real": "2026-10-25T17:30:30.280Z",
+    "from_agent": "concierge",
+    "to_agent": "claude",
+    "kind": "request",
+    "summary": "Classify crowd effect for 1 event"
+  },
+  {
+    "id": 17,
+    "ts_real": "2026-10-25T17:30:30.320Z",
+    "from_agent": "claude",
+    "to_agent": "concierge",
+    "kind": "response",
+    "summary": "crowd_effect medium"
+  },
+  {
+    "id": 18,
+    "ts_real": "2026-10-25T17:30:30.360Z",
+    "from_agent": "concierge",
+    "to_agent": "engine",
+    "kind": "post",
+    "summary": "Context posted to /api/context"
+  }
+]

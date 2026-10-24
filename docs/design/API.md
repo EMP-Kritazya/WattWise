@@ -12,8 +12,9 @@ it never decides and never computes numbers.
 ## Parts
 | Part | Folder | What it does |
 |---|---|---|
-| FastAPI app | `api/` | REST endpoints + `/ws` WebSocket from CONTRACTS.md section 2 |
-| Run loop | `runtime/loop.py` | Moves simulated time by calling `step()` on both lanes |
+| FastAPI app | `api/` | REST endpoints + viewer `/ws` (CONTRACTS.md section 2) + hub socket `/ws/hub` (section 8) |
+| Clock + run loop | `runtime/loop.py` | Owns simulated time: one `sim_tick` (1 sim min) per real tick, waits for `hub_report`, calls `step()` on both engine lanes |
+| Hub link | `runtime/hub_link.py` | Accepts exactly one sim host (`hub_hello` → `hub_welcome`), sends `sim_build` / `sim_tick` / `sim_control`, receives `hub_report`; queues Commands for the next tick |
 | Lanes | `runtime/lanes.py` | Holds two Kitchens (`without`, `with`) built from the same KitchenConfig + seed |
 | Agent | `agent/` | Claude with tools (CONTRACTS.md section 4), explanations, chat |
 | Store | `store/` | Convex writes (batched), in-memory fallback. `STORE=convex\|memory` |
@@ -22,42 +23,49 @@ it never decides and never computes numbers.
 | Device bridge | `runtime/device_bridge.py` | `HARDWARE=esp32`: `with` lane commands → Convex; ESP32 readings → `ingest_reading()` |
 | Proposals | `agent/proposals.py` | Creates, lists, confirms and applies Proposals (code path, never the model) |
 | Fetch.ai agents | `agents/` | Concierge (Chat Protocol, wraps the Claude agent) + Weather, Grid, Events agents (design/AGENTS.md) |
-| Fake engine | `fakes/fake_kitchen.py` | Same facade as the engine, canned results. `KITCHEN_IMPL=fake\|real` |
+| Fake engine | `fakes/fake_kitchen.py` | Same facade as the engine, canned results from `contracts/fixtures/facade/`. `KITCHEN_IMPL=fake\|real` |
+| Fake sim host | `fakes/fake_hub_client.py` | Connects to `/ws/hub` and answers every `sim_tick` from `contracts/fixtures/hub_protocol/hub_to_server.jsonl`, so the loop runs with no browser. `HUB_IMPL=browser\|fake` |
 
 ## Kitchen lifecycle
-1. `POST /api/kitchen` with KitchenConfig → build two Kitchens (`control="without"` and `"with"`), call
-   `warm_up(21)` on both, create **one** `CustomerSource(seed)`, save the config to Convex `kitchens`.
-2. `POST /api/sim/control {play, speed}` → start the run loop.
+1. `POST /api/kitchen` with KitchenConfig → build two engine Kitchens (`control="without"` and `"with"`), call
+   `warm_up(...)` (source TBD, engine), send `sim_build` to the sim host, `reset_all` on SpacetimeDB, save the config to Convex `kitchens`.
+2. `POST /api/sim/control {play, speed}` → start the clock. No sim host connected → stays paused with `sim_host_offline`.
 3. Settings changes (importance, peak cap) are applied to **both** lanes' configs only where it matters:
    importance and cap affect only the `with` lane's decisions; the `without` lane ignores them.
 
 ## Run loop (asyncio task)
 ```
-every real tick (≈ 0.5 s at speed 120 → 1 sim minute):
-    surges += live.consume_surges()               # judges' phone buttons (SpacetimeDB) + REST surges
-    for lane in lanes: lane.set_context(context.latest())   # only when it changed
-    events = customer_source.events(sim_ts, 1, surges)
+every real tick (0.5 s × 120 / speed; one tick = 1 sim minute):
+    surges += live.consume_surges() + rest_surges.drain()   # judges' phone buttons (SpacetimeDB) + REST
+    for lane in lanes: lane.set_context(context.latest())    # only when it changed (context is fetched periodically)
+    report = await hub.tick(tick_id, sim_ts, 1, surges, context.physical_inputs(), pending_commands)
+                                                  # sim_tick → hub_report; none within 2 s → pause "hub_waiting"
     for r in bridge.pending_readings():           # HARDWARE=esp32 only; real device = with lane
         lanes.with_.ingest_reading(r)
     states = {}
     for lane in (without, with):
-        states[lane.control] = lane.step(1, events)
+        states[lane.control] = lane.step(1, report.reports[lane.control])   # engine replans every 5 sim min
         for d in states[lane.control].new_decisions: handle_decision(d)
         for e in states[lane.control].new_escalations: escalations.submit(e)   # async; never blocks
+    pending_commands = states["without"].new_commands + states["with"].new_commands   # includes owner commands
     comparison = compare_lanes(states["without"], states["with"])
     bridge.forward(states["with"].new_commands)   # only commands for ESP32-mapped devices
-    live.publish(states, comparison)              # SpacetimeDB, or /ws when LIVE_TRANSPORT=ws
-    store.buffer(states)                          # Convex, flushed once per real second
+    live.publish(states, comparison)              # SpacetimeDB (the UI's live source), or /ws when LIVE_TRANSPORT=ws
+    store.buffer(states, report.acks)             # Convex, flushed once per real second
+    tick_id += 1; sim_ts += 1 min
 ```
-- Speeds: 1×, 30×, 120× (default), 600×. Pause / reset.
-- **Demo mode:** while an escalation is open or awaiting the owner, pause the loop (`paused_reason = "escalation"`);
-  resume when it resolves. Outside demo mode the engine applies the default at the deadline.
+- Speeds: 1×, 30×, 120× (default), 600×. Pause / reset. Speed only changes the real interval; a tick is always 1 sim minute.
+- Commands produced at tick *n* reach the appliances in tick *n + 1* (one sim minute later). Command acks go to Convex `commands`.
+- Sim host disconnects → pause (`sim_host_offline`) + warning; on reconnect re-send `sim_build` and resume.
+- **Escalation clock:** while an escalation is open, outside demo mode drop the send interval to `ESCALATION_SPEED`
+  (default 1×; `slowed_reason = "escalation"`) and restore the owner's speed when it resolves or expires; the engine applies the
+  default at the deadline. **Demo mode:** pause instead (`paused_reason = "escalation"`) and resume when it resolves.
+  Rationale and the early-escalation rule: ARCHITECTURE.md → Time.
 - Never call the AI inside the loop. Explanations are queued.
 
 ## Handling decisions
 - `executed` → push `decision` message immediately with a **template** explanation; queue an AI explanation if
   `effect.saving_usd ≥ 1` (configurable). When the AI replies, push an updated `decision` message (`explanation_source: "ai"`).
-- `escalated` → the related Escalation is what the UI shows (escalation card), not the decision.
 
 ## Escalations (`runtime/escalations.py`)
 1. New escalation → publish it (SpacetimeDB `live_escalation`, Convex `escalations`, `/ws escalation`).
@@ -107,7 +115,8 @@ Batch writes once per real second. If Convex is unreachable, switch to the in-me
 `warning: store_down`.
 
 ## FakeKitchen (build in Phase 1)
-Implements every facade method. `step()` returns TickStates with plausible numbers (sine-wave load + noise, seeded),
+Implements every facade method on fixture data (`contracts/fixtures/facade/`). `step(1, hub_report)` returns contract-shaped
+TickStates whose meter follows the given HubReport,
 emits a fake Decision every ~10 sim minutes and a fake Escalation every ~30. Lets the API and AI be built and
 demoed before the real engine exists.
 

@@ -1,0 +1,7 @@
+{
+  "reducer": "request_surge",
+  "args": [
+    40,
+    60
+  ]
+}

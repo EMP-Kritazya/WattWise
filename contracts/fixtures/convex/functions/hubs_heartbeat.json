@@ -1,0 +1,8 @@
+{
+  "function": "hubs:heartbeat",
+  "type": "mutation",
+  "args": {
+    "hub_id": "esp32_1"
+  },
+  "returns": null
+}

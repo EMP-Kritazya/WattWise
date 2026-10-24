@@ -1,0 +1,12 @@
+[
+  {
+    "escalation_id": "e_0001",
+    "lane": "with",
+    "status": "resolved",
+    "problem_json": "{\"forecast_peak_kw\":42.4,\"target_kw\":40.0,\"excess_kw\":2.4,\"reason\":\"dinner rush + customer surge + hot evening\"}",
+    "options_json": "[{\"option_id\":\"accept_overrun\",\"summary\":\"Let the peak reach 42.4 kW for one block\",\"actions\":[],\"projected\":{\"peak_kw\":42.4,\"cost_delta_usd\":67.2,\"max_indoor_temp_change_c\":0.0},\"rule_breaks\":[{\"kind\":\"cap_overrun\",\"amount\":2.4,\"unit\":\"kW\"}],\"within_authority\":true},{\"option_id\":\"deep_reduce_hvac\",\"summary\":\"HVAC 1 and 2 to 30 % until their planned restore\",\"actions\":[{\"command_id\":\"c_0005\",\"lane\":\"with\",\"ts\":\"2026-07-18T01:30:00Z\",\"device_id\":\"hvac_1\",\"action\":\"reduce\",\"value\":30,\"decision_id\":null,\"issued_by\":\"engine\"},{\"command_id\":\"c_0006\",\"lane\":\"with\",\"ts\":\"2026-07-18T01:30:00Z\",\"device_id\":\"hvac_2\",\"action\":\"reduce\",\"value\":30,\"decision_id\":null,\"issued_by\":\"engine\"}],\"projected\":{\"peak_kw\":43.1,\"cost_delta_usd\":86.82,\"max_indoor_temp_change_c\":1.4},\"rule_breaks\":[{\"kind\":\"cap_overrun\",\"amount\":3.1,\"unit\":\"kW\"},{\"kind\":\"below_min_power\",\"device_id\":\"hvac_1\",\"amount\":10,\"unit\":\"pct\"},{\"kind\":\"below_min_power\",\"device_id\":\"hvac_2\",\"amount\":10,\"unit\":\"pct\"}],\"within_authority\":false},{\"option_id\":\"extend_delay_dishwasher\",\"summary\":\"Delay the dishwasher 20 min past its deadline\",\"actions\":[{\"command_id\":\"c_0007\",\"lane\":\"with\",\"ts\":\"2026-07-18T01:30:00Z\",\"device_id\":\"dishwasher_1\",\"action\":\"delay\",\"value\":49,\"decision_id\":null,\"issued_by\":\"engine\"}],\"projected\":{\"peak_kw\":39.1,\"cost_delta_usd\":0.0,\"max_indoor_temp_change_c\":0.0},\"rule_breaks\":[{\"kind\":\"past_deadline\",\"device_id\":\"dishwasher_1\",\"amount\":20,\"unit\":\"min\"},{\"kind\":\"over_max_delay\",\"device_id\":\"dishwasher_1\",\"amount\":15,\"unit\":\"min\"}],\"within_authority\":true},{\"option_id\":\"ask_owner\",\"summary\":\"Ask the owner\",\"actions\":[],\"projected\":null,\"rule_breaks\":[],\"within_authority\":true}]",
+    "chosen_option_id": "extend_delay_dishwasher",
+    "resolved_by": "claude",
+    "rationale": "The owner wants a comfortable dining room tonight, so I kept HVAC as planned and moved the dishwasher instead: projected peak 39.1 kW, inside my authority."
+  }
+]

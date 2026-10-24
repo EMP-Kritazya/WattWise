@@ -1,0 +1,1423 @@
+{
+  "GAPS.md": {
+    "contract_section": "meta",
+    "consumers": [
+      "everyone"
+    ],
+    "seam": "-"
+  },
+  "MANIFEST.json": {
+    "contract_section": "meta",
+    "consumers": [
+      "everyone"
+    ],
+    "seam": "-"
+  },
+  "README.md": {
+    "contract_section": "meta",
+    "consumers": [
+      "everyone"
+    ],
+    "seam": "-"
+  },
+  "agents/agent_log.jsonl": {
+    "contract_section": "§7 Agent messages",
+    "consumers": [
+      "Suyog (agents --recorded)"
+    ],
+    "seam": "S5"
+  },
+  "agents/context_post.json": {
+    "contract_section": "§7 Agent messages",
+    "consumers": [
+      "Suyog (agents --recorded)"
+    ],
+    "seam": "S5"
+  },
+  "agents/events_request.json": {
+    "contract_section": "§7 Agent messages",
+    "consumers": [
+      "Suyog (agents --recorded)"
+    ],
+    "seam": "S5"
+  },
+  "agents/events_response.json": {
+    "contract_section": "§7 Agent messages",
+    "consumers": [
+      "Suyog (agents --recorded)"
+    ],
+    "seam": "S5"
+  },
+  "agents/price_request.json": {
+    "contract_section": "§7 Agent messages",
+    "consumers": [
+      "Suyog (agents --recorded)"
+    ],
+    "seam": "S5"
+  },
+  "agents/price_response.json": {
+    "contract_section": "§7 Agent messages",
+    "consumers": [
+      "Suyog (agents --recorded)"
+    ],
+    "seam": "S5"
+  },
+  "agents/weather_request.json": {
+    "contract_section": "§7 Agent messages",
+    "consumers": [
+      "Suyog (agents --recorded)"
+    ],
+    "seam": "S5"
+  },
+  "agents/weather_response.json": {
+    "contract_section": "§7 Agent messages",
+    "consumers": [
+      "Suyog (agents --recorded)"
+    ],
+    "seam": "S5"
+  },
+  "ai_tools/choose_escalation_option.json": {
+    "contract_section": "§4 AI tools",
+    "consumers": [
+      "Suyog (agent/tools.py tests)"
+    ],
+    "seam": "S2 via API"
+  },
+  "ai_tools/explain_decision.json": {
+    "contract_section": "§4 AI tools",
+    "consumers": [
+      "Suyog (agent/tools.py tests)"
+    ],
+    "seam": "S2 via API"
+  },
+  "ai_tools/get_bill.json": {
+    "contract_section": "§4 AI tools",
+    "consumers": [
+      "Suyog (agent/tools.py tests)"
+    ],
+    "seam": "S2 via API"
+  },
+  "ai_tools/get_context.json": {
+    "contract_section": "§4 AI tools",
+    "consumers": [
+      "Suyog (agent/tools.py tests)"
+    ],
+    "seam": "S2 via API"
+  },
+  "ai_tools/get_escalation.json": {
+    "contract_section": "§4 AI tools",
+    "consumers": [
+      "Suyog (agent/tools.py tests)"
+    ],
+    "seam": "S2 via API"
+  },
+  "ai_tools/get_forecast.json": {
+    "contract_section": "§4 AI tools",
+    "consumers": [
+      "Suyog (agent/tools.py tests)"
+    ],
+    "seam": "S2 via API"
+  },
+  "ai_tools/get_kitchen_state.json": {
+    "contract_section": "§4 AI tools",
+    "consumers": [
+      "Suyog (agent/tools.py tests)"
+    ],
+    "seam": "S2 via API"
+  },
+  "ai_tools/propose_customer_event.json": {
+    "contract_section": "§4 AI tools",
+    "consumers": [
+      "Suyog (agent/tools.py tests)"
+    ],
+    "seam": "S2 via API"
+  },
+  "ai_tools/propose_escalation_choice.json": {
+    "contract_section": "§4 AI tools",
+    "consumers": [
+      "Suyog (agent/tools.py tests)"
+    ],
+    "seam": "S2 via API"
+  },
+  "ai_tools/propose_importance_change.json": {
+    "contract_section": "§4 AI tools",
+    "consumers": [
+      "Suyog (agent/tools.py tests)"
+    ],
+    "seam": "S2 via API"
+  },
+  "ai_tools/propose_peak_cap_change.json": {
+    "contract_section": "§4 AI tools",
+    "consumers": [
+      "Suyog (agent/tools.py tests)"
+    ],
+    "seam": "S2 via API"
+  },
+  "ai_tools/propose_undo.json": {
+    "contract_section": "§4 AI tools",
+    "consumers": [
+      "Suyog (agent/tools.py tests)"
+    ],
+    "seam": "S2 via API"
+  },
+  "ai_tools/set_crowd_effect.json": {
+    "contract_section": "§4 AI tools",
+    "consumers": [
+      "Suyog (agent/tools.py tests)"
+    ],
+    "seam": "S2 via API"
+  },
+  "ai_tools/what_if.json": {
+    "contract_section": "§4 AI tools",
+    "consumers": [
+      "Suyog (agent/tools.py tests)"
+    ],
+    "seam": "S2 via API"
+  },
+  "check.py": {
+    "contract_section": "meta",
+    "consumers": [
+      "everyone"
+    ],
+    "seam": "-"
+  },
+  "convex/functions/backtest_save.json": {
+    "contract_section": "§6 Convex",
+    "consumers": [
+      "Suyog (store/, STORE=memory seed)"
+    ],
+    "seam": "S4"
+  },
+  "convex/functions/bills_save.json": {
+    "contract_section": "§6 Convex",
+    "consumers": [
+      "Suyog (store/, STORE=memory seed)"
+    ],
+    "seam": "S4"
+  },
+  "convex/functions/commands_ack.json": {
+    "contract_section": "§6 Convex",
+    "consumers": [
+      "Suyog (store/, STORE=memory seed)"
+    ],
+    "seam": "S4"
+  },
+  "convex/functions/commands_enqueue.json": {
+    "contract_section": "§6 Convex",
+    "consumers": [
+      "Suyog (store/, STORE=memory seed)"
+    ],
+    "seam": "S4"
+  },
+  "convex/functions/commands_forDevice.json": {
+    "contract_section": "§6 Convex",
+    "consumers": [
+      "Suyog (store/, STORE=memory seed)"
+    ],
+    "seam": "S4"
+  },
+  "convex/functions/decisions_record.json": {
+    "contract_section": "§6 Convex",
+    "consumers": [
+      "Suyog (store/, STORE=memory seed)"
+    ],
+    "seam": "S4"
+  },
+  "convex/functions/devices_report.json": {
+    "contract_section": "§6 Convex",
+    "consumers": [
+      "Suyog (store/, STORE=memory seed)"
+    ],
+    "seam": "S4"
+  },
+  "convex/functions/hubs_heartbeat.json": {
+    "contract_section": "§6 Convex",
+    "consumers": [
+      "Suyog (store/, STORE=memory seed)"
+    ],
+    "seam": "S4"
+  },
+  "convex/functions/proposals_upsert.json": {
+    "contract_section": "§6 Convex",
+    "consumers": [
+      "Suyog (store/, STORE=memory seed)"
+    ],
+    "seam": "S4"
+  },
+  "convex/tables/backtest_results.json": {
+    "contract_section": "§6 Convex",
+    "consumers": [
+      "Suyog (store/, STORE=memory seed)"
+    ],
+    "seam": "S4"
+  },
+  "convex/tables/bills.json": {
+    "contract_section": "§6 Convex",
+    "consumers": [
+      "Suyog (store/, STORE=memory seed)"
+    ],
+    "seam": "S4"
+  },
+  "convex/tables/commands.json": {
+    "contract_section": "§6 Convex",
+    "consumers": [
+      "Suyog (store/, STORE=memory seed)"
+    ],
+    "seam": "S4"
+  },
+  "convex/tables/context_snapshots.json": {
+    "contract_section": "§6 Convex",
+    "consumers": [
+      "Suyog (store/, STORE=memory seed)"
+    ],
+    "seam": "S4"
+  },
+  "convex/tables/decisions.json": {
+    "contract_section": "§6 Convex",
+    "consumers": [
+      "Suyog (store/, STORE=memory seed)"
+    ],
+    "seam": "S4"
+  },
+  "convex/tables/device_blocks.json": {
+    "contract_section": "§6 Convex",
+    "consumers": [
+      "Suyog (store/, STORE=memory seed)"
+    ],
+    "seam": "S4"
+  },
+  "convex/tables/device_map.json": {
+    "contract_section": "§6 Convex",
+    "consumers": [
+      "Suyog (store/, STORE=memory seed)"
+    ],
+    "seam": "S4"
+  },
+  "convex/tables/escalations.json": {
+    "contract_section": "§6 Convex",
+    "consumers": [
+      "Suyog (store/, STORE=memory seed)"
+    ],
+    "seam": "S4"
+  },
+  "convex/tables/hubs.json": {
+    "contract_section": "§6 Convex",
+    "consumers": [
+      "Suyog (store/, STORE=memory seed)"
+    ],
+    "seam": "S4"
+  },
+  "convex/tables/kitchens.json": {
+    "contract_section": "§6 Convex",
+    "consumers": [
+      "Suyog (store/, STORE=memory seed)"
+    ],
+    "seam": "S4"
+  },
+  "convex/tables/proposals.json": {
+    "contract_section": "§6 Convex",
+    "consumers": [
+      "Suyog (store/, STORE=memory seed)"
+    ],
+    "seam": "S4"
+  },
+  "convex/tables/readings.json": {
+    "contract_section": "§6 Convex",
+    "consumers": [
+      "Suyog (store/, STORE=memory seed)"
+    ],
+    "seam": "S4"
+  },
+  "facade/compare_lanes.json": {
+    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "consumers": [
+      "Suyog (fakes/fake_kitchen.py)",
+      "Kritazya (engine tests)"
+    ],
+    "seam": "S2"
+  },
+  "facade/forecast.json": {
+    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "consumers": [
+      "Suyog (fakes/fake_kitchen.py)",
+      "Kritazya (engine tests)"
+    ],
+    "seam": "S2"
+  },
+  "facade/ingest_reading.json": {
+    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "consumers": [
+      "Suyog (fakes/fake_kitchen.py)",
+      "Kritazya (engine tests)"
+    ],
+    "seam": "S2"
+  },
+  "facade/kitchen.json": {
+    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "consumers": [
+      "Suyog (fakes/fake_kitchen.py)",
+      "Kritazya (engine tests)"
+    ],
+    "seam": "S2"
+  },
+  "facade/open_escalations.json": {
+    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "consumers": [
+      "Suyog (fakes/fake_kitchen.py)",
+      "Kritazya (engine tests)"
+    ],
+    "seam": "S2"
+  },
+  "facade/owner_command.json": {
+    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "consumers": [
+      "Suyog (fakes/fake_kitchen.py)",
+      "Kritazya (engine tests)"
+    ],
+    "seam": "S2"
+  },
+  "facade/resolve_escalation.json": {
+    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "consumers": [
+      "Suyog (fakes/fake_kitchen.py)",
+      "Kritazya (engine tests)"
+    ],
+    "seam": "S2"
+  },
+  "facade/run_backtest.json": {
+    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "consumers": [
+      "Suyog (fakes/fake_kitchen.py)",
+      "Kritazya (engine tests)"
+    ],
+    "seam": "S2"
+  },
+  "facade/set_authority.json": {
+    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "consumers": [
+      "Suyog (fakes/fake_kitchen.py)",
+      "Kritazya (engine tests)"
+    ],
+    "seam": "S2"
+  },
+  "facade/set_context.json": {
+    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "consumers": [
+      "Suyog (fakes/fake_kitchen.py)",
+      "Kritazya (engine tests)"
+    ],
+    "seam": "S2"
+  },
+  "facade/set_importance.json": {
+    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "consumers": [
+      "Suyog (fakes/fake_kitchen.py)",
+      "Kritazya (engine tests)"
+    ],
+    "seam": "S2"
+  },
+  "facade/set_importance_rule_error.json": {
+    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "consumers": [
+      "Suyog (fakes/fake_kitchen.py)",
+      "Kritazya (engine tests)"
+    ],
+    "seam": "S2"
+  },
+  "facade/set_peak_cap.json": {
+    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "consumers": [
+      "Suyog (fakes/fake_kitchen.py)",
+      "Kritazya (engine tests)"
+    ],
+    "seam": "S2"
+  },
+  "facade/set_peak_cap_rule_error.json": {
+    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "consumers": [
+      "Suyog (fakes/fake_kitchen.py)",
+      "Kritazya (engine tests)"
+    ],
+    "seam": "S2"
+  },
+  "facade/set_preferences.json": {
+    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "consumers": [
+      "Suyog (fakes/fake_kitchen.py)",
+      "Kritazya (engine tests)"
+    ],
+    "seam": "S2"
+  },
+  "facade/snapshot.json": {
+    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "consumers": [
+      "Suyog (fakes/fake_kitchen.py)",
+      "Kritazya (engine tests)"
+    ],
+    "seam": "S2"
+  },
+  "facade/step_stream.jsonl": {
+    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "consumers": [
+      "Suyog (fakes/fake_kitchen.py)",
+      "Kritazya (engine tests)"
+    ],
+    "seam": "S2"
+  },
+  "facade/undo.json": {
+    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "consumers": [
+      "Suyog (fakes/fake_kitchen.py)",
+      "Kritazya (engine tests)"
+    ],
+    "seam": "S2"
+  },
+  "facade/warm_up.json": {
+    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "consumers": [
+      "Suyog (fakes/fake_kitchen.py)",
+      "Kritazya (engine tests)"
+    ],
+    "seam": "S2"
+  },
+  "facade/what_if.json": {
+    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "consumers": [
+      "Suyog (fakes/fake_kitchen.py)",
+      "Kritazya (engine tests)"
+    ],
+    "seam": "S2"
+  },
+  "generate.py": {
+    "contract_section": "meta",
+    "consumers": [
+      "everyone"
+    ],
+    "seam": "-"
+  },
+  "hub_protocol/hub_hello.json": {
+    "contract_section": "§8 Hub protocol",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "S6"
+  },
+  "hub_protocol/hub_report.json": {
+    "contract_section": "§8 Hub protocol",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "S6"
+  },
+  "hub_protocol/hub_to_server.jsonl": {
+    "contract_section": "§8 Hub protocol",
+    "consumers": [
+      "Suyog (fakes/fake_hub_client.py)",
+      "Kritazya (engine input)"
+    ],
+    "seam": "S6"
+  },
+  "hub_protocol/hub_welcome_accepted.json": {
+    "contract_section": "§8 Hub protocol",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "S6"
+  },
+  "hub_protocol/hub_welcome_host_taken.json": {
+    "contract_section": "§8 Hub protocol",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "S6"
+  },
+  "hub_protocol/server_to_hub.jsonl": {
+    "contract_section": "§8 Hub protocol",
+    "consumers": [
+      "Ashirwad (src/mocks/mockHubServer.ts)",
+      "Kritazya"
+    ],
+    "seam": "S6"
+  },
+  "hub_protocol/sim_build.json": {
+    "contract_section": "§8 Hub protocol",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "S6"
+  },
+  "hub_protocol/sim_control.json": {
+    "contract_section": "§8 Hub protocol",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "S6"
+  },
+  "hub_protocol/sim_tick.json": {
+    "contract_section": "§8 Hub protocol",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "S6"
+  },
+  "hub_protocol/sim_tick_replay.json": {
+    "contract_section": "§8 Hub protocol",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "S6"
+  },
+  "rest/get_backtest.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/get_catalog.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/get_context.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/get_decisions.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/get_escalations.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/get_health.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/get_kitchen.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/get_proposals.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/post_agent_log.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/post_backtest_run.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/post_chat.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/post_context.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/post_context_crowd_effect.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/post_decision_undo.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/post_decision_undo_404.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/post_device_command.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/post_device_command_404.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/post_escalation_resolve.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/post_events_customers.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/post_kitchen.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/post_kitchen_422.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/post_proposal_confirm.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/post_sim_control.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/put_authority.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/put_device_importance.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/put_device_importance_404.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/put_device_importance_422.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/put_peak_cap.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/put_peak_cap_422.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/put_preferences.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "scenario/demo_cafe/index.json": {
+    "contract_section": "Demo Café scenario (DEMO.md)",
+    "consumers": [
+      "Kritazya",
+      "Suyog",
+      "Ashirwad"
+    ],
+    "seam": "all"
+  },
+  "scenario/demo_cafe/scenario.json": {
+    "contract_section": "Demo Café scenario (DEMO.md)",
+    "consumers": [
+      "Kritazya",
+      "Suyog",
+      "Ashirwad"
+    ],
+    "seam": "all"
+  },
+  "shapes/agent_log.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/backtest_result.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/bill.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/claude_authority.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/command.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/command_ack_clamped.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/command_ack_ok.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/command_ack_rejected.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/command_owner.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/context.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/decision.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/device.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/device_measured.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/equipment_catalog.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/escalation_awaiting_owner.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/escalation_expired_default.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/escalation_open.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/escalation_resolved_claude.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/hub_report_with.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/hub_report_without.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/kitchen_config.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/kitchen_config_minimize.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/lane_comparison.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/meter.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/proposal_authority.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/proposal_confirmed.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/proposal_customer_event.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/proposal_peak_cap.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/proposal_pending.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/proposal_resolve_escalation.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/proposal_undo_decision.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/reading.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/tariff.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/tick_state_with.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/tick_state_without.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "spacetime/reducers/consume_surge.json": {
+    "contract_section": "§5 SpacetimeDB",
+    "consumers": [
+      "Ashirwad (mock live hook)",
+      "Kritazya (fakes/fake_live.py, spacetime/seed.ts)"
+    ],
+    "seam": "S3"
+  },
+  "spacetime/reducers/log_agent.json": {
+    "contract_section": "§5 SpacetimeDB",
+    "consumers": [
+      "Ashirwad (mock live hook)",
+      "Kritazya (fakes/fake_live.py, spacetime/seed.ts)"
+    ],
+    "seam": "S3"
+  },
+  "spacetime/reducers/publish_context.json": {
+    "contract_section": "§5 SpacetimeDB",
+    "consumers": [
+      "Ashirwad (mock live hook)",
+      "Kritazya (fakes/fake_live.py, spacetime/seed.ts)"
+    ],
+    "seam": "S3"
+  },
+  "spacetime/reducers/publish_escalation.json": {
+    "contract_section": "§5 SpacetimeDB",
+    "consumers": [
+      "Ashirwad (mock live hook)",
+      "Kritazya (fakes/fake_live.py, spacetime/seed.ts)"
+    ],
+    "seam": "S3"
+  },
+  "spacetime/reducers/publish_feed.json": {
+    "contract_section": "§5 SpacetimeDB",
+    "consumers": [
+      "Ashirwad (mock live hook)",
+      "Kritazya (fakes/fake_live.py, spacetime/seed.ts)"
+    ],
+    "seam": "S3"
+  },
+  "spacetime/reducers/publish_ticks.json": {
+    "contract_section": "§5 SpacetimeDB",
+    "consumers": [
+      "Ashirwad (mock live hook)",
+      "Kritazya (fakes/fake_live.py, spacetime/seed.ts)"
+    ],
+    "seam": "S3"
+  },
+  "spacetime/reducers/request_surge.json": {
+    "contract_section": "§5 SpacetimeDB",
+    "consumers": [
+      "Ashirwad (mock live hook)",
+      "Kritazya (fakes/fake_live.py, spacetime/seed.ts)"
+    ],
+    "seam": "S3"
+  },
+  "spacetime/reducers/reset_all.json": {
+    "contract_section": "§5 SpacetimeDB",
+    "consumers": [
+      "Ashirwad (mock live hook)",
+      "Kritazya (fakes/fake_live.py, spacetime/seed.ts)"
+    ],
+    "seam": "S3"
+  },
+  "spacetime/reducers/set_clock.json": {
+    "contract_section": "§5 SpacetimeDB",
+    "consumers": [
+      "Ashirwad (mock live hook)",
+      "Kritazya (fakes/fake_live.py, spacetime/seed.ts)"
+    ],
+    "seam": "S3"
+  },
+  "spacetime/rows_stream.jsonl": {
+    "contract_section": "§5 SpacetimeDB",
+    "consumers": [
+      "Ashirwad (mock live hook)",
+      "Kritazya (fakes/fake_live.py, spacetime/seed.ts)"
+    ],
+    "seam": "S3"
+  },
+  "spacetime/tables/live_agent_log.json": {
+    "contract_section": "§5 SpacetimeDB",
+    "consumers": [
+      "Ashirwad (mock live hook)",
+      "Kritazya (fakes/fake_live.py, spacetime/seed.ts)"
+    ],
+    "seam": "S3"
+  },
+  "spacetime/tables/live_clock.json": {
+    "contract_section": "§5 SpacetimeDB",
+    "consumers": [
+      "Ashirwad (mock live hook)",
+      "Kritazya (fakes/fake_live.py, spacetime/seed.ts)"
+    ],
+    "seam": "S3"
+  },
+  "spacetime/tables/live_comparison.json": {
+    "contract_section": "§5 SpacetimeDB",
+    "consumers": [
+      "Ashirwad (mock live hook)",
+      "Kritazya (fakes/fake_live.py, spacetime/seed.ts)"
+    ],
+    "seam": "S3"
+  },
+  "spacetime/tables/live_context.json": {
+    "contract_section": "§5 SpacetimeDB",
+    "consumers": [
+      "Ashirwad (mock live hook)",
+      "Kritazya (fakes/fake_live.py, spacetime/seed.ts)"
+    ],
+    "seam": "S3"
+  },
+  "spacetime/tables/live_device.json": {
+    "contract_section": "§5 SpacetimeDB",
+    "consumers": [
+      "Ashirwad (mock live hook)",
+      "Kritazya (fakes/fake_live.py, spacetime/seed.ts)"
+    ],
+    "seam": "S3"
+  },
+  "spacetime/tables/live_escalation.json": {
+    "contract_section": "§5 SpacetimeDB",
+    "consumers": [
+      "Ashirwad (mock live hook)",
+      "Kritazya (fakes/fake_live.py, spacetime/seed.ts)"
+    ],
+    "seam": "S3"
+  },
+  "spacetime/tables/live_feed.json": {
+    "contract_section": "§5 SpacetimeDB",
+    "consumers": [
+      "Ashirwad (mock live hook)",
+      "Kritazya (fakes/fake_live.py, spacetime/seed.ts)"
+    ],
+    "seam": "S3"
+  },
+  "spacetime/tables/live_tick.json": {
+    "contract_section": "§5 SpacetimeDB",
+    "consumers": [
+      "Ashirwad (mock live hook)",
+      "Kritazya (fakes/fake_live.py, spacetime/seed.ts)"
+    ],
+    "seam": "S3"
+  },
+  "spacetime/tables/surge_request.json": {
+    "contract_section": "§5 SpacetimeDB",
+    "consumers": [
+      "Ashirwad (mock live hook)",
+      "Kritazya (fakes/fake_live.py, spacetime/seed.ts)"
+    ],
+    "seam": "S3"
+  },
+  "spacetime/tables/tick_history.json": {
+    "contract_section": "§5 SpacetimeDB",
+    "consumers": [
+      "Ashirwad (mock live hook)",
+      "Kritazya (fakes/fake_live.py, spacetime/seed.ts)"
+    ],
+    "seam": "S3"
+  },
+  "ws/agent_log.json": {
+    "contract_section": "§2 WebSocket /ws",
+    "consumers": [
+      "Ashirwad (src/mocks, /ws fallback hook)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "ws/backtest_progress.json": {
+    "contract_section": "§2 WebSocket /ws",
+    "consumers": [
+      "Ashirwad (src/mocks, /ws fallback hook)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "ws/chat_delta.json": {
+    "contract_section": "§2 WebSocket /ws",
+    "consumers": [
+      "Ashirwad (src/mocks, /ws fallback hook)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "ws/chat_done.json": {
+    "contract_section": "§2 WebSocket /ws",
+    "consumers": [
+      "Ashirwad (src/mocks, /ws fallback hook)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "ws/clock.json": {
+    "contract_section": "§2 WebSocket /ws",
+    "consumers": [
+      "Ashirwad (src/mocks, /ws fallback hook)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "ws/comparison.json": {
+    "contract_section": "§2 WebSocket /ws",
+    "consumers": [
+      "Ashirwad (src/mocks, /ws fallback hook)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "ws/context.json": {
+    "contract_section": "§2 WebSocket /ws",
+    "consumers": [
+      "Ashirwad (src/mocks, /ws fallback hook)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "ws/decision.json": {
+    "contract_section": "§2 WebSocket /ws",
+    "consumers": [
+      "Ashirwad (src/mocks, /ws fallback hook)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "ws/escalation.json": {
+    "contract_section": "§2 WebSocket /ws",
+    "consumers": [
+      "Ashirwad (src/mocks, /ws fallback hook)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "ws/proposal.json": {
+    "contract_section": "§2 WebSocket /ws",
+    "consumers": [
+      "Ashirwad (src/mocks, /ws fallback hook)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "ws/stream.jsonl": {
+    "contract_section": "§2 WebSocket /ws",
+    "consumers": [
+      "Ashirwad (src/mocks, /ws fallback hook)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "ws/tick.json": {
+    "contract_section": "§2 WebSocket /ws",
+    "consumers": [
+      "Ashirwad (src/mocks, /ws fallback hook)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "ws/warning.json": {
+    "contract_section": "§2 WebSocket /ws",
+    "consumers": [
+      "Ashirwad (src/mocks, /ws fallback hook)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  }
+}

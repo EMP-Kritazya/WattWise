@@ -1,0 +1,13 @@
+{
+  "proposal_id": "p_0004",
+  "ts": "2026-07-18T02:30:00Z",
+  "kind": "undo_decision",
+  "payload": {
+    "decision_id": "d_0001"
+  },
+  "summary": "Undo the dishwasher delay",
+  "status": "pending",
+  "created_by": "ai",
+  "confirmed_via": null,
+  "expires_at": "2026-07-18T03:00:00Z"
+}

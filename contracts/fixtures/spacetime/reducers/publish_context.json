@@ -1,0 +1,6 @@
+{
+  "reducer": "publish_context",
+  "args": [
+    "{\"id\":0,\"weather_summary\":\"28.4 °C now\",\"weather_label\":\"recorded\",\"prices_summary\":\"0.34 USD/kWh now, stress high\",\"prices_label\":\"recorded\",\"events_summary\":\"Giants vs Dodgers at Oracle Park, 1.8 km\",\"events_label\":\"recorded\",\"crowd_effect\":\"medium\"}"
+  ]
+}

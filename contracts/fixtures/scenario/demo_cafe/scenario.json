@@ -1,0 +1,264 @@
+{
+  "name": "Demo Café",
+  "label": "FAKE DATA - not measured, not live",
+  "seed": 42,
+  "timezone": "America/Los_Angeles",
+  "start_sim_ts": "2026-07-18T00:30:00Z",
+  "start_local": "2026-07-17 17:30 (Friday)",
+  "ticks": 120,
+  "minutes_per_tick": 1,
+  "speed": 120,
+  "peak_cap_kw": 40.0,
+  "kitchen_id": "k_01",
+  "config": {
+    "name": "Demo Café",
+    "equipment": [
+      {
+        "type_id": "hvac",
+        "count": 2,
+        "importance": "flexible",
+        "limits": {
+          "min_power_pct": 40,
+          "max_reduce_min": 30
+        }
+      },
+      {
+        "type_id": "walk_in_cooler",
+        "count": 1,
+        "importance": "flexible",
+        "limits": {
+          "min_power_pct": 50,
+          "max_reduce_min": 30
+        }
+      },
+      {
+        "type_id": "reach_in_fridge",
+        "count": 1,
+        "importance": "always_on",
+        "limits": {}
+      },
+      {
+        "type_id": "freezer",
+        "count": 1,
+        "importance": "always_on",
+        "limits": {}
+      },
+      {
+        "type_id": "ice_machine",
+        "count": 1,
+        "importance": "deferrable",
+        "limits": {
+          "max_delay_min": 60,
+          "must_finish_by": "22:00"
+        }
+      },
+      {
+        "type_id": "fryer",
+        "count": 1,
+        "importance": "always_on",
+        "limits": {}
+      },
+      {
+        "type_id": "oven",
+        "count": 1,
+        "importance": "always_on",
+        "limits": {}
+      },
+      {
+        "type_id": "grill",
+        "count": 1,
+        "importance": "always_on",
+        "limits": {}
+      },
+      {
+        "type_id": "dishwasher",
+        "count": 1,
+        "importance": "deferrable",
+        "limits": {
+          "max_delay_min": 60,
+          "must_finish_by": "19:30"
+        }
+      },
+      {
+        "type_id": "water_heater",
+        "count": 1,
+        "importance": "flexible",
+        "limits": {
+          "min_power_pct": 40,
+          "max_reduce_min": 30
+        }
+      },
+      {
+        "type_id": "lights",
+        "count": 1,
+        "importance": "always_on",
+        "limits": {}
+      }
+    ],
+    "peak_mode": "cap",
+    "peak_cap_kw": 40.0,
+    "operating_hours": {
+      "open": "10:00",
+      "close": "22:00"
+    },
+    "location": {
+      "lat": 37.8,
+      "lon": -122.44,
+      "label": "Marina, San Francisco"
+    },
+    "owner_preferences": "Keep the dining room comfortable during dinner service.",
+    "authority": {
+      "enabled": true,
+      "max_cap_overrun_kw": 3.0,
+      "max_extra_delay_min": 20,
+      "max_extra_reduce_min": 15,
+      "may_go_below_min_power": false
+    },
+    "tariff_id": "demo_tariff_v1",
+    "seed": 42
+  },
+  "tariff": {
+    "tariff_id": "demo_tariff_v1",
+    "name": "WattWise demo commercial rate",
+    "label": "illustrative",
+    "currency": "USD",
+    "timezone": "America/Los_Angeles",
+    "energy": [
+      {
+        "name": "off_peak",
+        "start": "00:00",
+        "end": "16:00",
+        "usd_per_kwh": 0.22
+      },
+      {
+        "name": "peak",
+        "start": "16:00",
+        "end": "21:00",
+        "usd_per_kwh": 0.38
+      },
+      {
+        "name": "off_peak",
+        "start": "21:00",
+        "end": "24:00",
+        "usd_per_kwh": 0.22
+      }
+    ],
+    "demand": [
+      {
+        "name": "max_demand",
+        "window": null,
+        "usd_per_kw": 20.0
+      },
+      {
+        "name": "peak_demand",
+        "window": {
+          "start": "16:00",
+          "end": "21:00"
+        },
+        "usd_per_kw": 8.0
+      }
+    ]
+  },
+  "illustrative_constants": {
+    "initial_meter": {
+      "without": {
+        "energy_kwh_today": 286.4,
+        "cost_usd_today": 72.85,
+        "cost_usd_month": 1907.4,
+        "month_peak_kw": 42.6
+      },
+      "with": {
+        "energy_kwh_today": 286.4,
+        "cost_usd_today": 70.12,
+        "cost_usd_month": 1835.1,
+        "month_peak_kw": 39.4
+      }
+    }
+  },
+  "timeline": [
+    {
+      "tick": 0,
+      "what": "sim_build; recorded context posted (Context ts 2026-07-18T00:30:00Z), crowd_effect medium"
+    },
+    {
+      "tick": 30,
+      "what": "judge calls request_surge(40, 60) (surge_request id 1)"
+    },
+    {
+      "tick": 31,
+      "what": "sim_tick carries surge s_0001 (+40 customers for 60 min)"
+    },
+    {
+      "tick": 35,
+      "what": "d_0001 dishwasher_1 delay 50 (avoid_new_peak)"
+    },
+    {
+      "tick": 40,
+      "what": "d_0002 water_heater_1 reduce 40 (stay_under_cap)"
+    },
+    {
+      "tick": 45,
+      "what": "d_0003 hvac_1 reduce 44 (stay_under_cap)"
+    },
+    {
+      "tick": 55,
+      "what": "d_0004 hvac_2 reduce 45 (stay_under_cap)"
+    },
+    {
+      "tick": 60,
+      "what": "escalation e_0001 opens (forecast peak 42.4 kW > cap); clock slows to 1x (slowed_reason escalation); Claude chooses extend_delay_dishwasher within authority"
+    },
+    {
+      "tick": 61,
+      "what": "d_0005 dishwasher_1 delay 49 (escalation_choice)"
+    },
+    {
+      "tick": 61,
+      "what": "periodic context refresh (Context ts 2026-07-18T01:30:00Z)"
+    },
+    {
+      "tick": 65,
+      "what": "d_0006 walk_in_cooler_1 reduce 50 (stay_under_cap)"
+    },
+    {
+      "tick": 70,
+      "what": "d_0007 water_heater_1 restore  (catch_up)"
+    },
+    {
+      "tick": 75,
+      "what": "d_0008 hvac_1 restore  (catch_up)"
+    },
+    {
+      "tick": 75,
+      "what": "d_0009 water_heater_1 reduce 40 (stay_under_cap)"
+    },
+    {
+      "tick": 85,
+      "what": "d_0010 hvac_2 restore  (catch_up)"
+    },
+    {
+      "tick": 85,
+      "what": "d_0011 hvac_1 reduce 50 (stay_under_cap)"
+    },
+    {
+      "tick": 95,
+      "what": "d_0012 walk_in_cooler_1 restore  (catch_up)"
+    },
+    {
+      "tick": 105,
+      "what": "d_0013 water_heater_1 restore  (catch_up)"
+    },
+    {
+      "tick": 105,
+      "what": "d_0014 hvac_2 reduce 45 (stay_under_cap)"
+    },
+    {
+      "tick": 110,
+      "what": "d_0015 water_heater_1 reduce 40 (stay_under_cap)"
+    },
+    {
+      "tick": 115,
+      "what": "d_0016 hvac_1 restore  (catch_up)"
+    }
+  ]
+}

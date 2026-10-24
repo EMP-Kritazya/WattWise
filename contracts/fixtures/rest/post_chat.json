@@ -1,0 +1,11 @@
+{
+  "method": "POST",
+  "path": "/api/chat",
+  "status": 200,
+  "request": {
+    "message": "What did you decide about tonight?"
+  },
+  "response": {
+    "chat_id": "chat_0001"
+  }
+}

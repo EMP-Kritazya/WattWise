@@ -11,7 +11,7 @@ Goal: show, on historical data, what WattWise would have saved — fairly, repro
 |---|---|---|
 | Main replay | NREL ComStock End-Use Load Profiles (data.openei.org; viewer comstock.nrel.gov) | 15-min, full-year load for full-service restaurants, split by end use. **Calibrated model data**, not one restaurant's meter. |
 | Real-meter check (optional) | Building Data Genome 2 (github.com/buds-lab/building-data-genome-project-2) | **Real** hourly whole-building meters, 2016–2017, filter primary use = food service. Often campus dining. |
-| Tariff | OpenEI Utility Rate Database | One **real, named** commercial tariff with demand charges (e.g. a PG&E rate). Record the id in DECISIONS.md. |
+| Tariff | OpenEI Utility Rate Database | One **real, named** commercial tariff with demand charges (e.g. a PG&E rate), in the CONTRACTS.md Tariff shape (`label: "urdb"`). Until chosen, everything uses the made-up `demo_tariff_v1` (`label: "illustrative"`); no savings number from it is ever shown as real. |
 | Equipment power | FSTC test reports, ENERGY STAR specs | Rated/idle power for the equipment catalog |
 
 Loading rules: electricity columns only · energy per 15 min → `power_kw = kwh × 4` · verify column names at download

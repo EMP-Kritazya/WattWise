@@ -1,0 +1,12 @@
+{
+  "method": "PUT",
+  "path": "/api/kitchen/peak-cap",
+  "status": 422,
+  "request": {
+    "peak_mode": "cap",
+    "peak_cap_kw": null
+  },
+  "response": {
+    "detail": "peak_mode cap needs a peak_cap_kw"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "type": "hub_hello",
+  "protocol": 1,
+  "hub_id": "sim_hub",
+  "role": "sim_host",
+  "client": "wattwise-web/0.1"
+}

@@ -1,0 +1,326 @@
+{
+  "method": "GET",
+  "path": "/api/kitchen",
+  "status": 200,
+  "request": null,
+  "response": {
+    "config": {
+      "name": "Demo Café",
+      "equipment": [
+        {
+          "type_id": "hvac",
+          "count": 2,
+          "importance": "flexible",
+          "limits": {
+            "min_power_pct": 40,
+            "max_reduce_min": 30
+          }
+        },
+        {
+          "type_id": "walk_in_cooler",
+          "count": 1,
+          "importance": "flexible",
+          "limits": {
+            "min_power_pct": 50,
+            "max_reduce_min": 30
+          }
+        },
+        {
+          "type_id": "reach_in_fridge",
+          "count": 1,
+          "importance": "always_on",
+          "limits": {}
+        },
+        {
+          "type_id": "freezer",
+          "count": 1,
+          "importance": "always_on",
+          "limits": {}
+        },
+        {
+          "type_id": "ice_machine",
+          "count": 1,
+          "importance": "deferrable",
+          "limits": {
+            "max_delay_min": 60,
+            "must_finish_by": "22:00"
+          }
+        },
+        {
+          "type_id": "fryer",
+          "count": 1,
+          "importance": "always_on",
+          "limits": {}
+        },
+        {
+          "type_id": "oven",
+          "count": 1,
+          "importance": "always_on",
+          "limits": {}
+        },
+        {
+          "type_id": "grill",
+          "count": 1,
+          "importance": "always_on",
+          "limits": {}
+        },
+        {
+          "type_id": "dishwasher",
+          "count": 1,
+          "importance": "deferrable",
+          "limits": {
+            "max_delay_min": 60,
+            "must_finish_by": "19:30"
+          }
+        },
+        {
+          "type_id": "water_heater",
+          "count": 1,
+          "importance": "flexible",
+          "limits": {
+            "min_power_pct": 40,
+            "max_reduce_min": 30
+          }
+        },
+        {
+          "type_id": "lights",
+          "count": 1,
+          "importance": "always_on",
+          "limits": {}
+        }
+      ],
+      "peak_mode": "cap",
+      "peak_cap_kw": 40.0,
+      "operating_hours": {
+        "open": "10:00",
+        "close": "22:00"
+      },
+      "location": {
+        "lat": 37.8,
+        "lon": -122.44,
+        "label": "Marina, San Francisco"
+      },
+      "owner_preferences": "Keep the dining room comfortable during dinner service.",
+      "authority": {
+        "enabled": true,
+        "max_cap_overrun_kw": 3.0,
+        "max_extra_delay_min": 20,
+        "max_extra_reduce_min": 15,
+        "may_go_below_min_power": false
+      },
+      "tariff_id": "demo_tariff_v1",
+      "seed": 42
+    },
+    "devices": [
+      {
+        "device_id": "hvac_1",
+        "type_id": "hvac",
+        "name": "HVAC 1",
+        "importance": "flexible",
+        "state": "on",
+        "power_kw": 9.76,
+        "rated_kw": 12.0,
+        "power_pct": 81,
+        "source": "simulated",
+        "physical": {
+          "indoor_temp_c": 25.6
+        }
+      },
+      {
+        "device_id": "hvac_2",
+        "type_id": "hvac",
+        "name": "HVAC 2",
+        "importance": "flexible",
+        "state": "reduced",
+        "power_kw": 5.4,
+        "rated_kw": 12.0,
+        "power_pct": 45,
+        "source": "simulated",
+        "physical": {
+          "indoor_temp_c": 25.6
+        }
+      },
+      {
+        "device_id": "walk_in_cooler_1",
+        "type_id": "walk_in_cooler",
+        "name": "Walk-in cooler 1",
+        "importance": "flexible",
+        "state": "on",
+        "power_kw": 3.5,
+        "rated_kw": 3.5,
+        "power_pct": 100,
+        "source": "simulated",
+        "physical": {
+          "box_temp_c": 2.0
+        }
+      },
+      {
+        "device_id": "reach_in_fridge_1",
+        "type_id": "reach_in_fridge",
+        "name": "Reach-in fridge 1",
+        "importance": "always_on",
+        "state": "on",
+        "power_kw": 0.0,
+        "rated_kw": 0.8,
+        "power_pct": 0,
+        "source": "simulated",
+        "physical": {
+          "box_temp_c": 5.0
+        }
+      },
+      {
+        "device_id": "freezer_1",
+        "type_id": "freezer",
+        "name": "Freezer 1",
+        "importance": "always_on",
+        "state": "on",
+        "power_kw": 0.0,
+        "rated_kw": 1.4,
+        "power_pct": 0,
+        "source": "simulated",
+        "physical": {
+          "box_temp_c": -19.0
+        }
+      },
+      {
+        "device_id": "ice_machine_1",
+        "type_id": "ice_machine",
+        "name": "Ice machine 1",
+        "importance": "deferrable",
+        "state": "off",
+        "power_kw": 0.0,
+        "rated_kw": 1.6,
+        "power_pct": 0,
+        "source": "simulated",
+        "physical": {
+          "ice_level_pct": 45,
+          "job_remaining_min": 0
+        }
+      },
+      {
+        "device_id": "fryer_1",
+        "type_id": "fryer",
+        "name": "Fryer 1",
+        "importance": "always_on",
+        "state": "on",
+        "power_kw": 5.14,
+        "rated_kw": 14.0,
+        "power_pct": 37,
+        "source": "simulated",
+        "physical": {
+          "orders_in_progress": 14
+        }
+      },
+      {
+        "device_id": "oven_1",
+        "type_id": "oven",
+        "name": "Oven 1",
+        "importance": "always_on",
+        "state": "on",
+        "power_kw": 3.68,
+        "rated_kw": 10.0,
+        "power_pct": 37,
+        "source": "simulated",
+        "physical": {
+          "orders_in_progress": 14
+        }
+      },
+      {
+        "device_id": "grill_1",
+        "type_id": "grill",
+        "name": "Grill 1",
+        "importance": "always_on",
+        "state": "on",
+        "power_kw": 3.18,
+        "rated_kw": 8.0,
+        "power_pct": 40,
+        "source": "simulated",
+        "physical": {
+          "orders_in_progress": 14
+        }
+      },
+      {
+        "device_id": "dishwasher_1",
+        "type_id": "dishwasher",
+        "name": "Dishwasher 1",
+        "importance": "deferrable",
+        "state": "running_job",
+        "power_kw": 6.0,
+        "rated_kw": 6.0,
+        "power_pct": 100,
+        "source": "simulated",
+        "physical": {
+          "dirty_racks": 0,
+          "job_remaining_min": 20
+        }
+      },
+      {
+        "device_id": "water_heater_1",
+        "type_id": "water_heater",
+        "name": "Water heater 1",
+        "importance": "flexible",
+        "state": "reduced",
+        "power_kw": 1.8,
+        "rated_kw": 4.5,
+        "power_pct": 40,
+        "source": "simulated",
+        "physical": {
+          "box_temp_c": 54.0
+        }
+      },
+      {
+        "device_id": "lights_1",
+        "type_id": "lights",
+        "name": "Lights 1",
+        "importance": "always_on",
+        "state": "on",
+        "power_kw": 2.4,
+        "rated_kw": 2.4,
+        "power_pct": 100,
+        "source": "simulated"
+      }
+    ],
+    "tariff": {
+      "tariff_id": "demo_tariff_v1",
+      "name": "WattWise demo commercial rate",
+      "label": "illustrative",
+      "currency": "USD",
+      "timezone": "America/Los_Angeles",
+      "energy": [
+        {
+          "name": "off_peak",
+          "start": "00:00",
+          "end": "16:00",
+          "usd_per_kwh": 0.22
+        },
+        {
+          "name": "peak",
+          "start": "16:00",
+          "end": "21:00",
+          "usd_per_kwh": 0.38
+        },
+        {
+          "name": "off_peak",
+          "start": "21:00",
+          "end": "24:00",
+          "usd_per_kwh": 0.22
+        }
+      ],
+      "demand": [
+        {
+          "name": "max_demand",
+          "window": null,
+          "usd_per_kw": 20.0
+        },
+        {
+          "name": "peak_demand",
+          "window": {
+            "start": "16:00",
+            "end": "21:00"
+          },
+          "usd_per_kw": 8.0
+        }
+      ]
+    }
+  }
+}

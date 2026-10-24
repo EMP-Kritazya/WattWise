@@ -1,0 +1,10 @@
+{
+  "type": "comparison",
+  "data": {
+    "ts": "2026-07-18T02:30:00Z",
+    "saved_today_usd": 4.72,
+    "peak_avoided_kw": 9.29,
+    "month_peak_without_kw": 49.19,
+    "month_peak_with_kw": 39.9
+  }
+}

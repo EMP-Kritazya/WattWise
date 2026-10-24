@@ -8,10 +8,13 @@
   and registration through the Cal Hacks ASI:One Submission Agent.
 
 ## Demo mode
-`DEMO_MODE=1`: fixed seed, preset "Demo Café" kitchen (Marina, SF), Friday 17:30, hot evening, Giants game at 19:05
+`DEMO_MODE=1`: fixed seed, preset "Demo Café" kitchen (Marina, SF; all 11 catalog types, hvac × 2, dishwasher must finish by
+19:30), the made-up `demo_tariff_v1` (same in every run) until the real URDB rate is chosen, Friday 17:30, hot evening, Giants game at 19:05
 (recorded context), speed 120×, one escalation scripted to appear ~2 min in, cached backtest,
 AI explanations live if they arrive within 3 s (else template), recorded video as final fallback.
-Live view over SpacetimeDB (`LIVE_TRANSPORT=ws` fallback). ESP32 on if healthy (`HARDWARE=esp32`), else simulated hub.
+Live view over SpacetimeDB (`LIVE_TRANSPORT=ws` fallback). The demo laptop keeps the `/sim` tab open (the sim host);
+every other screen and phone is a viewer. Fake sim host (`HUB_IMPL=fake`) as the last-resort fallback. ESP32 on if healthy
+(`HARDWARE=esp32`), else browser hub only.
 Demo laptop and ESP32 on a phone hotspot, not venue WiFi.
 
 ## Roles at the table

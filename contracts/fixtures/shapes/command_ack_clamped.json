@@ -1,0 +1,7 @@
+{
+  "command_id": "c_0021",
+  "lane": "with",
+  "ok": true,
+  "applied_value": 20,
+  "reason": "out_of_range"
+}

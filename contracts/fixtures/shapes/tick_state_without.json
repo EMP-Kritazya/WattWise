@@ -1,0 +1,212 @@
+{
+  "lane": "without",
+  "ts": "2026-07-18T01:30:00Z",
+  "hub": {
+    "hub_id": "sim_hub",
+    "lane": "without",
+    "tick_id": 60,
+    "ts": "2026-07-18T01:30:00Z",
+    "total_kw": 52.86,
+    "customers_per_hour": 113,
+    "devices": [
+      {
+        "device_id": "hvac_1",
+        "type_id": "hvac",
+        "name": "HVAC 1",
+        "importance": "flexible",
+        "state": "on",
+        "power_kw": 8.08,
+        "rated_kw": 12.0,
+        "power_pct": 67,
+        "source": "simulated",
+        "physical": {
+          "indoor_temp_c": 22.5
+        }
+      },
+      {
+        "device_id": "hvac_2",
+        "type_id": "hvac",
+        "name": "HVAC 2",
+        "importance": "flexible",
+        "state": "on",
+        "power_kw": 8.08,
+        "rated_kw": 12.0,
+        "power_pct": 67,
+        "source": "simulated",
+        "physical": {
+          "indoor_temp_c": 22.5
+        }
+      },
+      {
+        "device_id": "walk_in_cooler_1",
+        "type_id": "walk_in_cooler",
+        "name": "Walk-in cooler 1",
+        "importance": "flexible",
+        "state": "on",
+        "power_kw": 3.5,
+        "rated_kw": 3.5,
+        "power_pct": 100,
+        "source": "simulated",
+        "physical": {
+          "box_temp_c": 2.3
+        }
+      },
+      {
+        "device_id": "reach_in_fridge_1",
+        "type_id": "reach_in_fridge",
+        "name": "Reach-in fridge 1",
+        "importance": "always_on",
+        "state": "on",
+        "power_kw": 0.8,
+        "rated_kw": 0.8,
+        "power_pct": 100,
+        "source": "simulated",
+        "physical": {
+          "box_temp_c": 2.7
+        }
+      },
+      {
+        "device_id": "freezer_1",
+        "type_id": "freezer",
+        "name": "Freezer 1",
+        "importance": "always_on",
+        "state": "on",
+        "power_kw": 1.4,
+        "rated_kw": 1.4,
+        "power_pct": 100,
+        "source": "simulated",
+        "physical": {
+          "box_temp_c": -19.4
+        }
+      },
+      {
+        "device_id": "ice_machine_1",
+        "type_id": "ice_machine",
+        "name": "Ice machine 1",
+        "importance": "deferrable",
+        "state": "running_job",
+        "power_kw": 1.6,
+        "rated_kw": 1.6,
+        "power_pct": 100,
+        "source": "simulated",
+        "physical": {
+          "ice_level_pct": 64,
+          "job_remaining_min": 6
+        }
+      },
+      {
+        "device_id": "fryer_1",
+        "type_id": "fryer",
+        "name": "Fryer 1",
+        "importance": "always_on",
+        "state": "on",
+        "power_kw": 7.48,
+        "rated_kw": 14.0,
+        "power_pct": 53,
+        "source": "simulated",
+        "physical": {
+          "orders_in_progress": 23
+        }
+      },
+      {
+        "device_id": "oven_1",
+        "type_id": "oven",
+        "name": "Oven 1",
+        "importance": "always_on",
+        "state": "on",
+        "power_kw": 4.76,
+        "rated_kw": 10.0,
+        "power_pct": 48,
+        "source": "simulated",
+        "physical": {
+          "orders_in_progress": 23
+        }
+      },
+      {
+        "device_id": "grill_1",
+        "type_id": "grill",
+        "name": "Grill 1",
+        "importance": "always_on",
+        "state": "on",
+        "power_kw": 4.26,
+        "rated_kw": 8.0,
+        "power_pct": 53,
+        "source": "simulated",
+        "physical": {
+          "orders_in_progress": 23
+        }
+      },
+      {
+        "device_id": "dishwasher_1",
+        "type_id": "dishwasher",
+        "name": "Dishwasher 1",
+        "importance": "deferrable",
+        "state": "running_job",
+        "power_kw": 6.0,
+        "rated_kw": 6.0,
+        "power_pct": 100,
+        "source": "simulated",
+        "physical": {
+          "dirty_racks": 2,
+          "job_remaining_min": 7
+        }
+      },
+      {
+        "device_id": "water_heater_1",
+        "type_id": "water_heater",
+        "name": "Water heater 1",
+        "importance": "flexible",
+        "state": "on",
+        "power_kw": 4.5,
+        "rated_kw": 4.5,
+        "power_pct": 100,
+        "source": "simulated",
+        "physical": {
+          "box_temp_c": 60.1
+        }
+      },
+      {
+        "device_id": "lights_1",
+        "type_id": "lights",
+        "name": "Lights 1",
+        "importance": "always_on",
+        "state": "on",
+        "power_kw": 2.4,
+        "rated_kw": 2.4,
+        "power_pct": 100,
+        "source": "simulated"
+      }
+    ],
+    "acks": [],
+    "source": "simulated"
+  },
+  "meter": {
+    "ts": "2026-07-18T01:30:00Z",
+    "total_kw": 52.86,
+    "block_avg_kw": 49.19,
+    "block_start": "2026-07-18T01:15:00Z",
+    "month_peak_kw": 49.19,
+    "peak_mode": "cap",
+    "peak_cap_kw": 40.0,
+    "target_kw": 40.0,
+    "energy_kwh_today": 326.143,
+    "price_usd_per_kwh_now": 0.38,
+    "cost_usd_today": 87.95,
+    "cost_usd_month": 1922.5
+  },
+  "customers_per_hour": 113,
+  "new_decisions": [],
+  "new_commands": [],
+  "new_escalations": [],
+  "indoor_temp_c": 22.5,
+  "forecast_kw": [
+    44.9,
+    41.9,
+    34.9,
+    33.6,
+    40.2,
+    40.0,
+    34.7,
+    32.1
+  ]
+}

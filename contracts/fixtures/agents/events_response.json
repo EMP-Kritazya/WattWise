@@ -1,0 +1,13 @@
+{
+  "items": [
+    {
+      "name": "Giants vs Dodgers",
+      "venue": "Oracle Park",
+      "start": "2026-07-18T02:05:00Z",
+      "distance_km": 1.8,
+      "expected_attendance": 40000
+    }
+  ],
+  "source": "demo_events",
+  "label": "recorded"
+}

@@ -1,0 +1,15 @@
+{
+  "device_id": "dishwasher_1",
+  "type_id": "dishwasher",
+  "name": "Dishwasher 1",
+  "importance": "deferrable",
+  "state": "running_job",
+  "power_kw": 5.8,
+  "rated_kw": 6.0,
+  "power_pct": 97,
+  "source": "measured",
+  "physical": {
+    "dirty_racks": 0,
+    "job_remaining_min": 25
+  }
+}

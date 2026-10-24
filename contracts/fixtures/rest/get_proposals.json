@@ -1,0 +1,23 @@
+{
+  "method": "GET",
+  "path": "/api/proposals?status=pending",
+  "status": 200,
+  "request": null,
+  "response": [
+    {
+      "proposal_id": "p_0001",
+      "ts": "2026-07-18T02:30:00Z",
+      "kind": "importance",
+      "payload": {
+        "device_id": "walk_in_cooler_1",
+        "importance": "always_on",
+        "limits": {}
+      },
+      "summary": "Never touch the walk-in after 21:00",
+      "status": "pending",
+      "created_by": "ai",
+      "confirmed_via": null,
+      "expires_at": "2026-07-18T03:00:00Z"
+    }
+  ]
+}

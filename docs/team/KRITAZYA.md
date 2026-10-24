@@ -1,52 +1,87 @@
-# Kritazya — Engine brain, data + proof, SpacetimeDB, Azure backend
+# KRITAZYA.md — your working instructions (Engine + SpacetimeDB + contracts/fixtures + data/proof + Azure backend)
 
-**Branch:** `kritazya` · **Merge order:** first at every gate · **Mission:** every number is right, and every screen sees it live.
+> **Claude Code: this file is Kritazya's instruction set.** Read it first in every session, together with the golden rules in
+> `CLAUDE.md`. When this file and a general doc disagree about *what Kritazya builds or may touch*, this file wins.
+> Kritazya owns `docs/CONTRACTS.md` and `contracts/`; changing a shared shape still means: CONTRACTS.md → `contract-sync` →
+> `fixture-builder` → tell Suyog and Ashirwad.
 
-## You own
-`backend/contracts/` · `backend/engine/` (except devices.py, hub.py, customers.py) · `backend/backtest/` · `backend/data/` (except
-equipment_catalog.json) · `backend/live/` · `backend/fakes/fake_live.py` · `spacetime/` · `infra/` Container Apps ·
-tests in `backend/tests/{engine,backtest,live}`. **Don't edit:** api/, runtime/, agent/, agents/, store/, convex/, firmware/, frontend/,
-simulation files.
+**Branch:** `kritazya` (create it from `architecture-separation` if it doesn't exist) · **Mission:** every number is right, and
+every screen sees it live.
 
-## You provide (others build against these)
-| To | What | When |
-|---|---|---|
-| Everyone | `backend/contracts/` Pydantic models matching CONTRACTS.md | Phase 1 |
-| Suyog | Engine facade (S2): stubs in Phase 1, real by Merge 2/3; `backend/live` client (S3) | Phase 1 stubs |
-| Ashirwad | SpacetimeDB module + generated bindings + seed rows (S3); hub interface (S6) the simulation implements | Phase 1 |
+## 1. Your job in one paragraph
+You build the **engine**: pure Python that takes each lane's HubReport (the hub's current state) every tick, meters energy and
+cost on a real tariff, forecasts, and every 5th tick decides Commands inside the owner's rules; when no such move holds the
+peak goal it escalates with 2–3 evaluated alternatives + `ask_owner` and validates whatever Claude or the owner picks. You build
+**SpacetimeDB** (module + Python live client), the UI's live source for charts and engine results. You keep the **contracts and
+fixtures** that let the other two build without you, and the **backtest** that proves savings on ComStock data + a URDB tariff.
 
-## You consume (build against fakes until real)
-Simulation via `engine/fake_hub.py` (Ashirwad) · nothing from Suyog (the engine has no I/O).
+## 2. Scope — exactly what you may edit
+| You may create and edit | Never edit (read only) |
+|---|---|
+| `backend/engine/`, `backend/backtest/`, `backend/data/` (except `equipment_catalog.json`) | `backend/api/`, `backend/runtime/`, `backend/agent/`, `backend/store/`, `backend/fakes/fake_kitchen.py`, `backend/fakes/fake_hub_client.py` |
+| `backend/contracts/`, `contracts/` (schema + `fixtures/` via `fixture-builder`) | `agents/`, `convex/`, `firmware/` |
+| `backend/live/`, `backend/fakes/fake_live.py`, `spacetime/` | `frontend/`, `backend/data/equipment_catalog.json` |
+| `backend/tests/{engine,backtest,live}/`, `infra/` Container Apps | Docs: only `CONTRACTS.md`, `design/ENGINE.md`, `design/SPACETIMEDB.md`, `design/DATA_AND_PROOF.md`, `design/AZURE.md` and this file |
 
-## Phase tasks
-**Phase 0 (before Sat 12 AM)** — [ ] pick ComStock building + county and tariff (DECISIONS 27, 28) · [ ] Azure subscription, resource group
-**Phase 1 (12–2 AM)**
-- [ ] `backend/contracts/` from CONTRACTS.md + `contracts/ws_messages.schema.json`
-- [ ] `engine/__init__.py` exports + facade stubs (`Kitchen` methods raise `NotImplementedError`, shapes correct)
-- [ ] SpacetimeDB module: all tables + reducers + identity check + `prune`; `spacetime build`; bindings generated; `seed.ts`
-- [ ] **Verify the HTTP reducer call from Python** on the installed version; record DECISIONS 29
-- [ ] `backend/live/spacetime_client.py` (publish_ticks, publish_feed, set_clock, publish_context, publish_escalation, log_agent, read/consume surges) + `fakes/fake_live.py`
-- [ ] Azure: Container Apps environment + `backend` and `agents` apps (skeleton image), health probe
-**Phase 2 (2–9 AM)**
-- [ ] Meter (+ hand test) · `step()` wiring with the hub interface · `warm_up()` · `snapshot()` · `owner_command()` · `ingest_reading()`
-- [ ] `context.py` + `set_context()` (crowd multiplier, outdoor temp passthrough) · `compare_lanes()` (+ hand test)
-- [ ] Publish real ticks through the live client with Suyog at Merge 2
-**Phase 3 (9 AM–3 PM)**
-- [ ] Forecaster (+ context terms) · target · decider · executor · rules · ledger · undo · `what_if` · `new_commands`
-- [ ] `escalation.py`: options, projections, `within_authority`, default, `resolve_escalation`, deadline → `expired_default`
-- [ ] All ENGINE.md section 7 tests; run `engine-math-verifier`
-**Phase 4 (3–9 PM)**
-- [ ] Data loader, distribution recipe, replay (15-min, no peeking), `run_backtest` (3 policies × 12 months, Jan partial, default escalations), checks, sensitivity, cache → Convex via Suyog's endpoint
-- [ ] Run `backtest-auditor`; numbers for DEMO.md brackets
-**Phase 5 (9 PM–4 AM)** — [ ] Release deploy of `backend` + `agents` on Azure; secrets; probe · [ ] Pitch the Proof part; rehearse
+## 3. Rules for this phase (independent development)
+1. **Build only against the fake data** in `contracts/fixtures/` (section 5) for everything you don't own. The engine never
+   imports from api/, runtime/, agent/, store/, live/, and never does I/O (golden rule 7).
+2. **Do not merge** anything or pull teammates' branches into yours. Commit to `kritazya` only. Integration comes later, on your call.
+3. **Contract changes are the only structural changes you make**, and only through the sequence above. Don't touch other people's code.
+4. **Never hand-edit fixtures**: change `generate.py` (via `fixture-builder`), regenerate, run `check.py`.
+5. Fixture numbers are illustrative; never show them as savings. Real numbers only from tested engine code + `backtest-auditor`.
 
-## Definition of done (your scope)
-Hand-computed tests pass · engine runs with no network · identical `DEMO_MODE` runs · escalations always resolve (Claude, owner or default) ·
-live client never blocks · backtest checks all green.
+## 4. What to build (in order; tick when done and tested)
+**A. Shared foundations (unblocks everyone's real integration later)**
+- [ ] `backend/contracts/` Pydantic v2 models for every CONTRACTS.md shape + `contracts/ws_messages.schema.json` (viewer `/ws` + `/ws/hub`); validate every fixture with them
+- [ ] Work through `Main_Gaps.md` (repo root): every gap has a demo decision in CONTRACTS.md; redesign the ☐ rows, then CONTRACTS.md → `contract-sync` → `fixture-builder`
+- [ ] `engine/__init__.py` exports (`Kitchen`, `run_backtest`, `compare_lanes`, `RuleError`) + facade stubs with correct shapes
 
-## Session starter (paste into Claude Code)
+**B. SpacetimeDB** — design: `docs/design/SPACETIMEDB.md`, CONTRACTS.md §5
+- [ ] Module: every table + reducer, runtime identity check, `prune`; `spacetime build`; generated TS bindings; `seed.ts` from `fixtures/spacetime/tables/`
+- [ ] Verify the HTTP reducer call from Python on the installed version (record the result in `docs/design/SPACETIMEDB.md`)
+- [ ] `backend/live/spacetime_client.py` (publish_ticks, publish_feed, set_clock, publish_context, publish_escalation, log_agent, read/consume surges), never blocking; `fakes/fake_live.py`; payloads equal `fixtures/spacetime/reducers/*.json`
+
+**C. Engine** — design: `docs/design/ENGINE.md` (draft; internals are yours to decide)
+- [ ] Decide and document: warm-up history source · target in `minimize` mode (GAPS G35) · planning model for option projections · early-escalation lead (≥ 30 sim min, deadline = block start − 5 min, chosen strategy)
+- [ ] Meter (+ hand test): energy, 15-min blocks, month peak, energy price now, cost today/month on the tariff
+- [ ] `step(1, hub_report)` on fixture HubReports; acks consumed; decisions only on `tick_id % 5 == 0`; Commands out in `new_commands`
+- [ ] Context (`set_context`), forecaster, decider, rules (limits are hard: e.g. `must_finish_by`), ledger, undo, `what_if`, `compare_lanes`
+- [ ] Escalation: options, projections, `within_authority`, default, `resolve_escalation`, deadline → `expired_default`
+- [ ] All ENGINE.md §7 hand-computed tests; run `engine-math-verifier`
+
+**D. Data + proof** — design: `docs/design/DATA_AND_PROOF.md`
+- [ ] Pick the ComStock building + county and the URDB tariff (same region); loader, distribution recipe, replay (no peeking), `run_backtest` (without / timer / with × 12 months), checks, sensitivity; run `backtest-auditor`
+
+**E. Azure** — design: `docs/design/AZURE.md`
+- [ ] Container Apps `backend` + `agents` (1 replica each), secrets, health probe
+
+## 5. Your fake data (all in `contracts/fixtures/`, which you own)
+| You need | Use this |
+|---|---|
+| Engine input (what the browser hub sends) | `hub_protocol/hub_to_server.jsonl` (120 ticks × 2 lanes), `shapes/hub_report_*.json`, `shapes/command_ack_*.json` |
+| Expected output shapes (not values) | `facade/step_stream.jsonl`, `facade/*.json`, `shapes/tick_state_*.json`, `shapes/escalation_*.json`, `shapes/meter.json` |
+| Context the engine receives | `shapes/context.json`, `agents/context_post.json` |
+| SpacetimeDB rows + reducer args | `spacetime/tables/*.json`, `spacetime/reducers/*.json`, `spacetime/rows_stream.jsonl` |
+| Scenario + open questions | `scenario/demo_cafe/`, `README.md`, `GAPS.md` |
+
+## 6. Big-picture docs
+`docs/ARCHITECTURE.md` · `docs/CONTRACTS.md` (all; you own it) · `docs/design/ENGINE.md` · `SPACETIMEDB.md` · `DATA_AND_PROOF.md` ·
+`AZURE.md` · `docs/PRINCIPLES.md`. Teammates' instructions: `docs/team/SUYOG.md`, `docs/team/ASHIRWAD.md`.
+
+## 7. Checks before you say "done"
+`pytest backend/tests/{engine,backtest,live}` passes · hand-computed tests included · engine runs with no network · identical
+`DEMO_MODE` runs · escalations always resolve (Claude, owner or default) · live client never blocks · `spacetime build` passes ·
+`python3 contracts/fixtures/check.py` passes after any contract change · backtest checks all green before any savings number.
+
+## 8. Out of scope — do not do these
+FastAPI, run loop, Claude prompts/tools, Fetch agents, Convex, firmware, frontend code · editing teammates' folders · merging or
+rebasing with other branches · shape changes that skip CONTRACTS.md → `contract-sync` → `fixture-builder`.
+
+## 9. Session starter (paste into Claude Code)
 ```
-ROLE = kritazya. Read CLAUDE.md, docs/team/KRITAZYA.md, docs/ARCHITECTURE.md, docs/CONTRACTS.md, and the design doc for
-today's task (ENGINE / SPACETIMEDB / DATA_AND_PROOF / AZURE). Stay inside my folders. Task: <task>. Restate it in ≤5 lines
-with the files you'll touch and the gate, then plan if >50 lines.
+ROLE = kritazya. Read docs/team/KRITAZYA.md first (it is my instruction set), then CLAUDE.md golden rules, and only the docs it
+lists for today's task. Build only inside my scope, against contracts/fixtures/ for anything I don't own. Do not merge, do not
+edit teammates' folders. Task: <task>. Restate it in ≤5 lines with the files you'll touch and the fixtures you'll use; plan
+first if >50 lines. End with: what changed, tests run, stubs, contract changes, next subagent.
 ```

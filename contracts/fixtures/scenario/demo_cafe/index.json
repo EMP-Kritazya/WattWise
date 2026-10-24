@@ -1,0 +1,53 @@
+{
+  "server_to_hub": "hub_protocol/server_to_hub.jsonl",
+  "hub_to_server": "hub_protocol/hub_to_server.jsonl",
+  "engine_steps": "facade/step_stream.jsonl",
+  "spacetime_publish_ticks": "spacetime/rows_stream.jsonl",
+  "viewer_ws": "ws/stream.jsonl",
+  "agent_log": "agents/agent_log.jsonl",
+  "escalation": {
+    "open": "shapes/escalation_open.json",
+    "resolved": "shapes/escalation_resolved_claude.json"
+  },
+  "decision_ids": [
+    "d_0001",
+    "d_0002",
+    "d_0003",
+    "d_0004",
+    "d_0005",
+    "d_0006",
+    "d_0007",
+    "d_0008",
+    "d_0009",
+    "d_0010",
+    "d_0011",
+    "d_0012",
+    "d_0013",
+    "d_0014",
+    "d_0015",
+    "d_0016"
+  ],
+  "command_ids": [
+    "c_0001",
+    "c_0002",
+    "c_0003",
+    "c_0004",
+    "c_0008",
+    "c_0009",
+    "c_0010",
+    "c_0011",
+    "c_0012",
+    "c_0013",
+    "c_0014",
+    "c_0015",
+    "c_0016",
+    "c_0017",
+    "c_0018",
+    "c_0019"
+  ],
+  "escalation_option_command_ids": [
+    "c_0005",
+    "c_0006",
+    "c_0007"
+  ]
+}

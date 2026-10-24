@@ -1,23 +1,35 @@
-# Design: Simulation (owner: Ashirwad; lives in `engine/`, so every engine rule applies)
+# Design: Simulation + Hub (owner: Ashirwad; runs in the browser, in the sim host tab)
 
 ## Principles
-- Physical, not clever: devices follow simple physics and usage; no optimisation here.
-- Deterministic: same config + seed + inputs → identical output. No clock: moves only on `step()`.
-- One hub: every reading out and every command in goes through the hub interface (the swap point for a real ESP32).
+- Physical, not clever: appliances follow simple physics and usage; no optimisation here.
+- Deterministic: same config + seed + the same sequence of `sim_tick`s → identical readings. No `Math.random()`, no
+  `Date.now()` inside `src/sim/` or `src/hub/` (lint rule); one seeded PRNG per kitchen.
+- Tick-driven: the simulation steps only when FastAPI sends a `sim_tick` (1 simulated minute). It has no clock of its own.
+- One hub: every reading out and every command in goes through the hub (the swap point for a real ESP32).
+- Blind to the engine: the simulation never sees forecasts, decisions, the cap or costs. It receives Commands and reports state.
+- Physics has the last word: an appliance applies a command within its physical limits and acks what really happened.
 - Sourced numbers: power values from FSTC / ENERGY STAR with `source_note`.
-- No I/O and no network: simulation files live in `engine/` and follow every engine rule.
 
-The simulated restaurant: devices that draw power, customers that drive them, and one hub box that every
-device reports to. The frontend **draws** this kitchen; the engine **is** this kitchen.
+The simulated restaurant: appliances that draw power, customers that drive them, and one hub (ESP32-style controller) that
+every appliance reports to. It runs only in the **sim host** tab (`/sim`); every other tab, and the UI in the sim host tab
+itself, draws the kitchen from SpacetimeDB, not from this code.
+
+```
+ FastAPI ──sim_tick (commands, surges, inputs)──▶ HUB ──apply(command)──▶ appliances ◀── customers (seeded)
+    ▲                                              │                          │
+    └──────────── hub_report (HubReport × 2, acks) ◀── reading() ─────────────┘
+```
 
 ## Parts
 | Part | File | What it does |
 |---|---|---|
-| Equipment catalog | `data/equipment_catalog.json` | Every equipment type the owner can add (EquipmentType in CONTRACTS.md) |
-| Devices | `engine/devices.py` | One object per unit; computes its power each step from its power model |
-| Customers | `engine/customers.py` | `CustomerSource`: seeded arrivals from an hourly profile + surge events |
-| Hub | `engine/hub.py` | Collects every device's power each step (HubReport); delivers Commands to devices |
-| Kitchen | `engine/kitchen.py` | Builds devices from KitchenConfig, wires hub + brain, exposes the facade |
+| Equipment catalog | `backend/data/equipment_catalog.json` | Every equipment type (EquipmentType in CONTRACTS.md); served by `GET /api/catalog` and sent in `sim_build` |
+| Appliances | `frontend/src/sim/appliances/` | One unit each, holding its current state as React state (power, mode, physical); computes its power each minute from its power model (Appliance interface, CONTRACTS.md §9) |
+| Customers | `frontend/src/sim/customers.ts` | Seeded arrivals from an hourly profile × crowd multiplier + surges from `sim_tick` |
+| Kitchen | `frontend/src/sim/kitchen.ts` | Builds both lanes (`without`, `with`) from `sim_build`; same customer stream for both |
+| Hub | `frontend/src/hub/hub.ts` | Applies Commands, collects readings into a HubReport per lane, acks commands |
+| Hub link | `frontend/src/hub/link.ts` | `/ws/hub` client: `hub_hello`, handles `sim_build` / `sim_tick` / `sim_control`, sends `hub_report` (CONTRACTS.md §8) |
+| Mock server | `frontend/src/mocks/mockHubServer.ts` | Plays `contracts/fixtures/hub_protocol/server_to_hub.jsonl`, so the simulation runs without FastAPI |
 
 ## Equipment catalog (starting set)
 Power values below are **placeholders**: replace each with a figure from FSTC test reports or ENERGY STAR specs
@@ -37,59 +49,50 @@ and record the source in `source_note`. Only electric equipment (gas appliances 
 | water_heater | water_heating | flexible | cycling | Can run at reduced power and recover later |
 | lights | lighting | always_on | fixed | On during opening hours |
 
-Owner can change importance per device (with limits) in the Kitchen Builder, and the count per type (0 = not present).
-Each type also carries `default_limits` (CONTRACTS.md) that pass `rules.py`: e.g. `walk_in_cooler` starts flexible with
-`min_power_pct: 50` (food-safety floor), `hvac` flexible with 40, `dishwasher` deferrable with `max_delay_min: 60`.
+`params` keys per power model are fixed by CONTRACTS.md (EquipmentType). Owner can change importance per device (with limits) in the Kitchen Builder, and the count per type (0 = not present).
+Each type also carries `default_limits` (CONTRACTS.md) that must pass the engine's rules check: e.g. `walk_in_cooler` starts
+flexible with `min_power_pct: 50` (food-safety floor), `hvac` flexible with 40, `dishwasher` deferrable with `max_delay_min: 60`.
 
 ## Power models
-| Model | Rule each step |
+| Model | Rule each minute |
 |---|---|
 | `fixed` | `rated_kw` when on, 0 when off |
 | `cycling` | On/off duty cycle that keeps a temperature inside a band; more door openings when busy → more on-time |
-| `thermal` | Simple RC model: `dT_in/dt = (T_out − T_in)/(R·C) − Q_cool/C`; unit runs to hold the setpoint. Outdoor temp from a fixed daily curve (summer day). Cut item 3: replace with a fixed HVAC curve if short on time |
+| `thermal` | One dining-room temperature per kitchen, shared by every HVAC unit. Simple RC model: `dT_in/dt = (T_out − T_in)/(R·C) − Q_cool/C`; unit runs to hold the setpoint. Outdoor temp from `sim_tick.inputs.outdoor_temp_c`, else a fixed summer-day curve. Cut item: fixed HVAC curve if short on time |
 | `demand_driven` | `idle_kw` + `kw_per_order × orders_in_progress`, capped at `rated_kw` |
 | `job` | Runs a fixed cycle (`rated_kw` for `cycle_min`) when triggered; trigger = dirty racks ≥ N (dishwasher) or ice level low (ice machine) |
 
-## Importance behaviour (what the engine is allowed to do)
-| Importance | Engine may | Limits |
+## How Commands act on appliances (what the engine may ask for)
+| Importance | Commands the engine may send | Appliance behaviour |
 |---|---|---|
-| `always_on` | nothing | – |
-| `flexible` | reduce power to `min_power_pct` for up to `max_reduce_min` | Never stops. Energy not used is **owed** (`owed_kwh` ledger, ENGINE.md 6b) and paid back the same day, so daily energy is conserved |
-| `deferrable` | delay a job start | Up to `max_delay_min`, and must finish by `must_finish_by` |
+| `always_on` | none (the engine never commands them; owner clicks only) | – |
+| `flexible` | `reduce` (value = power %), `restore` | Runs at the given % of its normal draw; physics continues (temperature drifts), catch-up after `restore` |
+| `deferrable` | `delay` (value = minutes), `start` | A queued job waits (state `waiting`) and starts when told or when the delay ends; a running job cannot be delayed (`ack.reason: job_running`) |
+The rules (limits, food-safety floor, deadlines) are enforced by the engine before a Command is sent; appliances only enforce physics.
 
 ## Customers
-- Hourly profile by weekday (synthetic, labeled "simulated customer flow"): lunch peak ~12:00–13:30, dinner peak ~18:30–20:30.
-- `CustomerSource(seed, profile).events(ts, minutes, surges)` returns arrivals for this step (Poisson, seeded).
-- Surge events from the UI ("+40 customers for 60 min") are added on top.
-- The run loop creates **one** source and passes identical events to both lanes.
+- Hourly profile by weekday (labeled "simulated customer flow"): lunch peak ~12:00–13:30, dinner peak ~18:30–20:30.
+- Arrivals per minute: Poisson with the seeded PRNG, × `inputs.crowd_multiplier`, plus active surges (a surge arrives once in
+  `sim_tick.surges` and stays active for its `duration_min`).
+- One stream drives both lanes, so the two kitchens see the same customers.
+- Customers → orders (cooking load) and dirty racks (dishwasher trigger).
 
-## Hub (simulated ESP32) — the swap point
-Interface (CONTRACTS.md section 8): `report(ts)`, `deliver(command)`, `devices()`. The brain uses nothing else.
-- `engine/fake_hub.py` (Phase 1): same interface, constant/sine power, honours commands trivially. Kritazya builds the
-  brain against it until the real devices exist.
-- Each step: every device reports `{device_id, power_kw, state}`; the hub sums them into a HubReport.
-- Commands from the engine (or owner clicks) go **through the hub** to the device. The hub logs every command.
-- The hub is the only thing the brain reads from and writes to, which is exactly how a real ESP32 hub would work.
-
-### Context inputs
-`step()` receives the outdoor temperature (from context) for the thermal model and the crowd multiplier for customers.
-No context → the fixed summer-day curve and multiplier 1.0.
-
-### Bridge test without hardware (`HARDWARE=sim_bridge`)
-The runtime sends the simulated hub's readings for mapped devices to Convex `devices:report` and routes their commands
-through Convex `commands`, exactly as for a real ESP32. When this works, plugging in the ESP32 changes nothing upstream.
-
-### Optional real ESP32 (`HARDWARE=esp32`)
-- A real ESP32 drives a few low-voltage stand-in loads (small 5 to 12 V fans or LED strips, never mains), each mapped to a
-  `device_id` in Convex `device_map` with a `scale` (bench watts → kitchen kW).
-- The runtime forwards the `with` lane's Commands for mapped devices to Convex; the ESP32 receives them pushed through
-  `convex-esp32` and acks. Its INA219 readings come back as Readings and enter the engine through `ingest_reading()`
-  (`source: measured`, shown as "measured (scaled)").
-- The engine's hub interface does not change, and the engine never talks to the network. Design: `docs/design/CONVEX_AND_ESP32.md`.
+## Hub (simulated ESP32)
+- Applies the tick's Commands first (each to its `lane`), then the kitchen steps, then the hub builds one HubReport per lane:
+  every appliance's `reading()`, `total_kw` = exact sum, `power_pct`, `physical`, `customers_per_hour`, `ts = sim_ts + minutes`.
+- Every Command gets a CommandAck in that lane's HubReport (`acks`), which the runtime passes to the engine.
+- The hub is the truth of appliance state: applying a Command updates the appliance's React state, which re-renders the
+  Simulation view in the sim host tab, and the next HubReport carries it to the backend.
+- The hub reports every tick; the engine decides every 5th tick (CONTRACTS.md §8 Cadence).
+- `hub_hello` refused (`host_taken`) → the tab stops simulating and shows "another sim host is running".
+- The hub is the only thing the backend reads from and writes to, exactly how a real ESP32 hub works. A real ESP32 is a second
+  hub reached through Convex (`docs/design/CONVEX_AND_ESP32.md`); its readings are merged by the runtime as `measured`.
 
 ## Warm-up history
-`warm_up(days=21)`: runs the configured kitchen for 21 simulated days with no control, at full speed, before the
-demo starts. This gives the forecaster history that matches **this** kitchen's equipment.
+How the engine gets its first weeks of history is an engine decision, **TBD (Kritazya)**. The simulation must not assume it.
 
-## Determinism
-Every random draw (customers, cycling phase) uses the kitchen seed. Same config + seed → identical run.
+## Tests (`frontend/src/sim/__tests__`, Vitest)
+Same seed + same tick stream → identical HubReports (byte equal) · `total_kw` = sum of devices · power never negative or above
+rated · each Command gets exactly one ack · a reduce to 40 % gives 40 % of the normal draw for that minute · a delayed job
+starts no earlier than its delay · the fixture tick stream (`contracts/fixtures/hub_protocol/`) produces reports that pass the
+fixture checker's shape checks.

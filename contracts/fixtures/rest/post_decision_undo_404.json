@@ -1,0 +1,9 @@
+{
+  "method": "POST",
+  "path": "/api/decisions/d_9999/undo",
+  "status": 404,
+  "request": null,
+  "response": {
+    "detail": "Unknown decision d_9999"
+  }
+}

@@ -24,13 +24,13 @@ three context agents (the senses) and the **Concierge** (the owner's chat door, 
 | Agent | Role | Source | When |
 |---|---|---|---|
 | **Concierge** | Owner chat (ASI:One + dashboard relay); orchestrates the context agents; asks Claude to set `crowd_effect` | Claude agent + engine tools via API | Always on |
-| **Weather** | Hourly outdoor temperature for the kitchen's location | Open-Meteo | On request (every 10 real min) |
+| **Weather** | Hourly outdoor temperature for the kitchen's location | Open-Meteo | Periodic (every `CONTEXT_INTERVAL_S`, default 600 real s) |
 | **Grid** | Hourly electricity prices + stress level | CAISO price data | On request |
 | **Events** (tier 2) | Events within 5 km in the next 12 h with expected attendance | Events API chosen at the event | On request |
 Message models: CONTRACTS.md section 7. Tariff stays a fixed decision (DECISIONS.md), not an agent.
 
 ## Concierge loops
-- **Context loop** (every 10 real min and on kitchen build): request Weather, Grid, Events → reshape → `POST /api/context` →
+- **Context loop** (periodic, every `CONTEXT_INTERVAL_S` = 600 real s by default, and on kitchen build; never per tick): request Weather, Grid, Events → reshape → `POST /api/context` →
   log each message. Then one narrow Claude call with the events list → `set_crowd_effect` (category + reason).
 - **Chat (ASI:One):** each message → the same Claude agent + tools as the dashboard → reply (Interactive Cards if time).
   Owner flows that must work: "What will lunch cost me?" · "Why did you delay the dishwasher?" · "Undo that" ·

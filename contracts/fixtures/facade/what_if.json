@@ -1,0 +1,14 @@
+{
+  "call": "what_if",
+  "args": {
+    "device_id": "walk_in_cooler_1",
+    "action": "reduce",
+    "value": 50,
+    "at": "2026-07-18T01:50:00Z"
+  },
+  "returns": {
+    "peak_before_kw": 40.0,
+    "peak_after_kw": 40.0,
+    "saving_usd": 0.0
+  }
+}

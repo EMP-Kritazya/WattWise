@@ -1,0 +1,11 @@
+{
+  "method": "PUT",
+  "path": "/api/kitchen/preferences",
+  "status": 200,
+  "request": {
+    "text": "Keep the dining room comfortable during dinner service."
+  },
+  "response": {
+    "ok": true
+  }
+}

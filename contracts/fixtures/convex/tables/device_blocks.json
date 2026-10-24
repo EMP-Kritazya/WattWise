@@ -1,0 +1,170 @@
+[
+  {
+    "lane": "without",
+    "device_id": "hvac_1",
+    "block_start": "2026-07-18T00:30:00Z",
+    "avg_kw": 7.785,
+    "source": "simulated"
+  },
+  {
+    "lane": "without",
+    "device_id": "hvac_2",
+    "block_start": "2026-07-18T00:30:00Z",
+    "avg_kw": 7.785,
+    "source": "simulated"
+  },
+  {
+    "lane": "without",
+    "device_id": "walk_in_cooler_1",
+    "block_start": "2026-07-18T00:30:00Z",
+    "avg_kw": 0.467,
+    "source": "simulated"
+  },
+  {
+    "lane": "without",
+    "device_id": "reach_in_fridge_1",
+    "block_start": "2026-07-18T00:30:00Z",
+    "avg_kw": 0.373,
+    "source": "simulated"
+  },
+  {
+    "lane": "without",
+    "device_id": "freezer_1",
+    "block_start": "2026-07-18T00:30:00Z",
+    "avg_kw": 0.84,
+    "source": "simulated"
+  },
+  {
+    "lane": "without",
+    "device_id": "ice_machine_1",
+    "block_start": "2026-07-18T00:30:00Z",
+    "avg_kw": 0.0,
+    "source": "simulated"
+  },
+  {
+    "lane": "without",
+    "device_id": "fryer_1",
+    "block_start": "2026-07-18T00:30:00Z",
+    "avg_kw": 4.117,
+    "source": "simulated"
+  },
+  {
+    "lane": "without",
+    "device_id": "oven_1",
+    "block_start": "2026-07-18T00:30:00Z",
+    "avg_kw": 3.208,
+    "source": "simulated"
+  },
+  {
+    "lane": "without",
+    "device_id": "grill_1",
+    "block_start": "2026-07-18T00:30:00Z",
+    "avg_kw": 2.708,
+    "source": "simulated"
+  },
+  {
+    "lane": "without",
+    "device_id": "dishwasher_1",
+    "block_start": "2026-07-18T00:30:00Z",
+    "avg_kw": 0.0,
+    "source": "simulated"
+  },
+  {
+    "lane": "without",
+    "device_id": "water_heater_1",
+    "block_start": "2026-07-18T00:30:00Z",
+    "avg_kw": 3.9,
+    "source": "simulated"
+  },
+  {
+    "lane": "without",
+    "device_id": "lights_1",
+    "block_start": "2026-07-18T00:30:00Z",
+    "avg_kw": 2.4,
+    "source": "simulated"
+  },
+  {
+    "lane": "with",
+    "device_id": "hvac_1",
+    "block_start": "2026-07-18T00:30:00Z",
+    "avg_kw": 7.785,
+    "source": "simulated"
+  },
+  {
+    "lane": "with",
+    "device_id": "hvac_2",
+    "block_start": "2026-07-18T00:30:00Z",
+    "avg_kw": 7.785,
+    "source": "simulated"
+  },
+  {
+    "lane": "with",
+    "device_id": "walk_in_cooler_1",
+    "block_start": "2026-07-18T00:30:00Z",
+    "avg_kw": 0.467,
+    "source": "simulated"
+  },
+  {
+    "lane": "with",
+    "device_id": "reach_in_fridge_1",
+    "block_start": "2026-07-18T00:30:00Z",
+    "avg_kw": 0.373,
+    "source": "simulated"
+  },
+  {
+    "lane": "with",
+    "device_id": "freezer_1",
+    "block_start": "2026-07-18T00:30:00Z",
+    "avg_kw": 0.84,
+    "source": "simulated"
+  },
+  {
+    "lane": "with",
+    "device_id": "ice_machine_1",
+    "block_start": "2026-07-18T00:30:00Z",
+    "avg_kw": 0.0,
+    "source": "simulated"
+  },
+  {
+    "lane": "with",
+    "device_id": "fryer_1",
+    "block_start": "2026-07-18T00:30:00Z",
+    "avg_kw": 4.117,
+    "source": "simulated"
+  },
+  {
+    "lane": "with",
+    "device_id": "oven_1",
+    "block_start": "2026-07-18T00:30:00Z",
+    "avg_kw": 3.208,
+    "source": "simulated"
+  },
+  {
+    "lane": "with",
+    "device_id": "grill_1",
+    "block_start": "2026-07-18T00:30:00Z",
+    "avg_kw": 2.708,
+    "source": "simulated"
+  },
+  {
+    "lane": "with",
+    "device_id": "dishwasher_1",
+    "block_start": "2026-07-18T00:30:00Z",
+    "avg_kw": 0.0,
+    "source": "simulated"
+  },
+  {
+    "lane": "with",
+    "device_id": "water_heater_1",
+    "block_start": "2026-07-18T00:30:00Z",
+    "avg_kw": 3.9,
+    "source": "simulated"
+  },
+  {
+    "lane": "with",
+    "device_id": "lights_1",
+    "block_start": "2026-07-18T00:30:00Z",
+    "avg_kw": 2.4,
+    "source": "simulated"
+  }
+]

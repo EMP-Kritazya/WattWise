@@ -1,0 +1,24 @@
+{
+  "tool": "propose_customer_event",
+  "input": {
+    "customers": 40,
+    "duration_min": 60,
+    "start_sim_ts": "2026-07-18T03:00:00Z",
+    "summary": "40-person party at 20:00"
+  },
+  "output": {
+    "proposal_id": "p_0005",
+    "ts": "2026-07-18T02:30:00Z",
+    "kind": "customer_event",
+    "payload": {
+      "customers": 40,
+      "duration_min": 60,
+      "start_sim_ts": "2026-07-18T03:00:00Z"
+    },
+    "summary": "40-person party at 20:00",
+    "status": "pending",
+    "created_by": "ai",
+    "confirmed_via": null,
+    "expires_at": "2026-07-18T03:00:00Z"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "tool": "propose_peak_cap_change",
+  "input": {
+    "peak_mode": "cap",
+    "peak_cap_kw": 38.0,
+    "summary": "Lower the cap to 38 kW"
+  },
+  "output": {
+    "proposal_id": "p_0002",
+    "ts": "2026-07-18T02:30:00Z",
+    "kind": "peak_cap",
+    "payload": {
+      "peak_mode": "cap",
+      "peak_cap_kw": 38.0
+    },
+    "summary": "Lower the cap to 38 kW",
+    "status": "pending",
+    "created_by": "ai",
+    "confirmed_via": null,
+    "expires_at": "2026-07-18T03:00:00Z"
+  }
+}
