@@ -93,7 +93,7 @@ src/
 - Rename `pages/` → `screens/`.
 - Add **Vitest** (`npm test`) and **ESLint** (flat config) as dev dependencies inside `frontend/`.
 
-**A2. Types.** ◐ Rewrite `src/types/contracts.ts` to match the new CONTRACTS.md §1, §2, §5 and §8 exactly. Every block is marked `// STUB: replace with generated types`.
+**A2. Types.** ☑ Contract-aligned hand types are in place; `ProofExtras` and its endpoint are removed. Every generated boundary remains marked `// STUB`.
 - **Changed shapes:**
   - EquipmentType: drop `min_power_pct`; add fixed `params` keys per power model and `default_limits`.
   - KitchenConfig: add `peak_mode` (`minimize | cap`, with `peak_cap_kw` null for minimize).
@@ -112,7 +112,7 @@ src/
   - Every hub protocol message (§8).
 - **Remove** `ProofExtras` and its endpoint: it isn't in the contract (golden rule: never invent a shape). Proof's gaps go to §7.
 
-**A3. Mocks** (`src/mocks/`, switched by `VITE_MOCKS=1`). ◐ Replace the hand-made mock server with fixture-driven fakes:
+**A3. Mocks** (`src/mocks/`, switched by `VITE_MOCKS=1`). ☑ Fixture REST, live rows, viewer `/ws`, reducers and hub server are implemented from the read-only shared fixtures:
 - **REST** (`rest.ts`): match method and path against `rest/*.json` and return `response` with its `status`.
   - Includes the `_404` and `_422` examples, served when the request matches theirs.
   - Errors come back as `{detail}`.
@@ -127,7 +127,7 @@ src/
   - Sends one tick per interval at the chosen speed and **waits for the matching `hub_report`** before sending the next.
   - Also offers `hub_welcome_host_taken.json` for testing the refusal.
 
-**A4. Data hooks** (`src/data/`). ◐
+**A4. Data hooks** (`src/data/`). ☑ Typed live rows, the `/sim`-aware device bridge and the REST facade are implemented and were verified through a temporary all-table debug route (removed after verification).
 - **`useLive()`:** typed rows for each SpacetimeDB table. It uses SpacetimeDB by default (generated bindings later), falls back to `/ws` (messages converted to the same row shapes), or uses the mock rows. One switch, invisible to screens.
 - **`useDevices()`:** in the `/sim` tab, the hub's current `Device[]` per lane; in every other tab, `live_device` rows (parsing `physical_json`). Same Device shape either way.
 - **`useApi()`:** one function per REST endpoint in CONTRACTS.md §2, used by the Builder, clicks, undo, escalation choices, proposals and chat.

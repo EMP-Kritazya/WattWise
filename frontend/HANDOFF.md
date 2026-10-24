@@ -57,31 +57,30 @@ Earlier work, built for the previous design. Much of the UI carries over; see PL
 - **Later env vars:** `VITE_API_URL`, `VITE_HUB_WS_URL`, `VITE_LIVE_TRANSPORT` (`spacetime` or `ws`), `VITE_SPACETIME_URI`, `VITE_SPACETIME_DB`.
 - **Preview server:** `.claude/launch.json` in the `Assignment 3` folder has `wattwise-frontend-mock` on port 5173.
 
-## Status right now (Oct 24, after commit `f9b8585`)
+## Status right now (Oct 24, after commit `980d0a0`)
 - **Done:**
   - PLAN.md written;
   - D1: `ashirwad` rebased onto `main` `0dc6a34`, force-pushed;
   - D2: old Python simulation deleted;
   - HANDOFF.md and FOR_TEAMMATES.md updated;
+  - A2: contract types aligned; `ProofExtras` and its non-contract endpoint removed;
+  - A3: fixture-backed REST, live rows, viewer `/ws`, Spacetime reducers and mock hub server added behind `VITE_MOCKS=1`;
+  - A4: `useLive()`, `useDevices()` and `useApi()` added; every live table verified in a temporary debug route and the route removed;
+  - Builder → Live smoke-tested in fixture mode;
+  - `contracts/fixtures/check.py` passes all 177 files;
   - `npm run build` passes.
-- **Not started:** every build step in PLAN.md §3. No code has been changed for the new design yet.
+- **Not started:** B1–B7 (catalog, browser simulation and hub), `/sim`, and the new screen layout.
 - **Waiting on Ashirwad: D3**, what the Simulation view draws.
   - Recommended: the tile floor per UI.md (a tile per device, wired to a pulsing Hub tile, with physical gauges).
   - Or: also keep the existing 3D floor as an optional look that reads only `useDevices()`.
   - Ask him before building C2's Simulation view. Steps A and B don't depend on it.
 
-## Immediate next task: PLAN.md step 2 (A2 → A3 → A4)
-1. **A2, types:** rewrite `frontend/src/types/contracts.ts` from CONTRACTS.md §1, §2, §5 and §8, marking every block `// STUB: replace with generated types`.
-   - Delete `ProofExtras`, plus `getProofExtras` in `src/transport/*` and `src/mocks/server.ts`; it isn't in the contract.
-   - Fix every compile error that follows.
-2. **A3, mocks:**
-   - In `vite.config.ts`, add the alias `@fixtures` → `../contracts/fixtures`, and set `server.fs.allow` to the repo root.
-   - Add `src/mocks/fixtures.ts`, which loads JSON and `.jsonl` (via `?raw`) read-only, then build `rest.ts`, `liveRows.ts`, `viewerWs.ts`, `spacetimeReducers.ts` and `mockHubServer.ts` exactly as PLAN.md A3 describes.
-   - The switch is `VITE_MOCKS=1`; also add an `.env.mocks` and the script `"dev:mocks": "vite --mode mocks"`.
-   - Keep the old `mocks/server.ts` working until the screens are moved over, then delete it.
-3. **A4, hooks:** in `src/data/`, add `useLive()` (typed rows per SpacetimeDB table), `useDevices()` (hub state in `/sim`, `live_device` rows elsewhere) and `useApi()` (CONTRACTS.md §2).
-   - Verify with a temporary debug route that dumps every table, then remove it.
-4. **Before committing:** run `npm run build`; add Vitest in step 3 of PLAN.md §5. Commit to `ashirwad` and push. Never commit to `main`, never merge.
+## Immediate next task: PLAN.md step 3 (B1 → B7 + Vitest)
+1. Bring `backend/data/equipment_catalog.json` to the current EquipmentType contract and replace placeholder power figures with sourced values.
+2. Build the deterministic TypeScript appliance models, seeded customer stream and one Zustand vanilla store per lane under `src/sim/`.
+3. Build `src/hub/hub.ts`: apply lane Commands, step both lanes from each `sim_tick`, then return exact HubReports and one ack per Command.
+4. Add Vitest and the PLAN.md §4 simulation/hub tests, including byte-identical repeated runs and exact hub totals.
+5. Build `src/hub/link.ts` against `mockHubServer`, then add the `/sim` host panel in PLAN step 4.
 
 ## Demo focus: the judging round is the priority
 The live demo in judging is the main point. The app should **read as a simulation**: calm, clear, a few impactful moments.
@@ -123,7 +122,7 @@ The fixture scenario matches this: surge at tick 31, escalation at tick 60, choi
 ## Next steps
 Exactly PLAN.md §5, in order:
 1. Settle D3 (D1 and D2 are done).
-2. Types → fixture mocks → data hooks.
+2. Types → fixture mocks → data hooks. ☑
 3. Catalog → simulation → hub → Vitest.
 4. Hub link with `mockHubServer` → `/sim` panel.
 5. Live (Charts | Simulation) → right rail.
