@@ -38,14 +38,14 @@ The whole restaurant in the current `plan.ts` layout, restyled as a toy miniatur
    - `Restaurant.tsx` derives visual seat occupancy from contract `customers_per_hour`; an unconsumed `surge_request` of +40 makes the queue appear immediately, even while paused. No derived business number is displayed.
    - Furniture, diners and table glows remain hidden when **Equipment focus** is on; the table pools follow the lights device reading.
    - Browser-verified at `/live` in demo mode after pressing **+40 customers** while the fixture was paused.
-4. **Step 4, done by Codex (checkpoint pending):** the full-screen demo right column uses Fredoka and Nunito; white cards have ink outlines and 22 px corners.
+4. **Step 4, done by Codex (commit `594d8db`):** the full-screen demo right column uses Fredoka and Nunito; white cards have ink outlines and 22 px corners.
    - **Gauge:** `live_tick.block_avg_kw` per lane against `target_kw`.
    - **Demand-charge card:** the escalation's `accept_overrun.projected.cost_delta_usd` (67.20 in the fixtures) against the chosen option's `cost_delta_usd` (0).
    - **Claude card:** from `live_escalation`.
    - **Also:** the demo hides the appliance/debug sidebar and duplicate KPI strip. Outside demo mode, the existing keyboard-accessible appliance inspector and owner controls remain available.
    - `ToyBoxRail.tsx` reads typed `live_tick` and `live_escalation` rows directly. Gauge geometry is presentational only; every displayed kW and dollar value remains contract-provided.
    - Browser-verified at `/live` in full-screen demo mode: 37.9 kW With, 33.2 kW ghost Without, 40.0 kW cap, +$67.20 projected overrun, $0 chosen-option cost and “Claude chose 3 of 3.”
-5. **Step 5, done by Codex (checkpoint pending):** when a new executed `live_feed` decision arrives, unrelated appliances fade 30% toward the Toy Box background, their secondary status effects and cables quiet down, and the changed appliance receives a brighter outline, cable and light.
+5. **Step 5, done by Codex (commit `594d8db`):** when a new executed `live_feed` decision arrives, unrelated appliances fade 30% toward the Toy Box background, their secondary status effects and cables quiet down, and the changed appliance receives a brighter outline, cable and light.
    - The pinned museum card stays for 6.5 seconds and uses only the engine decision: appliance/action plus `effect.peak_before_kw` → `effect.peak_after_kw`.
    - It reuses each appliance's always-mounted drei `Html` anchor instead of adding another floating React root.
    - Browser-verified during a 600× fixture replay: the walk-in cooler decision pinned to the appliance as “Turn down to 50% · 15-min peak 40.1 kW → 39.2 kW.”
