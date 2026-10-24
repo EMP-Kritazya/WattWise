@@ -1,12 +1,13 @@
 """WattWise Concierge: the owner's chat door in ASI:One (Agent Chat Protocol, mailbox mode).
 
-Step 1 (registration + discoverability): every chat message is acknowledged and answered with a fixed help text.
-Claude + engine tools through the API come next (docs/design/AGENTS.md, "Concierge loops").
+Chat (`owner_chat.py`): every message is acknowledged, then answered through the API by the same Claude agent and engine
+tools as the dashboard chat (POST /api/chat, reply joined from /ws). `confirm` / `yes` / `no` / `cancel` are matched by
+code and confirm or cancel the newest pending Proposal; the model never confirms. Sessions stay open (no end-session).
 
 Context loop (`context_loop.py`): every CONTEXT_INTERVAL_S (600 real s) and whenever a kitchen is built (GET /api/kitchen
 polled every KITCHEN_POLL_S), ask Weather, Grid and Events over uAgents → Claude crowd effect → POST /api/context.
-Env: API_URL (default http://127.0.0.1:8000), AGENT_TOKEN, CONTEXT_LOOP=0 to switch it off, DEMO_MODE=1 / --recorded
-for the recorded crowd effect. The context agents' addresses come from their seeds (common.agent_address).
+Env: API_URL (default http://127.0.0.1:8000), AGENT_TOKEN, CHAT_REPLY_TIMEOUT_S (30), CONTEXT_LOOP=0 to switch it off,
+DEMO_MODE=1 / --recorded for the recorded crowd effect. The context agents' addresses come from their seeds (common.agent_address).
 
 Run:  FETCH_AGENT_SEED="<long secret phrase>" python agents/concierge.py [--recorded]
 Then open the printed inspector link -> Connect -> Mailbox (see agents/REGISTRATION.md).
@@ -26,7 +27,6 @@ from uagents import Agent, Context, Model, Protocol
 from uagents_core.contrib.protocols.chat import (
     ChatAcknowledgement,
     ChatMessage,
-    EndSessionContent,
     TextContent,
     chat_protocol_spec,
 )
@@ -35,6 +35,7 @@ from common import agent_address, load_dotenv, recorded_mode
 from context_loop import ApiClient, ContextLoop, Location
 from crowd import create_classifier
 from models import EventsResponse, PriceResponse, WeatherResponse
+from owner_chat import OwnerChat, ws_url
 
 AGENT_NAME = "WattWise Concierge"
 DESCRIPTION = (
@@ -46,21 +47,6 @@ README_PATH = Path(__file__).resolve().parent / "README_concierge.md"
 PORT = int(os.environ.get("CONCIERGE_PORT", "8001"))
 # Agentverse @handle (max 20 chars), so the owner can call the agent directly in ASI:One.
 HANDLE = os.environ.get("CONCIERGE_HANDLE", "wattwise")
-
-# STUB: fixed reply until the Claude agent + engine tools are wired through the API.
-HELP_TEXT = (
-    "Hi, I'm the WattWise Concierge. I keep a restaurant's electricity peak under the owner's cap "
-    "without stopping service, so the demand charge on the utility bill stays low.\n\n"
-    "Soon you'll be able to ask me:\n"
-    "- What will lunch cost me in power today?\n"
-    "- Why did you delay the dishwasher?\n"
-    "- Undo that.\n"
-    "- Never touch the walk-in after 9 PM.\n"
-    "- How much did we save this month?\n"
-    "- What did you decide about tonight?\n\n"
-    "Live answers from the kitchen are being connected right now."
-)
-
 
 load_dotenv()
 seed = os.environ.get("FETCH_AGENT_SEED")
@@ -80,6 +66,13 @@ agent = Agent(
 
 chat_proto = Protocol(spec=chat_protocol_spec)
 
+API_URL = os.environ.get("API_URL", "http://127.0.0.1:8000")
+AGENT_TOKEN = os.environ.get("AGENT_TOKEN")
+CHAT_REPLY_TIMEOUT_S = float(os.environ.get("CHAT_REPLY_TIMEOUT_S", "30"))
+
+_http = httpx.AsyncClient(base_url=API_URL)
+_owner_chat = OwnerChat(_http, ws_url(API_URL), AGENT_TOKEN, reply_timeout_s=CHAT_REPLY_TIMEOUT_S)
+
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
@@ -95,14 +88,8 @@ async def handle_chat(ctx: Context, sender: str, msg: ChatMessage):
         return
     ctx.logger.info(f"chat from {sender}: {text!r}")
 
-    await ctx.send(
-        sender,
-        ChatMessage(
-            timestamp=_now(),
-            msg_id=uuid4(),
-            content=[TextContent(type="text", text=HELP_TEXT), EndSessionContent(type="end-session")],
-        ),
-    )
+    reply = await _owner_chat.answer(sender, text)
+    await ctx.send(sender, ChatMessage(timestamp=_now(), msg_id=uuid4(), content=[TextContent(type="text", text=reply)]))
 
 
 @chat_proto.on_message(ChatAcknowledgement)
@@ -120,14 +107,12 @@ async def announce(ctx: Context):
 
 # ---------------------------------------------------------------- context loop
 
-API_URL = os.environ.get("API_URL", "http://127.0.0.1:8000")
 CONTEXT_INTERVAL_S = float(os.environ.get("CONTEXT_INTERVAL_S", "600"))
 KITCHEN_POLL_S = float(os.environ.get("KITCHEN_POLL_S", "10"))
 AGENT_REPLY_TIMEOUT_S = int(os.environ.get("AGENT_REPLY_TIMEOUT_S", "15"))
 RESPONSE_TYPES: dict[str, type[Model]] = {"weather": WeatherResponse, "grid": PriceResponse, "events": EventsResponse}
 
-_http = httpx.AsyncClient(base_url=API_URL)
-_loop = ContextLoop(ApiClient(_http, os.environ.get("AGENT_TOKEN")), create_classifier(recorded_mode()))
+_loop = ContextLoop(ApiClient(_http, AGENT_TOKEN), create_classifier(recorded_mode()))
 _round_lock = asyncio.Lock()
 _kitchen_seen: str | None = None  # the last kitchen config seen (JSON), to spot a new build
 

@@ -156,9 +156,16 @@ def get_proposals(book: Proposals, status: m.ProposalStatus | None = None):
 
 
 # async: applying a customer_event proposal schedules a surge in the run loop, which lives on the event loop.
-@router.post("/proposals/{proposal_id}/confirm", response_model=m.Proposal, responses=R404, **_exclude_unset)
-async def post_proposal_confirm(proposal_id: str, body: m.ProposalConfirmRequest, book: Proposals):
-    return book.confirm(proposal_id, _body(body)["confirm"], via="ui")
+# The Concierge confirms with X-Agent-Token (an ASI:One reply or card) → `confirmed_via: asi_one`; the dashboard sends none.
+@router.post("/proposals/{proposal_id}/confirm", response_model=m.Proposal, responses={**R404, 401: _ERR},
+             **_exclude_unset)
+async def post_proposal_confirm(proposal_id: str, body: m.ProposalConfirmRequest, book: Proposals, request: Request,
+                                x_agent_token: Annotated[str | None, Header()] = None):
+    via = "ui"
+    if x_agent_token is not None:
+        _require_agent_token(request, x_agent_token)
+        via = "asi_one"
+    return book.confirm(proposal_id, _body(body)["confirm"], via=via)
 
 
 # ---------------------------------------------------------------- backtest, chat

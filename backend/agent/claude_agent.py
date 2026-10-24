@@ -47,6 +47,11 @@ SYSTEM_PROMPT = """You are WattWise's assistant for a restaurant owner. Be brief
   option the owner asked for, or add a customer event, call the matching propose_* tool. It applies only after the
   owner confirms; tell them it is waiting for their confirmation.
 - When explaining a decision, say what changed, why (its reason_code) and its effect, from the tool.
+- Escalation options are numbered 1, 2, 3... in the order get_escalation lists them; "option 2" is the second entry.
+  When you list options, number them that way.
+- A message may start with the earlier chat for reference. Use it only to understand what the owner refers to (e.g.
+  "undo that"); take every number from a tool call made now. Confirmation is handled outside you: never claim a change
+  was applied.
 - Times in tools are UTC. The restaurant's local time zone is {timezone}; speak in local time."""
 
 ESCALATION_PROMPT = """

@@ -1,6 +1,7 @@
 uagents>=0.26.1
 uagents-core>=0.4.12
 httpx>=0.28
+websockets>=12  # owner_chat.py: the API's viewer socket /ws (chat replies)
 anthropic>=2.3  # crowd.py: beta.messages.create(fallbacks=...)
 # tests: agents/.venv/Scripts/python -m pytest agents/tests
 pytest>=8.2

@@ -45,6 +45,28 @@ def client(app):
         yield c
 
 
+FACADE_WRITES = ("set_importance", "set_peak_cap", "set_authority", "undo", "resolve_escalation")
+
+
+@pytest.fixture
+def facade_calls(app, monkeypatch):
+    """Record every write call on the `with` lane's kitchen and answer it with the real FakeKitchen result."""
+    kitchen = app.state.service.lanes["with"]
+    calls = []
+    for name in FACADE_WRITES:
+        real = getattr(kitchen, name)
+
+        def recorder(*args, _name=name, _real=real):
+            calls.append((_name, args))
+            try:
+                return _real(*args)
+            except LookupError:  # NotRecordedError: no canned answer for these args; the call itself is what matters
+                return {"proposal_test": True}
+
+        monkeypatch.setattr(kitchen, name, recorder)
+    return calls
+
+
 class ScriptedLLM:
     """Stands in for AnthropicLLM: plays back Turns in order and records every request."""
 
