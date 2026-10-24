@@ -102,7 +102,7 @@ class KitchenService:
     def build_kitchen(self, config: dict) -> dict:
         self._lanes = self._build_lanes(config)  # RuleError leaves the store untouched
         self._store.record_kitchen(config, self._now_utc())
-        # STUB: runtime/hub_link.py sends sim_build to the sim host (Phase B).
+        # STUB: runtime/loop.py calls HubLink.send_build here once the clock exists (it owns start_sim_ts).
         return {"kitchen_id": KITCHEN_ID}
 
     @_serialized

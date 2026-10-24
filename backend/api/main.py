@@ -1,4 +1,4 @@
-"""FastAPI app: every REST endpoint of CONTRACTS.md §2, `/api/health` and the viewer socket `/ws`.
+"""FastAPI app: every REST endpoint of CONTRACTS.md §2, `/api/health`, the viewer socket `/ws` and the hub socket `/ws/hub` (§8).
 
 Thin layer: validate the body → call the service → return. Run from backend/: `uvicorn api.main:app`.
 """
@@ -11,6 +11,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Request, WebSocket
 from pydantic import BaseModel
 
+from runtime.hub_link import HubLink
 from runtime.kitchen_factory import load_engine
 from store import create_store
 
@@ -188,7 +189,7 @@ def get_health(request: Request):
         live_transport=s.live_transport,
         store=s.store,
         hardware=s.hardware,
-        # STUB: set by runtime/hub_link.py once it exists; no sim host can connect yet
+        # Kept current by runtime/hub_link.py (on_host)
         sim_host="connected" if request.app.state.sim_host_connected else "offline",
     )
 
@@ -207,12 +208,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.service = KitchenService(settings.fixtures_dir, engine, store)
     app.state.broadcaster = Broadcaster()
     app.state.sim_host_connected = False
+
+    def _sim_host_changed(connected: bool) -> None:
+        app.state.sim_host_connected = connected
+
+    # STUB: until runtime/loop.py exists, hub warnings go straight to /ws viewers and paused_reason is not published.
+    app.state.hub = HubLink(on_warning=app.state.broadcaster.broadcast, on_host=_sim_host_changed)
     install_error_handlers(app, engine.RuleError)
     app.include_router(router)
 
     @app.websocket("/ws")
     async def viewer_socket(websocket: WebSocket) -> None:
         await websocket.app.state.broadcaster.serve(websocket)
+
+    @app.websocket("/ws/hub")
+    async def hub_socket(websocket: WebSocket) -> None:
+        await websocket.app.state.hub.serve(websocket)
 
     return app
 
