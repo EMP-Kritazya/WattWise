@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useRef } from "react";
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes } from "react-router";
 import { ChartColumn, ChefHat, LayoutDashboard, Leaf, Microscope, MonitorPlay, Network } from "lucide-react";
 import { ChatDrawer } from "@/components/ChatDrawer";
@@ -114,8 +114,17 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
 /** Brand, the four tabs, kitchen and connection status, and the assistant, at every width. */
 function TopBar() {
   const kitchenName = useSim((s) => s.kitchen?.config.name);
+  // Its height as `--topbar-h`, so a screen can fill exactly the rest of the window (Live Simulation).
+  const ref = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => document.documentElement.style.setProperty("--topbar-h", `${el.offsetHeight}px`));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   return (
-    <header className="sticky top-0 z-30 flex flex-wrap items-center gap-x-5 gap-y-2 border-b-2 border-[#22223B] bg-[#FFF1E2]/95 px-4 py-3 backdrop-blur sm:px-6">
+    <header ref={ref} className="sticky top-0 z-30 flex flex-wrap items-center gap-x-5 gap-y-2 border-b-2 border-[#22223B] bg-[#FFF1E2]/95 px-4 py-3 backdrop-blur sm:px-6">
       <Brand />
       <nav aria-label="Main" className="order-last flex w-full gap-1 overflow-x-auto lg:order-none lg:w-auto">
         {NAV.map(({ to, label, icon: Icon }) => (

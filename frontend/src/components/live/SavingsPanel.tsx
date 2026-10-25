@@ -16,15 +16,15 @@ export function SavingsPanel() {
     <section
       aria-label="Money saved by WattWise"
       aria-live="polite"
-      className="rounded-[22px] border-2 border-[#22223B] bg-[#69C9BF] p-4 text-[#22223B] shadow-[0_5px_0_#22223B]"
+      className="rounded-[22px] border-2 border-[#22223B] bg-[#69C9BF] px-3 py-2.5 text-[#22223B] shadow-[0_4px_0_#22223B]"
     >
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 font-['Fredoka',sans-serif] text-lg font-bold">
-          <PiggyBank className="size-5" /> What WattWise is saving
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-x-2">
+        <h2 className="flex items-center gap-2 font-['Fredoka',sans-serif] text-base font-bold">
+          <PiggyBank className="size-4" /> What WattWise is saving
         </h2>
         <span className="text-[10px] font-extrabold tracking-[0.16em] uppercase opacity-70">Simulated · not measured savings</span>
       </div>
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         <Tile icon={PiggyBank} label="Saved today" value={fmtUsd(comparison?.saved_today_usd)} highlight />
         <Tile icon={TrendingDown} label="Peak avoided" value={fmtKw(comparison?.peak_avoided_kw)} />
         <Tile
@@ -41,13 +41,13 @@ export function SavingsPanel() {
 
 function Tile({ icon: Icon, label, value, sub, highlight }: { icon: LucideIcon; label: string; value: string; sub?: ReactNode; highlight?: boolean }) {
   return (
-    <div className={highlight ? "rounded-2xl border-2 border-[#22223B] bg-white px-3 py-2.5" : "rounded-2xl bg-white/85 px-3 py-2.5"}>
+    <div className={highlight ? "rounded-2xl border-2 border-[#22223B] bg-white px-3 py-1.5" : "rounded-2xl bg-white/85 px-3 py-1.5"}>
       <div className="flex items-center gap-1.5 text-[10px] font-extrabold tracking-wide uppercase opacity-70">
         <Icon className="size-3.5" />
         {label}
       </div>
-      <div className="mt-0.5 font-['Fredoka',sans-serif] text-2xl font-bold tabular-nums">{value}</div>
-      {sub && <div className="text-xs font-semibold opacity-75 tabular-nums">{sub}</div>}
+      <div className="font-['Fredoka',sans-serif] text-xl font-bold tabular-nums">{value}</div>
+      {sub && <div className="truncate text-[11px] font-semibold opacity-75 tabular-nums">{sub}</div>}
     </div>
   );
 }

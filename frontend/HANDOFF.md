@@ -3,6 +3,17 @@
 You are taking over Ashirwad's work on **WattWise** (Cal Hacks 13.0, Oct 23–25 2026). Work carefully, keep the existing code style,
 and run `npm run build` and `npm test` (in `frontend/`) before calling anything done.
 
+## ⭐ Oct 25: Live Simulation is one screen (on `integrate/ashirwad-suyog`)
+- From tablet width up (≥768 px) the Live tab fills exactly the window below the top bar (`--topbar-h`, set by `TopBar`
+  in `App.tsx`); nothing scrolls. Phones keep the scrolling layout.
+- The controls card is gone: clock, Play/Pause, speed, reset, customers/h and +20/+40 sit in the floor's dark header bar
+  (`SimControls embedded`), around the 3D view. The savings strip and the demand strip are compact.
+- Laptop width: floor and appliance list side by side, both filling the height (the list scrolls inside itself). Tablet
+  width: a Floor / Appliances switch in the header shows one at a time; "Locate appliance on floor" switches back.
+- Camera: the settled starting view is the furthest out. Orthographic views lock `minZoom` to the fitted zoom (up to 6× in);
+  Street / POV lock `maxDistance` to the pose (in to 30 %). Verified: wheel-out leaves the view unchanged, wheel-in enlarges it.
+- Demo mode (full screen) is unchanged.
+
 ## ⭐ Oct 24 night: `integrate/ashirwad-suyog` (worktree `~/Downloads/WattWise-integrate`, local, not pushed)
 Branch from `ashirwad` (`0db6689`) with Suyog's branch merged in, as planned:
 - `77f28d3` merge `origin/Suyog` @ `930c472` (only conflict `docs/Claude_EVAL.md`: main's version, identical to Suyog's).

@@ -5,7 +5,8 @@ import { Bloom, EffectComposer, ToneMapping } from "@react-three/postprocessing"
 import { ToneMappingMode } from "postprocessing";
 import { Box3, Vector3, type Group, type OrthographicCamera } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
-import { Box, Crosshair, Eye, Focus, Map as MapIcon, Maximize2, Store, Tags, type LucideIcon } from "lucide-react";
+import { Box, Crosshair, Eye, Focus, List, Map as MapIcon, Maximize2, Store, Tags, type LucideIcon } from "lucide-react";
+import { SimControls } from "@/components/live/SimControls";
 import { WarningBanner } from "@/components/live/WarningBanner";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -70,8 +71,12 @@ const COMPARE_LAYOUT: Record<"row" | "column", { without: Vec3; with: Vec3 }> = 
 const FOLLOW_HOLD_MS = 4500;
 const FOLLOW_COOLDOWN_MS = 9000;
 
-/** A quiet spatial overview beside authoritative appliance readings and demand comparison. */
-export function LiveFloor({ demo, onDemoChange }: { demo: boolean; onDemoChange: (on: boolean) => void }) {
+/**
+ * A quiet spatial overview beside authoritative appliance readings and demand comparison. The simulation controls sit in
+ * its header bar, around the 3D view. From tablet width up it fills the height it is given (`className`); between tablet
+ * and laptop width the floor and the appliance list share that space, one at a time.
+ */
+export function LiveFloor({ demo, onDemoChange, className }: { demo: boolean; onDemoChange: (on: boolean) => void; className?: string }) {
   const metas = useDeviceMeta();
   const placement = useMemo(() => placeDevices(metas), [metas]);
   const [mode, setMode] = useState<Mode>("with");
@@ -86,6 +91,8 @@ export function LiveFloor({ demo, onDemoChange }: { demo: boolean; onDemoChange:
     if (mode === "compare" && perspective) setView("iso");
   }, [mode, perspective]);
   const [selected, setSelected] = useState<string | null>(null);
+  // Tablet width only: the appliance list replaces the floor instead of sitting beside it.
+  const [showList, setShowList] = useState(false);
   const [autoFocus, setAutoFocus] = useState<string | null>(null);
   const withTick = useSim((s) => s.latest.with);
   const withoutTick = useSim((s) => s.latest.without);
@@ -170,16 +177,31 @@ export function LiveFloor({ demo, onDemoChange }: { demo: boolean; onDemoChange:
     <section
       className={cn(
         "flex flex-col overflow-hidden border-2 border-[#22223B] bg-[#0f1424] text-slate-100",
-        demo ? "fixed inset-0 z-40 overflow-y-auto" : "rounded-[22px] shadow-[0_6px_0_#22223B]",
+        demo ? "fixed inset-0 z-40 overflow-y-auto" : cn("rounded-[22px] shadow-[0_5px_0_#22223B]", className),
       )}
       aria-label="Live kitchen simulation"
     >
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
-        <div>
-          <h2 className="text-lg font-semibold">Keep service running. Keep demand down.</h2>
-          <p className="text-xs text-slate-400">Watch appliance status → see the engine’s action → compare demand.</p>
-        </div>
+      <header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-white/10 px-3 py-2">
+        {demo ? (
+          <div>
+            <h2 className="text-lg font-semibold">Keep service running. Keep demand down.</h2>
+            <p className="text-xs text-slate-400">Watch appliance status → see the engine’s action → compare demand.</p>
+          </div>
+        ) : (
+          <SimControls embedded />
+        )}
         <div className="flex flex-wrap items-center gap-2">
+          {!demo && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-8 text-slate-300 max-md:hidden lg:hidden"
+              aria-pressed={showList}
+              onClick={() => setShowList((s) => !s)}
+            >
+              {showList ? <MapIcon /> : <List />} {showList ? "Floor" : "Appliances"}
+            </Button>
+          )}
           <ToggleGroup type="single" size="sm" value={mode} onValueChange={(v) => v && setMode(v as Mode)}>
             <ToggleGroupItem value="with" className="px-3 data-[state=on]:bg-emerald-400/15 data-[state=on]:text-emerald-300">
               With WattWise
@@ -199,10 +221,10 @@ export function LiveFloor({ demo, onDemoChange }: { demo: boolean; onDemoChange:
             aria-pressed={focus}
             onClick={() => setFocus((f) => !f)}
           >
-            <Focus /> Equipment focus {focus ? "on" : "off"}
+            <Focus /> <span className="max-xl:sr-only">Equipment focus {focus ? "on" : "off"}</span>
           </Button>
           <details className="relative">
-            <summary className="cursor-pointer px-3 py-2 text-xs text-slate-400">View options</summary>
+            <summary className="cursor-pointer px-2 py-2 text-xs text-slate-400">View</summary>
             <div className="absolute right-0 top-full z-[90] flex w-80 flex-wrap gap-2 rounded-lg border bg-slate-900 p-3">
               {" "}
               <ToggleGroup type="single" size="sm" value={view} onValueChange={(v) => v && setView(v as View)}>
@@ -240,7 +262,7 @@ export function LiveFloor({ demo, onDemoChange }: { demo: boolean; onDemoChange:
           </details>{" "}
           {!demo && (
             <Button size="sm" variant="ghost" className="h-8" title="Full-screen demo mode" onClick={() => onDemoChange(true)}>
-              <Maximize2 /> Demo mode
+              <Maximize2 /> <span className="max-xl:sr-only">Demo mode</span>
             </Button>
           )}
         </div>
@@ -255,12 +277,17 @@ export function LiveFloor({ demo, onDemoChange }: { demo: boolean; onDemoChange:
       <div
         className={cn(
           "grid min-h-0",
-          demo ? "flex-1 lg:min-h-[560px] lg:grid-cols-[minmax(0,1fr)_370px]" : "lg:h-[620px] lg:grid-cols-[minmax(0,1fr)_360px]",
+          demo
+            ? "flex-1 lg:min-h-[560px] lg:grid-cols-[minmax(0,1fr)_370px]"
+            : "md:flex-1 md:grid-rows-[minmax(0,1fr)] lg:grid-cols-[minmax(0,1fr)_340px]",
         )}
       >
         <div
           ref={container}
-          className={cn("relative min-w-0 overflow-hidden", demo ? "min-h-[400px] lg:min-h-[460px]" : "h-[420px] lg:h-[620px]")}
+          className={cn(
+            "relative min-w-0 overflow-hidden",
+            demo ? "min-h-[400px] lg:min-h-[460px]" : cn("h-[420px] md:h-auto", showList && "md:max-lg:hidden"),
+          )}
           style={{ background: BACKGROUND }}
         >
           <Canvas
@@ -338,7 +365,20 @@ export function LiveFloor({ demo, onDemoChange }: { demo: boolean; onDemoChange:
             <span className="text-slate-500">· {mode === "compare" ? "same customers in both" : "click an appliance for details"} · simulated</span>
           </div>
         </div>
-        {demo ? <ToyBoxRail /> : <OperationsPanel mode={mode} selected={selected} onSelect={setSelected} />}
+        {demo ? (
+          <ToyBoxRail />
+        ) : (
+          <OperationsPanel
+            className={cn(!showList && "md:max-lg:hidden")}
+            mode={mode}
+            selected={selected}
+            onSelect={setSelected}
+            onLocate={(id) => {
+              setSelected(id);
+              setShowList(false); // tablet width: back to the floor to see it
+            }}
+          />
+        )}
       </div>
     </section>
   );
@@ -367,6 +407,15 @@ function applyLimits(controls: OrbitControlsImpl, l: Limits) {
   controls.maxAzimuthAngle = l.maxAzimuth;
 }
 const FREE: Limits = { minPolar: 0, maxPolar: Math.PI, minAzimuth: -Infinity, maxAzimuth: Infinity };
+/** The starting view is the furthest out: once the camera settles, the viewer may zoom in (this far) but not out. */
+const MAX_ZOOM_IN = 6;
+const MIN_DISTANCE_SHARE = 0.3; // perspective views: how close the viewer may dolly in, as a share of the start distance
+
+/** Orthographic: no zooming out past `zoom`, and up to MAX_ZOOM_IN× in. No arguments: free, while the camera travels. */
+function lockZoom(controls: OrbitControlsImpl, zoom?: number) {
+  controls.minZoom = zoom ?? 0;
+  controls.maxZoom = zoom ? zoom * MAX_ZOOM_IN : Infinity;
+}
 
 function CameraRig({
   frames,
@@ -402,6 +451,7 @@ function CameraRig({
       goal.current = { ...fitGoal(dir, req.frames, req.padding, req.margin, size.width, size.height), dir };
       computedFor.current = { version: req.version, width: size.width, height: size.height };
       applyLimits(controls, FREE); // let the camera travel; the view's limits apply on arrival
+      lockZoom(controls);
     }
     const g = goal.current;
     if (!g) return;
@@ -415,8 +465,11 @@ function CameraRig({
     if (controls.target.distanceTo(g.target) < 0.01 && Math.abs(camera.zoom - g.zoom) < 0.01 && dir.angleTo(g.dir) < 0.002) {
       // Land exactly on the view direction (matters for top-down, where a tiny leftover tilt would rotate the plan).
       camera.position.copy(controls.target).addScaledVector(g.dir, CAMERA_DISTANCE);
+      camera.zoom = g.zoom;
+      camera.updateProjectionMatrix();
       goal.current = null;
       applyLimits(controls, req.view.limits);
+      lockZoom(controls, g.zoom);
       controls.update();
     }
   });
@@ -430,7 +483,11 @@ function PerspectiveRig({ pose }: { pose: { pos: Vec3; target: Vec3 } }) {
   const arrived = useRef(false);
   useEffect(() => {
     arrived.current = false;
-    if (controls) applyLimits(controls, FREE);
+    if (controls) {
+      applyLimits(controls, FREE);
+      controls.minDistance = 0;
+      controls.maxDistance = Infinity;
+    }
   }, [pose, controls]);
   useFrame((_, dt) => {
     if (!controls || arrived.current) return;
@@ -449,6 +506,10 @@ function PerspectiveRig({ pose }: { pose: { pos: Vec3; target: Vec3 } }) {
         minAzimuth: az - 0.7,
         maxAzimuth: az + 0.7,
       });
+      // The pose is the furthest out: the viewer may move in, not back.
+      const start = camera.position.distanceTo(controls.target);
+      controls.maxDistance = start;
+      controls.minDistance = start * MIN_DISTANCE_SHARE;
     }
   });
   return null;
