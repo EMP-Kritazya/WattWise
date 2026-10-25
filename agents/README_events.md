@@ -2,7 +2,7 @@
 
 # WattWise Events: nearby events and crowd agent
 
-**Agent:** WattWise Events · `@wattwiseevents` · `agent1qfpewxv737laxv5gk0zcraucrdse4cwl596399ce5cruy5kmn3t3v5h262y`
+**Agent:** WattWise Events | `@wattwiseevents` | `agent1qfpewxv737laxv5gk0zcraucrdse4cwl596399ce5cruy5kmn3t3v5h262y`
 
 Events near a restaurant in the next hours, with venue, start time, distance and expected attendance.
 

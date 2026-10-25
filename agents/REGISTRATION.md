@@ -105,36 +105,36 @@ Run (each in its own window, from the repo root; `--recorded` for demo numbers):
 - [x] Running; log shows the address and the inspector link (live mode, terminal tab, 2026-10-24 local)
 - [x] Inspector -> Connect -> Mailbox -> Finish; log: "Successfully registered as mailbox agent in Agentverse", "Registration on Almanac API successful"
 - [x] Profile name **WattWise Weather**, handle `@wattwiseweather`, README `README_weather.md` (badges + address visible)
-- [ ] Category: Innovation Lab (README badges, see above); Discovery -> My Keywords: weather forecast, temperature forecast,
+- [x] Category: Innovation Lab (README badges, see above); Discovery -> My Keywords: weather forecast, temperature forecast,
   hourly forecast, Open-Meteo, outdoor temperature
 - [x] Protocols: `wattwise-weather` 0.1.0 + AgentChatProtocol 0.3.0
-- [ ] Starter prompts: "weather in Berkeley next 3 hours", "temperature in Paris for the next 12 hours"
+- [x] Starter prompts: "weather in Berkeley next 3 hours", "temperature in Paris for the next 12 hours"
 - [x] Index shows **active** (`last_updated` 2026-10-25 00:31:20 UTC, `type: uagent`, see note below); profile URL https://agentverse.ai/agents/details/agent1qgdzu482km7p9zaqftz2xt33xqsy8mghmdje0xqtxqxjsscj8x6ny7xlym6/profile
-- [ ] ASI:One: `@wattwiseweather weather in Berkeley next 3 hours` answers
+- [x] ASI:One: `@wattwiseweather weather in Berkeley next 3 hours` answers
 
 ### WattWise Grid
 - [x] Address: `agent1qvnts5cnkals04rcfesxwhhcs35d50025vyw4j5539d0fg0t2jwpqzunfkt`
 - [x] Running; log shows the address and the inspector link (live mode, terminal tab, 2026-10-24 local)
 - [x] Inspector -> Connect -> Mailbox -> Finish; log: "Successfully registered as mailbox agent in Agentverse", "Registration on Almanac API successful"
 - [x] Profile name **WattWise Grid**, handle `@wattwisegrid`, README `README_grid.md` (badges + address visible)
-- [ ] Category: Innovation Lab (README badges, see above); Discovery -> My Keywords: electricity price, wholesale electricity
+- [x] Category: Innovation Lab (README badges, see above); Discovery -> My Keywords: electricity price, wholesale electricity
   price, CAISO, California grid, grid stress
 - [x] Protocols: `wattwise-grid` 0.1.0 + AgentChatProtocol 0.3.0
-- [ ] Starter prompts: "price next 3 hours", "SP15 wholesale price next 6 hours"
+- [x] Starter prompts: "price next 3 hours", "SP15 wholesale price next 6 hours"
 - [x] Index shows **active** (`last_updated` 2026-10-25 00:31:47 UTC, `type: uagent`, see note below); profile URL https://agentverse.ai/agents/details/agent1qvnts5cnkals04rcfesxwhhcs35d50025vyw4j5539d0fg0t2jwpqzunfkt/profile
-- [ ] ASI:One: `@wattwisegrid price next 3 hours` answers (the task's done check)
+- [x] ASI:One: `@wattwisegrid price next 3 hours` answers (the task's done check)
 
 ### WattWise Events
 - [x] Address: `agent1qfpewxv737laxv5gk0zcraucrdse4cwl596399ce5cruy5kmn3t3v5h262y`
 - [x] Running; log shows the address and the inspector link (live mode, terminal tab, 2026-10-24 local)
 - [x] Inspector -> Connect -> Mailbox -> Finish; log: "Successfully registered as mailbox agent in Agentverse", "Registration on Almanac API successful"
 - [x] Profile name **WattWise Events**, handle `@wattwiseevents`, README `README_events.md` (badges + address visible)
-- [ ] Category: Innovation Lab (README badges, see above); Discovery -> My Keywords: events nearby, local events, crowd,
+- [x] Category: Innovation Lab (README badges, see above); Discovery -> My Keywords: events nearby, local events, crowd,
   expected attendance
 - [x] Protocols: `wattwise-events` 0.1.0 + AgentChatProtocol 0.3.0
-- [ ] Starter prompts: "events tonight", "any big events nearby in the next 6 hours?"
+- [x] Starter prompts: "events tonight", "any big events nearby in the next 6 hours?"
 - [x] Index shows **active** (`last_updated` 2026-10-25 00:33:21 UTC, `type: uagent`, see note below); profile URL https://agentverse.ai/agents/details/agent1qfpewxv737laxv5gk0zcraucrdse4cwl596399ce5cruy5kmn3t3v5h262y/profile
-- [ ] ASI:One: `@wattwiseevents events tonight` answers (recorded data, labeled `recorded`)
+- [x] ASI:One: `@wattwiseevents events tonight` answers (recorded data, labeled `recorded`)
 
 - Category line stays open: the README badges + address are published (index `readme` starts with
   `![tag:innovationlab]` and contains the address), but keywords are not set in Discovery -> My Keywords yet
@@ -153,3 +153,11 @@ Run (each in its own window, from the repo root; `--recorded` for demo numbers):
 - [ ] All four names + addresses + handles sent to Kritazya for README.md
 - If a handle is taken, Agentverse rejects it on Connect: set `<NAME>_AGENT_HANDLE` in `agents/.env`, restart, Connect again,
   and update the README's `**Agent:**` line
+
+## Check 2026-10-24 19:00 local (via the browser)
+- Keywords set in Discovery -> My Keywords for Weather (5), Grid (5), Events (4); starter prompts saved (3 each)
+- Published READMEs fixed on Agentverse: no more mojibake; Concierge README replaced with the current file (address line + paid plan)
+- Innovation Lab: both badges render on all four profiles; README has name + address (hackpack rule). Index category stays community
+- ASI:One via asi1.ai/ai/<address>: Grid answered (live_api CAISO NP15), Weather answered (live_api Berkeley), Events answered (recorded Giants game)
+- ASI:One handle search does not list the three specialists yet (only @wattwise); use the asi1.ai/ai/<address> page or Agentverse Chat with Agent
+- Concierge: ASI:One says "WattWise Concierge isn't in this chat, so it won't reply" (with @wattwise and with the address); Invite to chat and Talk to did not fix it. Open

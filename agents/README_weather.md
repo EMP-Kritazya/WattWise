@@ -2,11 +2,11 @@
 
 # WattWise Weather: hourly temperature forecast agent
 
-**Agent:** WattWise Weather · `@wattwiseweather` · `agent1qgdzu482km7p9zaqftz2xt33xqsy8mghmdje0xqtxqxjsscj8x6ny7xlym6`
+**Agent:** WattWise Weather | `@wattwiseweather` | `agent1qgdzu482km7p9zaqftz2xt33xqsy8mghmdje0xqtxqxjsscj8x6ny7xlym6`
 
 Hourly outdoor temperature forecast for any place, for the next hours, for any user or agent.
 
-Temperatures come from Open-Meteo (`temperature_2m`, °C) and are passed on unchanged. Every answer carries its label:
+Temperatures come from Open-Meteo (`temperature_2m`, C) and are passed on unchanged. Every answer carries its label:
 `live_api` when it came from Open-Meteo just now, `recorded` in demo mode. When Open-Meteo does not answer, the agent says
 so instead of sending old numbers as new.
 
@@ -17,9 +17,9 @@ Example reply (illustrative values; real answers come from the live source):
 ```
 Input:  @wattwiseweather weather in Berkeley next 3 hours
 Output: WattWise Weather: Berkeley, United States, next 3 h (live_api, source open-meteo):
-        - 2026-10-24 18:00 UTC: 15.3 °C
-        - 2026-10-24 19:00 UTC: 16.1 °C
-        - 2026-10-24 20:00 UTC: 16.85 °C
+        - 2026-10-24 18:00 UTC: 15.3 C
+        - 2026-10-24 19:00 UTC: 16.1 C
+        - 2026-10-24 20:00 UTC: 16.85 C
 ```
 
 Example prompts:

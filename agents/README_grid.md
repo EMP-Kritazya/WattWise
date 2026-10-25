@@ -2,7 +2,7 @@
 
 # WattWise Grid: California wholesale electricity price agent
 
-**Agent:** WattWise Grid · `@wattwisegrid` · `agent1qvnts5cnkals04rcfesxwhhcs35d50025vyw4j5539d0fg0t2jwpqzunfkt`
+**Agent:** WattWise Grid | `@wattwisegrid` | `agent1qvnts5cnkals04rcfesxwhhcs35d50025vyw4j5539d0fg0t2jwpqzunfkt`
 
 Hourly California (CAISO) wholesale electricity prices for the next hours, with a grid stress level, for any user or agent.
 
