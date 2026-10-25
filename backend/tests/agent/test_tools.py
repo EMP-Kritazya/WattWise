@@ -6,7 +6,13 @@ from agent.tools import CHAT_TOOLS, ESCALATION_TOOLS, AgentTools, ToolInputError
 
 from .conftest import FIXTURES, load
 
-AI_TOOL_FILES = sorted((FIXTURES / "ai_tools").glob("*.json"))
+AI_TOOL_FILES = [
+    fixture for fixture in sorted((FIXTURES / "ai_tools").glob("*.json"))
+    # This legacy fixture has Claude create an escalation Proposal.  7142401
+    # and the current contract path reserve that kind for an explicit owner
+    # override, so generic chat no longer receives the tool.
+    if fixture.stem != "propose_escalation_choice"
+]
 # The proposals the scenario made before each one (shapes/proposal_<kind>.json are p_0001 … p_0006).
 PROPOSAL_SHAPES = ["proposal_pending", "proposal_peak_cap", "proposal_authority", "proposal_undo_decision",
                    "proposal_customer_event", "proposal_resolve_escalation"]
@@ -31,7 +37,8 @@ def test_ai_tool_fixture(app, set_clock, fixture_file):
 
     # The stale fixture still lists every engine option. Claude is now offered only authority-eligible ids and never
     # ask_owner; the actual valid fixture call remains useful as a facade recording check.
-    schema = next(t["input_schema"] for t in tools.schemas(allowed, escalation) if t["name"] == fx["tool"])
+    authority = tools.get_kitchen_state()["config"]["authority"] if escalation else None
+    schema = next(t["input_schema"] for t in tools.schemas(allowed, escalation, authority) if t["name"] == fx["tool"])
     if fx["tool"] == "choose_escalation_option":
         assert schema["properties"]["option_id"]["enum"] == ["accept_overrun", "extend_delay_dishwasher"]
     else:
@@ -61,7 +68,9 @@ def test_bounded_tools_reject_values_outside_their_enum(app):
 
 def test_chat_cannot_choose_escalation_options(app):
     tools = app.state.agent_tools
-    assert "choose_escalation_option" not in {t["name"] for t in tools.schemas(CHAT_TOOLS)}
+    offered = {t["name"] for t in tools.schemas(CHAT_TOOLS)}
+    assert "choose_escalation_option" not in offered
+    assert "propose_escalation_choice" not in offered
     with pytest.raises(ToolInputError):
         tools.call("choose_escalation_option", {"option_id": "accept_overrun", "rationale": "x"})
 
@@ -69,7 +78,9 @@ def test_chat_cannot_choose_escalation_options(app):
 def test_claude_enum_excludes_ask_owner_and_outside_authority(app):
     tools = app.state.agent_tools
     escalation = tools.get_escalation()[0]
-    tool = next(item for item in tools.schemas(ESCALATION_TOOLS, escalation) if item["name"] == "choose_escalation_option")
+    authority = tools.get_kitchen_state()["config"]["authority"]
+    tool = next(item for item in tools.schemas(ESCALATION_TOOLS, escalation, authority)
+                if item["name"] == "choose_escalation_option")
     assert tool["input_schema"]["properties"]["option_id"]["enum"] == [
         "accept_overrun", "extend_delay_dishwasher"
     ]
@@ -81,6 +92,13 @@ def test_disabled_authority_does_not_offer_claude_a_choice(app):
     tools = app.state.agent_tools
     escalation = tools.get_escalation()[0]
     offered = {item["name"] for item in tools.schemas(ESCALATION_TOOLS, escalation, {"enabled": False})}
+    assert "choose_escalation_option" not in offered
+
+
+def test_missing_authority_does_not_offer_claude_a_choice(app):
+    tools = app.state.agent_tools
+    escalation = tools.get_escalation()[0]
+    offered = {item["name"] for item in tools.schemas(ESCALATION_TOOLS, escalation)}
     assert "choose_escalation_option" not in offered
 
 

@@ -212,17 +212,19 @@ class FakeKitchen:
             return _answer(self._rec, "resolve_escalation", args)
         except NotRecordedError:
             pass
-        # STUB: no recording for this choice. Return the recorded open escalation with the choice filled in; the status
-        # follows the chosen option's engine-computed `within_authority` (CONTRACTS.md §3). No number is produced.
+        # STUB: no recording for this choice. Return the recorded open escalation with the choice filled in, but do
+        # not manufacture the legacy ``awaiting_owner`` handoff.  Claude is never offered an outside-authority id;
+        # a direct invalid call is rejected here too, while the owner can still select any offered option.
         escalation = next((e for e in self.open_escalations() if e["escalation_id"] == escalation_id), None)
         if escalation is None:
             raise NotRecordedError(f"STUB: FakeKitchen has no open escalation {escalation_id}")
         option = next((o for o in escalation["options"] if o["option_id"] == option_id), None)
         if option is None:
             raise RuleError(f"{escalation_id}: {option_id} is not one of the offered options")
-        awaiting = resolved_by == "claude" and not option["within_authority"]
+        if resolved_by == "claude" and not option["within_authority"]:
+            raise RuleError(f"{escalation_id}: {option_id} is outside Claude authority")
         escalation.update(
-            status="awaiting_owner" if awaiting else "resolved",
+            status="resolved",
             resolved_by=resolved_by,
             chosen_option_id=option_id,
             rationale=rationale,

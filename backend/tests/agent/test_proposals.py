@@ -66,10 +66,10 @@ def test_expired_proposal_cannot_be_confirmed(app, set_clock, facade_calls, push
     assert [m["data"]["status"] for m in pushed] == ["expired"]
 
 
-def test_escalation_proposal_expires_at_the_escalation_deadline(app, set_clock):
+def test_explicit_owner_escalation_override_proposal_expires_at_the_escalation_deadline(app, set_clock):
     fx = load("ai_tools/propose_escalation_choice.json")
     set_clock(fx["output"]["ts"])
-    proposal = app.state.agent_tools.call(fx["tool"], fx["input"])
+    proposal = app.state.agent_tools.propose_escalation_choice(**fx["input"])
     assert proposal["expires_at"] == "2026-07-18T01:40:00Z"
 
 
