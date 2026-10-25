@@ -109,12 +109,12 @@ def test_parse_region():
 
 
 async def test_events_chat_recorded(monkeypatch):
-    monkeypatch.setattr(events, "RECORDED", False)
+    monkeypatch.setattr(events, "RECORDED", True)
     item = load_fixture("events_response.json")["items"][0]
     text = await events.answer_text("events tonight")
     assert text.splitlines() == [
         "WattWise Events: near Marina, San Francisco, next 12 h (recorded, source demo_events):",
-        f"- {item['name']} at {item['venue']}, {when(item['start'])}, {item['distance_km']} km away, "
+        f"- {item['name']} at {item['venue']}, {events.local_and_utc(item['start'])}, {item['distance_km']} km away, "
         f"expected attendance {item['expected_attendance']}",
     ]
 

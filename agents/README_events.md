@@ -4,18 +4,21 @@
 
 **Agent:** WattWise Events | `@wattwiseevents` | `agent1qfpewxv737laxv5gk0zcraucrdse4cwl596399ce5cruy5kmn3t3v5h262y`
 
-Events near a restaurant in the next hours, with venue, start time, distance and expected attendance.
+Events near a restaurant in the next hours, with venue, start time and distance (Ticketmaster Discovery API).
 
 Big events nearby (a ballgame, a concert) bring a crowd into nearby restaurants. This agent lists them so a kitchen, or
-any agent, can plan for the rush. Every answer carries its label. Today the agent answers from recorded demo data for
-San Francisco (source `demo_events`, label `recorded`); no live events provider is connected yet.
+any agent, can plan for the rush. Every answer carries its label: live events come from Ticketmaster (source
+`ticketmaster`, label `live_api`), fields passed through unchanged. If Ticketmaster is unavailable (no key, timeout, HTTP
+error, rate limit) the agent answers with recorded demo data for San Francisco (source `demo_events`, label `recorded`).
+Demo mode (`--recorded` / `DEMO_MODE=1`) always uses the recorded data.
 
 ## Ask in plain text (ASI:One, Agent Chat Protocol)
 
 ```
 Input:  @wattwiseevents events tonight
-Output: WattWise Events: near Marina, San Francisco, next 12 h (recorded, source demo_events):
-        - Giants vs Dodgers at Oracle Park, 2026-07-18 02:05 UTC, 1.8 km away, expected attendance 40000
+Output: WattWise Events: near Marina, San Francisco, next 12 h (live_api, source ticketmaster):
+        - San Francisco Giants vs. Los Angeles Dodgers at Oracle Park, 2026-10-24 19:05 PDT (2026-10-25 02:05 UTC),
+          4.21 km away, attendance not published
 ```
 
 Example prompts:
@@ -25,7 +28,7 @@ Example prompts:
 - will a game bring a crowd this evening?
 - concerts or games near the restaurant next 24 hours
 
-Hours: 1 to 24 (default 12). Times are UTC.
+Hours: 1 to 24 (default 12). Start times in local time (America/Los_Angeles) with UTC next to them.
 
 ## Call it from your agent (typed messages, uAgents)
 
@@ -50,7 +53,7 @@ class EventItem(Model):
 class EventsResponse(Model):
     items: list[EventItem]
     source: str  # "demo_events"
-    label: str   # recorded (live_api once a live provider is connected)
+    label: str   # recorded
 ```
 
 ```python
@@ -61,10 +64,15 @@ reply, status = await ctx.send_and_receive(EVENTS_ADDRESS,
 
 ## Limitations
 
-- Recorded demo data only (one San Francisco event), whatever the location asked; labeled `recorded` every time.
+- No attendance: Ticketmaster does not publish it, and the agent never estimates it (chat says "attendance not
+  published").
+- Typed `EventsResponse` replies are still the recorded event (label `recorded`): the contract requires
+  `expected_attendance` as a number, which Ticketmaster does not give. Live events reach chat replies only, for now.
+- Chat looks up events near the demo location (Marina, San Francisco) only; a place named in the message is not used yet.
+- Live mode needs `TICKETMASTER_API_KEY`; Ticketmaster's free tier is rate limited (a 429 falls back to recorded).
 
 ## Metadata
 
 WattWise team, Cal Hacks 13.0, Fetch.ai Innovation Lab. Version 0.1. Part of WattWise, which keeps a restaurant's
 electricity peak under its owner's cap; the WattWise Concierge (@wattwise) uses this agent to judge the crowd effect.
-Keywords: events nearby, local events, crowd, ballgame, concert, expected attendance, restaurant rush, foot traffic.
+Keywords: events nearby, local events, Ticketmaster, crowd, ballgame, concert, restaurant rush, foot traffic.
