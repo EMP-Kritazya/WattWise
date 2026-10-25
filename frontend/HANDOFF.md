@@ -3,6 +3,29 @@
 You are taking over Ashirwad's work on **WattWise** (Cal Hacks 13.0, Oct 23–25 2026). Work carefully, keep the existing code style,
 and run `npm run build` and `npm test` (in `frontend/`) before calling anything done.
 
+## ⭐ Oct 24 night: `integrate/ashirwad-suyog` (worktree `~/Downloads/WattWise-integrate`, local, not pushed)
+Branch from `ashirwad` (`0db6689`) with Suyog's branch merged in, as planned:
+- `77f28d3` merge `origin/Suyog` @ `930c472` (only conflict `docs/Claude_EVAL.md`: main's version, identical to Suyog's).
+- `0af0d61`, `00160a9` the two fixes from `ashirwad-suyog-work`: `sim_build` re-sent for a kitchen restored from the store;
+  the loop pauses at the end of the fake recording (its frontend half was already on `ashirwad`).
+- `02bb3be` merge Suyog's latest `f7ceb51` ("Updated docs rule"): engine-owned escalations, **never ask the owner** (Claude is
+  offered only within-authority options, never `ask_owner`; no Proposal for Claude's choice; the clock is never touched for an
+  escalation; the fake kitchen accepts `FULL_AUTHORITY`; ASI:One cards say "Outside Claude's authority"). This branch had its
+  own version of that change; it was dropped for Suyog's (kept on local branch `backup/integrate-own-fullauth`).
+  `loop.py` conflict: Suyog's play / `next_day` control plus `restore_build()` on play.
+- Checks: backend `pytest` 297 passed, 11 skipped, 8 xfailed (Suyog's "fixtures predate CONTRACTS 10528e2"); agents `pytest`
+  80 passed (needs a venv with `agents/requirements.txt`); frontend build + 8 tests pass.
+- End to end (`integrate-api` + `integrate-web` in `.claude/launch.json`, `/sim` host tab open, fake kitchen, Claude off): the clock
+  ran through the tick-60 escalation without pausing and stopped at 7:30 PM, the end of the recording; no owner text, no dialog.
+- **Known gaps, not from the merge:**
+  - The Builder cannot build the fake's recorded kitchen: the catalog defaults the dishwasher to `must_finish_by` 15:30, the
+    recording has 19:30 (plus 2 HVAC and a preference text). For a fake run, `POST /api/kitchen` with the recorded config.
+  - `GET /api/escalations?status=open` returns 500 in fake mode: Suyog's models need the new contract fields (`updated_ts`,
+    `active_option_id`, `harm_score`, `rank`) the old recordings lack. Clears when Kritazya's regenerated fixtures land.
+  - The Dashboard escalation card stays "Claude is choosing…" when Claude is off; showing `active_option_id` (the engine's
+    fallback in force) is part of the ASHIRWAD.md section D contract migration.
+- Next: PR `integrate/ashirwad-suyog` → `main` (architecture-reviewer), then the section D migration once Kritazya's fixtures merge.
+
 ## ⭐ Oct 24 evening: four-tab UI ported from `WattWise-suyog-work` (uncommitted on `ashirwad`)
 **Pitch work is parked** on local branch `pitch-wip` (commit `62c0add`, not pushed): `PitchPage.tsx`, `.env.demo`, `public/`
 (`_redirects`, `staticwebapp.config.json`), and its edits to `App.tsx`, `SimControls.tsx`, `Hud.tsx`, `LiveFloor.tsx`, `ToyBoxRail.tsx`,
