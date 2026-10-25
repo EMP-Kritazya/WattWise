@@ -131,7 +131,8 @@ function DemandChargeCard() {
 
 function claudeHeading(escalation: LiveEscalationRow | undefined, options: EscalationOption[]) {
   if (!escalation || escalation.status === "open") return "Claude is choosing…";
-  if (escalation.status === "awaiting_owner") return "Claude needs your choice";
+  // The owner is never asked: Claude's pick is shown and the engine's default stays in force (full authority).
+  if (escalation.status === "awaiting_owner") return "Claude chose · engine default applies";
   if (escalation.status === "expired_default") return "Default option applied";
   const actionable = options.filter((option) => option.projected != null);
   const chosenIndex = actionable.findIndex((option) => option.option_id === escalation.chosen_option_id);

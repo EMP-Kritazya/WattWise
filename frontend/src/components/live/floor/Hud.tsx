@@ -151,7 +151,6 @@ export function DemoBar({ onExit }: { onExit: () => void }) {
   const { run, busy } = useAction();
   const simTs = latest?.ts ?? clock?.sim_ts;
   const playing = clock?.playing ?? false;
-  const waiting = clock?.paused_reason === "escalation";
   // From the engine's LaneComparison; the browser never subtracts lanes.
   const saved = comparison?.saved_today_usd ?? null;
 
@@ -159,11 +158,9 @@ export function DemoBar({ onExit }: { onExit: () => void }) {
     <div className={cn(GLASS, "flex flex-wrap items-center gap-3 px-3 py-2")}>
       <div className="px-1">
         <div className="text-lg leading-tight font-semibold tabular-nums">{simTs ? fmtSimClock(simTs) : "–"}</div>
-        <div className={cn("text-[11px]", waiting ? "text-amber-300" : "text-white/50")}>
-          {waiting ? "Paused — waiting for you" : playing ? `Running ${clock?.speed}×` : "Paused"}
-        </div>
+        <div className="text-[11px] text-white/50">{playing ? `Running ${clock?.speed}×` : "Paused"}</div>
       </div>
-      <Button size="sm" disabled={busy || waiting} onClick={() => run(() => transport.simControl({ action: playing ? "pause" : "play" }))}>
+      <Button size="sm" disabled={busy} onClick={() => run(() => transport.simControl({ action: playing ? "pause" : "play" }))}>
         {playing ? <Pause /> : <Play />}
         {playing ? "Pause" : "Play"}
       </Button>

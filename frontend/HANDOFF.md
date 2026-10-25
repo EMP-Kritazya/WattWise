@@ -22,6 +22,27 @@ Copied as-is from `~/Downloads/WattWise-suyog-work` (branch `ashirwad-suyog-work
 - Verified: build + tests pass; in `dev:mocks` the four tabs, both sub-tab rows, both redirects, Build kitchen → `/live` with controls,
   savings panel and 3D floor, and the Dashboard all work.
 
+## ⭐ Oct 24 evening: the project never stops for the owner (uncommitted on `ashirwad`)
+Ashirwad's product decision: on an escalation Claude picks the best option itself and the system keeps running. The owner is never
+asked, nothing waits for the owner, the clock never pauses for an escalation. Full authority (Builder sends `FULL_AUTHORITY`, no UI);
+hard floors stay: always_on untouched, never below `min_power_pct`, `must_finish_by` holds, refrigeration ≥ 50 %.
+- **Docs:** `CLAUDE.md` (product paragraph, `authority` row, golden rule 2, "Never" list) and `docs/CONTRACTS.md` (ClaudeAuthority
+  full-authority note) now use the wording from `ashirwad-suyog-work`. **Tell Suyog and Kritazya** (CLAUDE.md + CONTRACTS.md changed).
+- **Frontend:** `Hud.tsx` DemoBar has no "Paused — waiting for you" label and Play is never disabled for an escalation; `LiveFloor.tsx`
+  Space toggles play/pause regardless of `paused_reason`; `EscalationCard.tsx` shows `awaiting_owner` as "Claude chose" + Claude's
+  pick + "Engine default applies at <deadline_sim_ts>" (contract numbers only; no "Claude asked you"); `ToyBoxRail.tsx` heading
+  is "Claude chose · engine default applies" (the rail row has no deadline column on this branch's types yet).
+- **Fixture mode:** `mocks/viewerWs.ts` loops the recording at its end (`resetPlayback(true)`, keeping the chosen speed) instead of
+  stopping. The recorded `escalation_awaiting_owner` fixture is unchanged (Kritazya's); the UI just doesn't treat it as a question.
+- **Backend part lives only on `ashirwad-suyog-work`** (`agent/tools.py` `claude_choices()`: Claude is offered only within-authority
+  options, never `ask_owner`; `runtime/escalations.py`: no escalation pause). Bring it in when Suyog's backend merges; this branch
+  has no backend code.
+- Still open: `docs/design/UI.md` and `docs/team/ASHIRWAD.md` (main) still describe the Builder "Claude's authority" card and
+  "Waiting for you" option buttons; main's section D contract migration (`run_days`, phases, `obsolete`, `active_option_id`, …) is
+  not started, and its `scenario/demo_cafe_multiday/` fixtures don't exist on main yet.
+- Verified in `dev:mocks` at 600×: the replay runs through the tick-60 escalation and past its end, loops back to 5:31 PM and keeps
+  running; no dialog, no owner-waiting text, no console errors.
+
 ## ⭐ CURRENT TASK (Oct 24, latest): build the Toy Box restaurant design
 **Spec:** `frontend/UI_CONCEPTS.md`, chosen by Ashirwad. **Visual target:** `frontend/design/toybox-restaurant-mockup.html`; open it in a browser.
 
