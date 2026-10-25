@@ -44,13 +44,15 @@ const schedule = () => {
 };
 
 const publishNext = () => {
-  const frame = frames[frameIndex++];
-  if (!frame) {
-    playing = false;
-    stopTimer();
+  if (frameIndex >= frames.length) {
+    // End of the recording: the replay restarts from tick 0 and keeps playing, so the demo never stops.
+    // Same frames every loop, so it stays deterministic. The chosen speed carries over.
+    const loopSpeed = speed;
+    resetPlayback(true);
+    speed = loopSpeed;
     broadcastClock();
-    return;
   }
+  const frame = frames[frameIndex++];
 
   for (const original of frame) {
     let message = original;
@@ -83,8 +85,6 @@ export function controlFixtureViewer(body: SimControlRequest): ClockState {
   if (body.action === "reset") {
     resetPlayback(false);
   } else {
-    // At the end of the 120-tick scenario, Play replays it from the start instead of stopping again at once.
-    if (body.action === "play" && frameIndex >= frames.length) resetPlayback(true);
     if (body.speed != null) speed = body.speed;
     playing = body.action === "play";
     if (!playing) stopTimer();

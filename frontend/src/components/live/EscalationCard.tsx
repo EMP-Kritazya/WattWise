@@ -1,4 +1,4 @@
-import { Bot, CheckCircle2, Clock, LoaderCircle, ShieldAlert, User } from "lucide-react";
+import { Bot, CheckCircle2, Clock, LoaderCircle, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useEscalations } from "@/data";
 import { fmtKw, fmtSimTime, fmtUsd } from "@/lib/format";
@@ -7,7 +7,8 @@ import type { Escalation } from "@/types";
 
 /**
  * The latest escalation, inline on the Live screen (UI.md): the problem in engine numbers, then
- * Claude is choosing… → Claude chose X: rationale · Waiting for you (the decision dialog opens) · Default applied.
+ * Claude is choosing… → Claude chose X: rationale · Default applied. The owner is never asked (full authority): an
+ * `awaiting_owner` row shows Claude's pick and when the engine's default applies, never a question to the owner.
  */
 export function EscalationCard() {
   const [latest] = useEscalations();
@@ -15,7 +16,7 @@ export function EscalationCard() {
   const e = latest;
   const chosen = e.options.find((o) => o.option_id === e.chosen_option_id);
   const state = STATE[e.status];
-  const Icon = e.status === "open" ? LoaderCircle : e.status === "awaiting_owner" ? ShieldAlert : e.resolved_by === "owner" ? User : e.resolved_by === "claude" ? Bot : Clock;
+  const Icon = e.status === "open" ? LoaderCircle : e.resolved_by === "owner" ? User : e.resolved_by === "claude" ? Bot : Clock;
 
   return (
     <section
@@ -50,7 +51,12 @@ export function EscalationCard() {
         )}
         {e.rationale && (
           <p className="mt-1 text-xs text-muted-foreground">
-            {e.resolved_by === "owner" ? "Claude asked you: " : "Claude: "}“{e.rationale}”
+            Claude: “{e.rationale}”
+          </p>
+        )}
+        {e.status === "awaiting_owner" && e.deadline_sim_ts && (
+          <p className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Clock className="size-3.5" /> Engine default applies at {fmtSimTime(e.deadline_sim_ts)}
           </p>
         )}
       </div>
@@ -65,11 +71,12 @@ const STATE: Record<Escalation["status"], { label: (e: Escalation) => string; bo
     icon: "bg-importance-flexible/15 text-importance-flexible",
     badge: "border-importance-flexible/40 text-importance-flexible",
   },
+  // Not a question to the owner: Claude has picked and the engine's default holds until the deadline.
   awaiting_owner: {
-    label: () => "Waiting for you",
-    box: "border-importance-deferrable/50 bg-importance-deferrable/10",
-    icon: "bg-importance-deferrable/15 text-importance-deferrable",
-    badge: "border-importance-deferrable/40 text-importance-deferrable",
+    label: () => "Claude chose",
+    box: "border-lane-with/40 bg-lane-with/5",
+    icon: "bg-lane-with/15 text-lane-with",
+    badge: "border-lane-with/40 text-lane-with",
   },
   resolved: {
     label: (e) => (e.resolved_by === "claude" ? "Claude chose" : e.resolved_by === "owner" ? "You chose" : "Resolved"),

@@ -515,8 +515,7 @@ function useDemoKeys(
       const { clock } = useSim.getState();
       if (e.code === "Space") {
         e.preventDefault();
-        if (clock?.paused_reason !== "escalation")
-          transport.simControl({ action: clock?.playing ? "pause" : "play" }).catch(() => {});
+        transport.simControl({ action: clock?.playing ? "pause" : "play" }).catch(() => {});
       } else if (e.key === "c" || e.key === "C") {
         requestSurge(40).catch(() => {});
       } else if (e.key === "s" || e.key === "S") {
