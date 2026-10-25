@@ -298,7 +298,7 @@ def test_g36_2045_block_counts_on_peak_2100_block_does_not():
 
 def test_tariff_without_windowed_charge_gives_null_on_peak_peak():
     tariff = load_tariff()
-    only_max = tariff.model_copy(update={"demand": [DemandCharge(name="max_demand", window=None, usd_per_kw=20.0)]})
+    only_max = tariff.model_copy(update={"demand": [DemandCharge(name="max_demand", windows=None, usd_per_kw=20.0)]})
     kitchen, devices = new_kitchen(tariff=only_max)
     run = Feeder(kitchen, devices, local_ts(2026, 7, 16, 16, 0))
     m = run.feed(15, 45.0)
@@ -647,7 +647,7 @@ def _july_history(devices, month_to_date=None):
     start = local_ts(2026, 7, 16, 16, 0)  # run start = history.end
     blocks = [
         (local_ts(2026, 6, 30, 16, 0), 60.0),  # June: not this month
-        (local_ts(2026, 6, 30, 23, 45), 70.0),  # June local, but 2026-07-01T06:45Z in UTC: not this month
+        (local_ts(2026, 6, 30, 23, 45), 65.0),  # June local (65 kW: under the 68.2 kW rated sum since the 8 kW HVAC catalog change), but 2026-07-01T06:45Z in UTC: not this month
         (local_ts(2026, 7, 1, 0, 0), 8.0),  # first local July block
         (local_ts(2026, 7, 15, 10, 0), 40.0),  # July morning peak
         (local_ts(2026, 7, 15, 16, 0), 30.0),  # July on-peak peak
@@ -666,7 +666,7 @@ def test_warm_up_meters_current_month_history_into_month_to_date():
 
     m = run.feed(1, 45.0)  # ts 16 Jul 16:01
     # July blocks only (local month): 1 Jul 00:00 = 8, 15 Jul 10:00 = 40, 15 Jul 16:00 = 30 (on-peak)
-    #   June 30 16:00 (60) and June 30 23:45 local (70, July in UTC) excluded -> month 40, on-peak 30
+    #   June 30 16:00 (60) and June 30 23:45 local (65, July in UTC) excluded -> month 40, on-peak 30
     assert m.month_peak_kw == pytest.approx(40.0, abs=USD)
     assert m.on_peak_month_peak_kw == pytest.approx(30.0, abs=USD)
     # history energy: 8 × 0.25 = 2 + 40 × 0.25 = 10 + 30 × 0.25 = 7.5 -> 19.5 kWh; + live 45/60 = 0.75 -> 20.25

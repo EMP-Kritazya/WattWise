@@ -5,22 +5,7 @@
   "request": null,
   "response": [
     {
-      "decision_id": "d_0022",
-      "ts": "2026-07-18T02:30:00Z",
-      "device_id": "hvac_1",
-      "action": "restore",
-      "value": null,
-      "reason_code": "catch_up",
-      "inside_rules": true,
-      "status": "executed",
-      "effect": {
-        "peak_before_kw": 36.1,
-        "peak_after_kw": 37.5,
-        "saving_usd": -0.02
-      }
-    },
-    {
-      "decision_id": "d_0021",
+      "decision_id": "d_0016",
       "ts": "2026-07-18T02:30:00Z",
       "device_id": "hvac_2",
       "action": "restore",
@@ -29,13 +14,13 @@
       "inside_rules": true,
       "status": "executed",
       "effect": {
-        "peak_before_kw": 36.6,
-        "peak_after_kw": 36.1,
-        "saving_usd": -0.23
+        "peak_before_kw": 37.0,
+        "peak_after_kw": 36.8,
+        "saving_usd": -0.12
       }
     },
     {
-      "decision_id": "d_0020",
+      "decision_id": "d_0015",
       "ts": "2026-07-18T02:28:00Z",
       "device_id": "dishwasher_1",
       "action": "start",
@@ -44,13 +29,13 @@
       "inside_rules": true,
       "status": "executed",
       "effect": {
-        "peak_before_kw": 38.2,
-        "peak_after_kw": 38.2,
+        "peak_before_kw": 38.8,
+        "peak_after_kw": 38.8,
         "saving_usd": 0.0
       }
     },
     {
-      "decision_id": "d_0019",
+      "decision_id": "d_0014",
       "ts": "2026-07-18T02:28:00Z",
       "device_id": "dishwasher_1",
       "action": "start",
@@ -65,39 +50,9 @@
       }
     },
     {
-      "decision_id": "d_0018",
+      "decision_id": "d_0013",
       "ts": "2026-07-18T02:20:00Z",
-      "device_id": "walk_in_cooler_1",
-      "action": "restore",
-      "value": null,
-      "reason_code": "catch_up",
-      "inside_rules": true,
-      "status": "executed",
-      "effect": {
-        "peak_before_kw": 37.2,
-        "peak_after_kw": 38.4,
-        "saving_usd": 0.04
-      }
-    },
-    {
-      "decision_id": "d_0017",
-      "ts": "2026-07-18T02:15:00Z",
       "device_id": "hvac_1",
-      "action": "reduce",
-      "value": 40,
-      "reason_code": "stay_under_cap",
-      "inside_rules": true,
-      "status": "executed",
-      "effect": {
-        "peak_before_kw": 40.1,
-        "peak_after_kw": 37.2,
-        "saving_usd": 0.22
-      }
-    },
-    {
-      "decision_id": "d_0016",
-      "ts": "2026-07-18T02:15:00Z",
-      "device_id": "water_heater_1",
       "action": "restore",
       "value": null,
       "reason_code": "catch_up",
@@ -105,133 +60,13 @@
       "status": "executed",
       "effect": {
         "peak_before_kw": 37.4,
-        "peak_after_kw": 40.1,
-        "saving_usd": -0.72
-      }
-    },
-    {
-      "decision_id": "d_0015",
-      "ts": "2026-07-18T02:00:00Z",
-      "device_id": "walk_in_cooler_1",
-      "action": "reduce",
-      "value": 50,
-      "reason_code": "stay_under_cap",
-      "inside_rules": true,
-      "status": "executed",
-      "effect": {
-        "peak_before_kw": 40.8,
-        "peak_after_kw": 40.1,
-        "saving_usd": -0.01
-      }
-    },
-    {
-      "decision_id": "d_0014",
-      "ts": "2026-07-18T02:00:00Z",
-      "device_id": "hvac_2",
-      "action": "reduce",
-      "value": 40,
-      "reason_code": "stay_under_cap",
-      "inside_rules": true,
-      "status": "executed",
-      "effect": {
-        "peak_before_kw": 43.2,
-        "peak_after_kw": 40.8,
-        "saving_usd": 18.61
-      }
-    },
-    {
-      "decision_id": "d_0013",
-      "ts": "2026-07-18T01:45:00Z",
-      "device_id": "water_heater_1",
-      "action": "reduce",
-      "value": 40,
-      "reason_code": "stay_under_cap",
-      "inside_rules": true,
-      "status": "executed",
-      "effect": {
-        "peak_before_kw": 44.7,
-        "peak_after_kw": 43.1,
-        "saving_usd": 44.69
+        "peak_after_kw": 38.9,
+        "saving_usd": -0.24
       }
     },
     {
       "decision_id": "d_0012",
-      "ts": "2026-07-18T01:45:00Z",
-      "device_id": "hvac_1",
-      "action": "restore",
-      "value": null,
-      "reason_code": "catch_up",
-      "inside_rules": true,
-      "status": "executed",
-      "effect": {
-        "peak_before_kw": 41.0,
-        "peak_after_kw": 44.7,
-        "saving_usd": -60.94
-      }
-    },
-    {
-      "decision_id": "d_0011",
-      "ts": "2026-07-18T01:30:00Z",
-      "device_id": "hvac_2",
-      "action": "restore",
-      "value": null,
-      "reason_code": "catch_up",
-      "inside_rules": true,
-      "status": "executed",
-      "effect": {
-        "peak_before_kw": 41.2,
-        "peak_after_kw": 44.7,
-        "saving_usd": -61.24
-      }
-    },
-    {
-      "decision_id": "d_0010",
-      "ts": "2026-07-18T01:20:00Z",
-      "device_id": "dishwasher_1",
-      "action": "delay",
-      "value": 40,
-      "reason_code": "escalation_fallback",
-      "inside_rules": false,
-      "status": "executed",
-      "effect": {
-        "peak_before_kw": 48.0,
-        "peak_after_kw": 43.1,
-        "saving_usd": 137.2
-      }
-    },
-    {
-      "decision_id": "d_0009",
-      "ts": "2026-07-18T01:20:00Z",
-      "device_id": "walk_in_cooler_1",
-      "action": "restore",
-      "value": null,
-      "reason_code": "catch_up",
-      "inside_rules": true,
-      "status": "executed",
-      "effect": {
-        "peak_before_kw": 51.0,
-        "peak_after_kw": 50.7,
-        "saving_usd": 7.91
-      }
-    },
-    {
-      "decision_id": "d_0008",
-      "ts": "2026-07-18T01:15:00Z",
-      "device_id": "hvac_1",
-      "action": "reduce",
-      "value": 40,
-      "reason_code": "stay_under_cap",
-      "inside_rules": true,
-      "status": "executed",
-      "effect": {
-        "peak_before_kw": 49.6,
-        "peak_after_kw": 50.6,
-        "saving_usd": -27.61
-      }
-    },
-    {
-      "decision_id": "d_0007",
-      "ts": "2026-07-18T01:05:00Z",
+      "ts": "2026-07-18T02:15:00Z",
       "device_id": "water_heater_1",
       "action": "restore",
       "value": null,
@@ -239,14 +74,29 @@
       "inside_rules": true,
       "status": "executed",
       "effect": {
-        "peak_before_kw": 46.9,
-        "peak_after_kw": 49.6,
-        "saving_usd": -76.51
+        "peak_before_kw": 35.9,
+        "peak_after_kw": 37.4,
+        "saving_usd": -0.62
       }
     },
     {
-      "decision_id": "d_0006",
-      "ts": "2026-07-18T01:00:00Z",
+      "decision_id": "d_0011",
+      "ts": "2026-07-18T02:15:00Z",
+      "device_id": "walk_in_cooler_1",
+      "action": "restore",
+      "value": null,
+      "reason_code": "catch_up",
+      "inside_rules": true,
+      "status": "executed",
+      "effect": {
+        "peak_before_kw": 35.6,
+        "peak_after_kw": 35.9,
+        "saving_usd": -0.32
+      }
+    },
+    {
+      "decision_id": "d_0010",
+      "ts": "2026-07-18T02:10:00Z",
       "device_id": "hvac_2",
       "action": "reduce",
       "value": 40,
@@ -254,29 +104,29 @@
       "inside_rules": true,
       "status": "executed",
       "effect": {
-        "peak_before_kw": 49.9,
-        "peak_after_kw": 50.7,
-        "saving_usd": -22.01
+        "peak_before_kw": 40.6,
+        "peak_after_kw": 37.4,
+        "saving_usd": 0.61
       }
     },
     {
-      "decision_id": "d_0005",
-      "ts": "2026-07-18T00:55:00Z",
-      "device_id": "dishwasher_1",
-      "action": "delay",
-      "value": 50,
+      "decision_id": "d_0009",
+      "ts": "2026-07-18T02:00:00Z",
+      "device_id": "hvac_1",
+      "action": "reduce",
+      "value": 40,
       "reason_code": "stay_under_cap",
       "inside_rules": true,
       "status": "executed",
       "effect": {
-        "peak_before_kw": 42.7,
-        "peak_after_kw": 42.7,
-        "saving_usd": 0.0
+        "peak_before_kw": 44.1,
+        "peak_after_kw": 40.6,
+        "saving_usd": 43.91
       }
     },
     {
-      "decision_id": "d_0004",
-      "ts": "2026-07-18T00:50:00Z",
+      "decision_id": "d_0008",
+      "ts": "2026-07-18T01:45:00Z",
       "device_id": "walk_in_cooler_1",
       "action": "reduce",
       "value": 50,
@@ -284,28 +134,103 @@
       "inside_rules": true,
       "status": "executed",
       "effect": {
-        "peak_before_kw": 42.9,
-        "peak_after_kw": 42.7,
-        "saving_usd": 5.64
+        "peak_before_kw": 43.3,
+        "peak_after_kw": 44.2,
+        "saving_usd": -25.24
       }
     },
     {
-      "decision_id": "d_0003",
-      "ts": "2026-07-18T00:50:00Z",
-      "device_id": "dishwasher_1",
-      "action": "delay",
+      "decision_id": "d_0007",
+      "ts": "2026-07-18T01:45:00Z",
+      "device_id": "water_heater_1",
+      "action": "reduce",
       "value": 40,
       "reason_code": "stay_under_cap",
       "inside_rules": true,
       "status": "executed",
       "effect": {
-        "peak_before_kw": 42.3,
-        "peak_after_kw": 42.9,
-        "saving_usd": -10.08
+        "peak_before_kw": 43.4,
+        "peak_after_kw": 43.3,
+        "saving_usd": 2.91
+      }
+    },
+    {
+      "decision_id": "d_0006",
+      "ts": "2026-07-18T01:40:00Z",
+      "device_id": "hvac_2",
+      "action": "restore",
+      "value": null,
+      "reason_code": "catch_up",
+      "inside_rules": true,
+      "status": "executed",
+      "effect": {
+        "peak_before_kw": 38.9,
+        "peak_after_kw": 43.4,
+        "saving_usd": -26.26
+      }
+    },
+    {
+      "decision_id": "d_0005",
+      "ts": "2026-07-18T01:30:00Z",
+      "device_id": "hvac_1",
+      "action": "restore",
+      "value": null,
+      "reason_code": "catch_up",
+      "inside_rules": true,
+      "status": "executed",
+      "effect": {
+        "peak_before_kw": 38.9,
+        "peak_after_kw": 43.4,
+        "saving_usd": -26.5
+      }
+    },
+    {
+      "decision_id": "d_0004",
+      "ts": "2026-07-18T01:10:00Z",
+      "device_id": "hvac_2",
+      "action": "reduce",
+      "value": 40,
+      "reason_code": "stay_under_cap",
+      "inside_rules": true,
+      "status": "executed",
+      "effect": {
+        "peak_before_kw": 43.3,
+        "peak_after_kw": 43.3,
+        "saving_usd": 0.69
+      }
+    },
+    {
+      "decision_id": "d_0003",
+      "ts": "2026-07-18T01:00:00Z",
+      "device_id": "hvac_1",
+      "action": "reduce",
+      "value": 40,
+      "reason_code": "stay_under_cap",
+      "inside_rules": true,
+      "status": "executed",
+      "effect": {
+        "peak_before_kw": 43.4,
+        "peak_after_kw": 43.4,
+        "saving_usd": 0.78
       }
     },
     {
       "decision_id": "d_0002",
+      "ts": "2026-07-18T01:00:00Z",
+      "device_id": "dishwasher_1",
+      "action": "delay",
+      "value": 60,
+      "reason_code": "stay_under_cap",
+      "inside_rules": true,
+      "status": "executed",
+      "effect": {
+        "peak_before_kw": 47.5,
+        "peak_after_kw": 43.4,
+        "saving_usd": 115.94
+      }
+    },
+    {
+      "decision_id": "d_0001",
       "ts": "2026-07-18T00:45:00Z",
       "device_id": "ice_machine_1",
       "action": "delay",
@@ -314,24 +239,9 @@
       "inside_rules": true,
       "status": "executed",
       "effect": {
-        "peak_before_kw": 40.4,
-        "peak_after_kw": 39.6,
+        "peak_before_kw": 39.7,
+        "peak_after_kw": 38.9,
         "saving_usd": 0.0
-      }
-    },
-    {
-      "decision_id": "d_0001",
-      "ts": "2026-07-18T00:35:00Z",
-      "device_id": "water_heater_1",
-      "action": "reduce",
-      "value": 40,
-      "reason_code": "stay_under_cap",
-      "inside_rules": true,
-      "status": "executed",
-      "effect": {
-        "peak_before_kw": 40.1,
-        "peak_after_kw": 39.8,
-        "saving_usd": 0.11
       }
     }
   ]

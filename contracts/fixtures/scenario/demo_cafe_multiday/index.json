@@ -72,15 +72,14 @@
   "spacetime_set_clock": "scenario/demo_cafe_multiday/clock_stream.jsonl",
   "viewer_ws": "scenario/demo_cafe_multiday/ws_stream.jsonl",
   "decision_ids": [
+    "d_0017",
+    "d_0018",
+    "d_0019",
+    "d_0020",
+    "d_0021",
+    "d_0022",
     "d_0023",
-    "d_0024",
-    "d_0025",
-    "d_0026",
-    "d_0027",
-    "d_0028",
-    "d_0029",
-    "d_0030",
-    "d_0031"
+    "d_0024"
   ],
   "escalation_ids": [],
   "midnight_tick": 391,

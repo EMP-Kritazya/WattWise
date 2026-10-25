@@ -5,46 +5,48 @@
     "policies": {
       "without": {
         "period": "2026-06",
-        "energy_kwh": 10725.646,
-        "energy_cost_usd": 2986.7,
+        "energy_kwh": 10691.265,
+        "energy_cost_usd": 2977.59,
         "demand_charges": [
           {
             "name": "max_demand",
-            "peak_kw": 44.136,
-            "cost_usd": 882.72
+            "peak_kw": 42.683,
+            "cost_usd": 853.66
           },
           {
             "name": "peak_demand",
-            "peak_kw": 41.129,
-            "cost_usd": 329.03
+            "peak_kw": 40.002,
+            "cost_usd": 320.02
           }
         ],
-        "total_usd": 4198.45,
+        "fixed_usd": 0.0,
+        "total_usd": 4151.27,
         "tariff_id": "demo_tariff_v1"
       },
       "timer": {
         "period": "2026-06",
-        "energy_kwh": 10725.646,
-        "energy_cost_usd": 2985.54,
+        "energy_kwh": 10691.265,
+        "energy_cost_usd": 2976.43,
         "demand_charges": [
           {
             "name": "max_demand",
-            "peak_kw": 44.136,
-            "cost_usd": 882.72
+            "peak_kw": 42.683,
+            "cost_usd": 853.66
           },
           {
             "name": "peak_demand",
-            "peak_kw": 41.342,
-            "cost_usd": 330.74
+            "peak_kw": 39.895,
+            "cost_usd": 319.16
           }
         ],
-        "total_usd": 4199.0,
+        "fixed_usd": 0.0,
+        "total_usd": 4149.25,
         "tariff_id": "demo_tariff_v1"
       },
       "with": {
         "period": "2026-06",
-        "energy_kwh": 10725.646,
-        "energy_cost_usd": 2986.7,
+        "energy_kwh": 10691.265,
+        "energy_cost_usd": 2977.59,
         "demand_charges": [
           {
             "name": "max_demand",
@@ -57,7 +59,8 @@
             "cost_usd": 312.0
           }
         ],
-        "total_usd": 4078.7,
+        "fixed_usd": 0.0,
+        "total_usd": 4069.59,
         "tariff_id": "demo_tariff_v1"
       }
     },
@@ -67,6 +70,10 @@
       "rule_violations": 0
     },
     "assumptions_id": "base",
+    "tariff_id": "demo_tariff_v1",
+    "partial": false,
+    "saved_usd": 81.68,
+    "saved_vs_timer_usd": 79.66,
     "run_id": "run_0001"
   },
   {
@@ -89,6 +96,7 @@
             "cost_usd": 340.3
           }
         ],
+        "fixed_usd": 0.0,
         "total_usd": 2786.88,
         "tariff_id": "demo_tariff_v1"
       },
@@ -108,6 +116,7 @@
             "cost_usd": 339.44
           }
         ],
+        "fixed_usd": 0.0,
         "total_usd": 2783.23,
         "tariff_id": "demo_tariff_v1"
       },
@@ -127,6 +136,7 @@
             "cost_usd": 312.0
           }
         ],
+        "fixed_usd": 0.0,
         "total_usd": 2687.84,
         "tariff_id": "demo_tariff_v1"
       }
@@ -137,6 +147,10 @@
       "rule_violations": 0
     },
     "assumptions_id": "base",
+    "tariff_id": "demo_tariff_v1",
+    "partial": true,
+    "saved_usd": 99.04,
+    "saved_vs_timer_usd": 95.39,
     "run_id": "run_0001"
   }
 ]

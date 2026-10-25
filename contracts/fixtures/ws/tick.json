@@ -8,7 +8,7 @@
       "lane": "with",
       "tick_id": 50,
       "ts": "2026-07-18T01:20:00Z",
-      "total_kw": 35.95,
+      "total_kw": 30.0,
       "customers_per_hour": 107,
       "devices": [
         {
@@ -17,12 +17,12 @@
           "name": "HVAC 1",
           "importance": "flexible",
           "state": "reduced",
-          "power_kw": 4.8,
-          "rated_kw": 12.0,
+          "power_kw": 3.2,
+          "rated_kw": 8.0,
           "power_pct": 40,
           "source": "simulated",
           "physical": {
-            "indoor_temp_c": 22.9
+            "indoor_temp_c": 23.4
           }
         },
         {
@@ -31,12 +31,12 @@
           "name": "HVAC 2",
           "importance": "flexible",
           "state": "reduced",
-          "power_kw": 4.8,
-          "rated_kw": 12.0,
+          "power_kw": 3.2,
+          "rated_kw": 8.0,
           "power_pct": 40,
           "source": "simulated",
           "physical": {
-            "indoor_temp_c": 22.9
+            "indoor_temp_c": 23.4
           }
         },
         {
@@ -44,13 +44,13 @@
           "type_id": "walk_in_cooler",
           "name": "Walk-in cooler 1",
           "importance": "flexible",
-          "state": "reduced",
-          "power_kw": 1.75,
+          "state": "on",
+          "power_kw": 3.5,
           "rated_kw": 3.5,
-          "power_pct": 50,
+          "power_pct": 100,
           "source": "simulated",
           "physical": {
-            "box_temp_c": 4.7
+            "box_temp_c": 3.2
           }
         },
         {
@@ -159,12 +159,12 @@
           "name": "Water heater 1",
           "importance": "flexible",
           "state": "on",
-          "power_kw": 4.5,
+          "power_kw": 0.0,
           "rated_kw": 4.5,
-          "power_pct": 100,
+          "power_pct": 0,
           "source": "simulated",
           "physical": {
-            "box_temp_c": 62.6
+            "box_temp_c": 63.2
           }
         },
         {
@@ -184,75 +184,37 @@
     },
     "meter": {
       "ts": "2026-07-18T01:20:00Z",
-      "total_kw": 35.95,
-      "block_avg_kw": 36.15,
+      "total_kw": 30.0,
+      "block_avg_kw": 32.9,
       "block_start": "2026-07-18T01:15:00Z",
       "month_peak_kw": 42.54,
       "on_peak_month_peak_kw": 42.54,
       "peak_mode": "cap",
       "peak_cap_kw": 40.0,
       "target_kw": 40.0,
-      "energy_kwh_today": 276.334,
-      "energy_kwh_month": 5771.297,
+      "energy_kwh_today": 275.617,
+      "energy_kwh_month": 5770.579,
       "price_usd_per_kwh_now": 0.38,
-      "cost_usd_today": 73.0,
-      "cost_usd_month": 2797.72
+      "cost_usd_today": 72.73,
+      "cost_usd_month": 2797.53,
+      "demand_peaks": [
+        {
+          "name": "max_demand",
+          "peak_kw": 42.54,
+          "usd_per_kw": 20.0,
+          "cost_usd": 850.8
+        },
+        {
+          "name": "peak_demand",
+          "peak_kw": 42.54,
+          "usd_per_kw": 8.0,
+          "cost_usd": 340.32
+        }
+      ]
     },
     "customers_per_hour": 107,
-    "new_decisions": [
-      {
-        "decision_id": "d_0009",
-        "ts": "2026-07-18T01:20:00Z",
-        "device_id": "walk_in_cooler_1",
-        "action": "restore",
-        "value": null,
-        "reason_code": "catch_up",
-        "inside_rules": true,
-        "status": "executed",
-        "effect": {
-          "peak_before_kw": 51.0,
-          "peak_after_kw": 50.7,
-          "saving_usd": 7.91
-        }
-      },
-      {
-        "decision_id": "d_0010",
-        "ts": "2026-07-18T01:20:00Z",
-        "device_id": "dishwasher_1",
-        "action": "delay",
-        "value": 40,
-        "reason_code": "escalation_fallback",
-        "inside_rules": false,
-        "status": "executed",
-        "effect": {
-          "peak_before_kw": 48.0,
-          "peak_after_kw": 43.1,
-          "saving_usd": 137.2
-        }
-      }
-    ],
-    "new_commands": [
-      {
-        "command_id": "c_0009",
-        "lane": "with",
-        "ts": "2026-07-18T01:20:00Z",
-        "device_id": "walk_in_cooler_1",
-        "action": "restore",
-        "value": null,
-        "decision_id": "d_0009",
-        "issued_by": "engine"
-      },
-      {
-        "command_id": "c_0013",
-        "lane": "with",
-        "ts": "2026-07-18T01:20:00Z",
-        "device_id": "dishwasher_1",
-        "action": "delay",
-        "value": 40,
-        "decision_id": "d_0010",
-        "issued_by": "engine"
-      }
-    ],
+    "new_decisions": [],
+    "new_commands": [],
     "new_escalations": [
       {
         "escalation_id": "e_0001",
@@ -261,121 +223,117 @@
         "updated_ts": "2026-07-18T01:20:00Z",
         "block_start": "2026-07-18T01:45:00Z",
         "problem": {
-          "forecast_peak_kw": 48.0,
+          "forecast_peak_kw": 40.7,
           "target_kw": 40.0,
-          "excess_kw": 8.0,
+          "excess_kw": 0.7,
           "reason": "dinner rush + customer surge + hot evening"
         },
         "options": [
           {
             "option_id": "accept_overrun",
-            "summary": "Let the peak reach 48.0 kW for one block",
+            "summary": "Let the peak reach 40.7 kW for one block",
             "actions": [],
             "projected": {
-              "peak_kw": 48.0,
-              "cost_delta_usd": 137.2,
-              "max_indoor_temp_change_c": null
-            },
-            "rule_breaks": [
-              {
-                "kind": "cap_overrun",
-                "amount": 8.0,
-                "unit": "kW"
-              }
-            ],
-            "within_authority": false,
-            "harm_score": 2.667,
-            "rank": 2
-          },
-          {
-            "option_id": "deep_reduce_hvac",
-            "summary": "HVAC 1 and HVAC 2 at 40 % until 19:00",
-            "actions": [
-              {
-                "command_id": "c_0010",
-                "lane": "with",
-                "ts": "2026-07-18T01:20:00Z",
-                "device_id": "hvac_1",
-                "action": "reduce",
-                "value": 40,
-                "decision_id": null,
-                "issued_by": "engine"
-              },
-              {
-                "command_id": "c_0011",
-                "lane": "with",
-                "ts": "2026-07-18T01:20:00Z",
-                "device_id": "hvac_2",
-                "action": "reduce",
-                "value": 40,
-                "decision_id": null,
-                "issued_by": "engine"
-              }
-            ],
-            "projected": {
-              "peak_kw": 44.9,
-              "cost_delta_usd": 49.7,
-              "max_indoor_temp_change_c": null
-            },
-            "rule_breaks": [
-              {
-                "kind": "cap_overrun",
-                "amount": 4.9,
-                "unit": "kW"
-              },
-              {
-                "kind": "over_max_reduce",
-                "device_id": "hvac_1",
-                "amount": 15,
-                "unit": "min"
-              },
-              {
-                "kind": "over_max_reduce",
-                "device_id": "hvac_2",
-                "amount": 30,
-                "unit": "min"
-              }
-            ],
-            "within_authority": false,
-            "harm_score": 4.633,
-            "rank": 3
-          },
-          {
-            "option_id": "extend_delay_dishwasher",
-            "summary": "Hold the dishwasher 10 min past its max delay",
-            "actions": [
-              {
-                "command_id": "c_0012",
-                "lane": "with",
-                "ts": "2026-07-18T01:20:00Z",
-                "device_id": "dishwasher_1",
-                "action": "delay",
-                "value": 40,
-                "decision_id": null,
-                "issued_by": "engine"
-              }
-            ],
-            "projected": {
-              "peak_kw": 42.0,
+              "peak_kw": 40.7,
               "cost_delta_usd": 0.0,
               "max_indoor_temp_change_c": null
             },
             "rule_breaks": [
               {
                 "kind": "cap_overrun",
-                "amount": 2.0,
+                "amount": 0.7,
                 "unit": "kW"
+              }
+            ],
+            "within_authority": true,
+            "harm_score": 0.233,
+            "rank": 1
+          },
+          {
+            "option_id": "deep_reduce_water_heater",
+            "summary": "Water heater 1 at 20 % until 19:00",
+            "actions": [
+              {
+                "command_id": "c_0005",
+                "lane": "with",
+                "ts": "2026-07-18T01:20:00Z",
+                "device_id": "water_heater_1",
+                "action": "reduce",
+                "value": 20,
+                "decision_id": null,
+                "issued_by": "engine"
+              }
+            ],
+            "projected": {
+              "peak_kw": 41.3,
+              "cost_delta_usd": 0.18,
+              "max_indoor_temp_change_c": null
+            },
+            "rule_breaks": [
+              {
+                "kind": "cap_overrun",
+                "amount": 1.3,
+                "unit": "kW"
+              },
+              {
+                "kind": "below_min_power",
+                "device_id": "water_heater_1",
+                "amount": 20,
+                "unit": "pct"
+              },
+              {
+                "kind": "over_max_reduce",
+                "device_id": "water_heater_1",
+                "amount": 25,
+                "unit": "min"
+              }
+            ],
+            "within_authority": false,
+            "harm_score": 2.6,
+            "rank": 3
+          },
+          {
+            "option_id": "extend_delay_dishwasher",
+            "summary": "Delay the dishwasher 5 min past its deadline",
+            "actions": [
+              {
+                "command_id": "c_0006",
+                "lane": "with",
+                "ts": "2026-07-18T01:20:00Z",
+                "device_id": "dishwasher_1",
+                "action": "delay",
+                "value": 45,
+                "decision_id": null,
+                "issued_by": "engine"
+              }
+            ],
+            "projected": {
+              "peak_kw": 40.7,
+              "cost_delta_usd": 0.0,
+              "max_indoor_temp_change_c": null
+            },
+            "rule_breaks": [
+              {
+                "kind": "cap_overrun",
+                "amount": 0.7,
+                "unit": "kW"
+              },
+              {
+                "kind": "past_deadline",
+                "device_id": "dishwasher_1",
+                "amount": 5,
+                "unit": "min"
               },
               {
                 "kind": "over_max_delay",
                 "device_id": "dishwasher_1",
-                "amount": 10,
+                "amount": 5,
                 "unit": "min"
               }
             ],
             "within_authority": true,
-            "harm_score": 1.167,
-            "rank": 1
+            "harm_score": 0.733,
+            "rank": 2
           },
           {
             "option_id": "ask_owner",
@@ -388,8 +346,8 @@
             "rank": null
           }
         ],
-        "default_option_id": "extend_delay_dishwasher",
-        "active_option_id": "extend_delay_dishwasher",
+        "default_option_id": "accept_overrun",
+        "active_option_id": "accept_overrun",
         "deadline_sim_ts": "2026-07-18T01:35:00Z",
         "status": "open",
         "resolved_by": null,
@@ -398,16 +356,16 @@
       }
     ],
     "warnings": [],
-    "indoor_temp_c": 22.9,
+    "indoor_temp_c": 23.4,
     "forecast_kw": [
-      37.2,
-      38.6,
-      42.0,
-      43.1,
-      41.0,
-      37.0,
-      31.7,
-      35.9
+      31.9,
+      38.1,
+      40.7,
+      42.2,
+      44.2,
+      34.7,
+      34.6,
+      32.8
     ]
   }
 }

@@ -385,9 +385,17 @@
     "seam": "S2"
   },
   "facade/run_backtest.json": {
-    "contract_section": "§3 Engine facade",
+    "contract_section": "§3 run_backtest (inputs, returns, on_progress events in order)",
     "consumers": [
-      "Suyog (fakes/fake_kitchen.py)",
+      "Suyog (fakes/fake_kitchen.py replays on_progress)",
+      "Kritazya (engine tests)"
+    ],
+    "seam": "S2"
+  },
+  "facade/run_backtest_on_progress.jsonl": {
+    "contract_section": "§3 run_backtest (inputs, returns, on_progress events in order)",
+    "consumers": [
+      "Suyog (fakes/fake_kitchen.py replays on_progress)",
       "Kritazya (engine tests)"
     ],
     "seam": "S2"
@@ -973,14 +981,32 @@
     ],
     "seam": "all"
   },
-  "shapes/backtest_result.json": {
-    "contract_section": "§1 Shared shapes",
+  "shapes/backtest_inputs.json": {
+    "contract_section": "§1 BacktestResult / BacktestPoint / BacktestInputs (fake, never savings)",
     "consumers": [
-      "Ashirwad",
-      "Suyog",
-      "Kritazya"
+      "Kritazya (run_backtest tests)",
+      "Suyog (API backtest route)",
+      "Ashirwad (Proof screen)"
     ],
-    "seam": "all"
+    "seam": "S1 S2"
+  },
+  "shapes/backtest_point.json": {
+    "contract_section": "§1 BacktestResult / BacktestPoint / BacktestInputs (fake, never savings)",
+    "consumers": [
+      "Kritazya (run_backtest tests)",
+      "Suyog (API backtest route)",
+      "Ashirwad (Proof screen)"
+    ],
+    "seam": "S1 S2"
+  },
+  "shapes/backtest_result.json": {
+    "contract_section": "§1 BacktestResult / BacktestPoint / BacktestInputs (fake, never savings)",
+    "consumers": [
+      "Kritazya (run_backtest tests)",
+      "Suyog (API backtest route)",
+      "Ashirwad (Proof screen)"
+    ],
+    "seam": "S1 S2"
   },
   "shapes/bill.json": {
     "contract_section": "§1 Shared shapes",
@@ -1279,6 +1305,14 @@
     ],
     "seam": "all"
   },
+  "shapes/tariff_pge_b19.json": {
+    "contract_section": "§1 Tariff (PG&E B-19 from URDB 69de8cdb02f684104e01267d: seasons, windows, fixed charge)",
+    "consumers": [
+      "Kritazya (engine tariff/meter tests, backend/data/tariff_urdb.py target)",
+      "Ashirwad (bill breakdown UI)"
+    ],
+    "seam": "S2"
+  },
   "shapes/tick_state_with.json": {
     "contract_section": "§1 Shared shapes",
     "consumers": [
@@ -1331,6 +1365,20 @@
     ],
     "seam": "S3"
   },
+  "spacetime/reducers/publish_backtest_month.json": {
+    "contract_section": "§5 SpacetimeDB reducers (Proof)",
+    "consumers": [
+      "Kritazya (live/spacetime_client.py)"
+    ],
+    "seam": "S3"
+  },
+  "spacetime/reducers/publish_backtest_point.json": {
+    "contract_section": "§5 SpacetimeDB reducers (Proof)",
+    "consumers": [
+      "Kritazya (live/spacetime_client.py)"
+    ],
+    "seam": "S3"
+  },
   "spacetime/reducers/publish_context.json": {
     "contract_section": "§5 SpacetimeDB",
     "consumers": [
@@ -1379,6 +1427,13 @@
     ],
     "seam": "S3"
   },
+  "spacetime/reducers/reset_backtest.json": {
+    "contract_section": "§5 SpacetimeDB reducers (Proof)",
+    "consumers": [
+      "Kritazya (live/spacetime_client.py)"
+    ],
+    "seam": "S3"
+  },
   "spacetime/reducers/set_clock.json": {
     "contract_section": "§5 SpacetimeDB",
     "consumers": [
@@ -1391,6 +1446,22 @@
     "contract_section": "§5 SpacetimeDB",
     "consumers": [
       "Ashirwad (mock live hook)",
+      "Kritazya (fakes/fake_live.py, spacetime/seed.ts)"
+    ],
+    "seam": "S3"
+  },
+  "spacetime/tables/backtest_month.json": {
+    "contract_section": "§5 SpacetimeDB backtest_point / backtest_month (Proof chart rows)",
+    "consumers": [
+      "Ashirwad (Proof screen mock live hook)",
+      "Kritazya (fakes/fake_live.py, spacetime/seed.ts)"
+    ],
+    "seam": "S3"
+  },
+  "spacetime/tables/backtest_point.json": {
+    "contract_section": "§5 SpacetimeDB backtest_point / backtest_month (Proof chart rows)",
+    "consumers": [
+      "Ashirwad (Proof screen mock live hook)",
       "Kritazya (fakes/fake_live.py, spacetime/seed.ts)"
     ],
     "seam": "S3"
@@ -1483,10 +1554,26 @@
     ],
     "seam": "S1"
   },
-  "ws/backtest_progress.json": {
-    "contract_section": "§2 WebSocket /ws",
+  "ws/backtest_month.json": {
+    "contract_section": "§2 WebSocket /ws (Proof chart, LIVE_TRANSPORT=ws)",
     "consumers": [
-      "Ashirwad (src/mocks, /ws fallback hook)",
+      "Ashirwad (Proof screen /ws mock)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "ws/backtest_point.json": {
+    "contract_section": "§2 WebSocket /ws (Proof chart, LIVE_TRANSPORT=ws)",
+    "consumers": [
+      "Ashirwad (Proof screen /ws mock)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "ws/backtest_progress.json": {
+    "contract_section": "§2 WebSocket /ws (Proof chart, LIVE_TRANSPORT=ws)",
+    "consumers": [
+      "Ashirwad (Proof screen /ws mock)",
       "Suyog (API tests)"
     ],
     "seam": "S1"

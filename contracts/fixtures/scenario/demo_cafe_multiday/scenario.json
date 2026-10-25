@@ -20,36 +20,49 @@
         "name": "off_peak",
         "start": "00:00",
         "end": "16:00",
-        "usd_per_kwh": 0.22
+        "usd_per_kwh": 0.22,
+        "months": null,
+        "days": "all"
       },
       {
         "name": "peak",
         "start": "16:00",
         "end": "21:00",
-        "usd_per_kwh": 0.38
+        "usd_per_kwh": 0.38,
+        "months": null,
+        "days": "all"
       },
       {
         "name": "off_peak",
         "start": "21:00",
         "end": "24:00",
-        "usd_per_kwh": 0.22
+        "usd_per_kwh": 0.22,
+        "months": null,
+        "days": "all"
       }
     ],
     "demand": [
       {
         "name": "max_demand",
-        "window": null,
+        "windows": null,
+        "months": null,
+        "days": "all",
         "usd_per_kw": 20.0
       },
       {
         "name": "peak_demand",
-        "window": {
-          "start": "16:00",
-          "end": "21:00"
-        },
+        "windows": [
+          {
+            "start": "16:00",
+            "end": "21:00"
+          }
+        ],
+        "months": null,
+        "days": "all",
         "usd_per_kw": 8.0
       }
-    ]
+    ],
+    "fixed_charges": []
   },
   "warm_up": {
     "history": "history/warmup_demo_cafe.json",
@@ -59,6 +72,20 @@
       "energy_kwh_month": 5742.777,
       "month_peak_kw": 42.54,
       "on_peak_month_peak_kw": 42.54,
+      "demand_peaks": [
+        {
+          "name": "max_demand",
+          "peak_kw": 42.54,
+          "usd_per_kw": 20.0,
+          "cost_usd": 850.8
+        },
+        {
+          "name": "peak_demand",
+          "peak_kw": 42.54,
+          "usd_per_kw": 8.0,
+          "cost_usd": 340.32
+        }
+      ],
       "energy_cost_usd_today": 62.16,
       "energy_cost_usd_month": 1595.84
     }
@@ -262,44 +289,40 @@
       "what": "recorded context posted (Context ts 2026-07-18T16:30:00Z), crowd_effect none"
     },
     {
-      "tick": 1080,
-      "what": "d_0023 with walk_in_cooler_1 reduce 50 (stay_under_cap)"
+      "tick": 1095,
+      "what": "d_0017 with water_heater_1 reduce 60 (stay_under_cap)"
     },
     {
       "tick": 1095,
-      "what": "d_0024 with water_heater_1 reduce 60 (stay_under_cap)"
+      "what": "d_0018 with walk_in_cooler_1 reduce 60 (stay_under_cap)"
     },
     {
-      "tick": 1110,
-      "what": "d_0025 with walk_in_cooler_1 restore (catch_up)"
-    },
-    {
-      "tick": 1125,
-      "what": "d_0026 with water_heater_1 restore (catch_up)"
+      "tick": 1105,
+      "what": "d_0019 with walk_in_cooler_1 restore (catch_up)"
     },
     {
       "tick": 1125,
-      "what": "d_0027 with dishwasher_1 delay 60 (stay_under_cap)"
+      "what": "d_0020 with water_heater_1 restore (catch_up)"
+    },
+    {
+      "tick": 1125,
+      "what": "d_0021 with dishwasher_1 delay 60 (stay_under_cap)"
+    },
+    {
+      "tick": 1125,
+      "what": "d_0022 with ice_machine_1 delay 45 (stay_under_cap)"
     },
     {
       "tick": 1126,
       "what": "sim_tick carries surge s_0002 (+35 customers for 45 min)"
     },
     {
-      "tick": 1140,
-      "what": "d_0028 with ice_machine_1 delay 60 (stay_under_cap)"
+      "tick": 1165,
+      "what": "d_0023 with hvac_1 reduce 40 (stay_under_cap)"
     },
     {
-      "tick": 1140,
-      "what": "d_0029 with walk_in_cooler_1 reduce 50 (stay_under_cap)"
-    },
-    {
-      "tick": 1170,
-      "what": "d_0030 with walk_in_cooler_1 restore (catch_up)"
-    },
-    {
-      "tick": 1175,
-      "what": "d_0031 with hvac_1 reduce 40 (stay_under_cap)"
+      "tick": 1190,
+      "what": "d_0024 with hvac_1 restore (catch_up)"
     },
     {
       "tick": 1710,

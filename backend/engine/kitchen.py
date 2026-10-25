@@ -25,6 +25,7 @@ from . import rules
 from .catalog import DEFAULT_INDOOR_TEMP_C, TypeFacts, lookup, type_facts_from
 from .context import ContextState
 from .decider import target_kw
+from .forecaster import forecast_devices
 from .history import BlockHistory
 from .ids import IdAllocator
 from .meter import BLOCK_H, MeterState
@@ -88,6 +89,7 @@ class Kitchen:
         self._pending_readings: dict[str, dict] = {}
         self._forecast_kw: Optional[list[float]] = None
         self._forecast_ts: Optional[datetime] = None
+        self._forecast_detail: Optional[dict] = None  # per-device forecast + unavoidable_kw (decider input)
         self._warnings: list[dict] = []
         self._active_commands: list[dict] = []
         self._recent_decisions: list[dict] = []
@@ -182,9 +184,10 @@ class Kitchen:
         new_escalations: list[dict] = []
         forecast_kw: Optional[list[float]] = None
         if minutes > 1 or report.tick_id % DECISION_EVERY_TICKS == 0:  # replay: every step; live: tick_id % 5 == 0
-            forecast_kw = self._placeholder_forecast(ts)
-            self._forecast_kw, self._forecast_ts = forecast_kw, ts
-            # STUB: forecaster / target warnings / decider / escalation (ENGINE.md sections 3-6) not built yet:
+            fc = self._forecast(ts)
+            forecast_kw = fc["total_kw"]
+            self._forecast_kw, self._forecast_ts, self._forecast_detail = forecast_kw, ts, fc
+            # STUB: target warnings / decider / escalation (ENGINE.md sections 4-6) not built yet:
             # decision ticks issue no decisions, commands, escalations or cap_unreachable warnings.
         self._warnings = warnings
 
@@ -231,13 +234,19 @@ class Kitchen:
             return self._indoor_temp_c
         return DEFAULT_INDOOR_TEMP_C
 
-    def _placeholder_forecast(self, ts: datetime) -> list[float]:
-        # STUB: persistence placeholder until engine/forecaster.py exists (ENGINE.md section 3). Block 0 = metered
-        # minutes of the block in progress + the current total_kw for the rest; blocks 1..7 = the current total_kw.
-        block = block_start_of(ts)
-        remaining_min = (block + BLOCK - ts) / MINUTE
-        block0 = (self._meter.metered_in_block_kwh(block) + self._total_kw * remaining_min / 60.0) / BLOCK_H
-        return [block0] + [self._total_kw] * (FORECAST_BLOCKS - 1)
+    def _forecast(self, ts: datetime) -> dict:
+        """ENGINE.md section 3 on the latest HubReport, closed history only. Context is the one merged before this step."""
+        devices = []
+        for device_id in sorted(self._devices):
+            d = dict(self._devices[device_id])
+            unit = self._units.get(device_id)
+            d["power_model"] = unit.facts.power_model if unit is not None else None
+            d["limits"] = dict(unit.limits) if unit is not None else {}
+            devices.append(d)
+        # STUB: reductions (active reduce commands + owed energy) come with the decider / ledger (ENGINE.md sections 5, 9).
+        return forecast_devices(now=ts, history=self._history.view(ts), tariff=self._tariff, devices=devices,
+                                block0_metered_kwh=self._meter.metered_device_kwh(block_start_of(ts)),
+                                crowd_multiplier=self._context.crowd_multiplier(), reductions=None)
 
     def _meter_now(self) -> dict:
         if self._now is None:
@@ -342,8 +351,8 @@ class Kitchen:
     def forecast(self, horizon_min: int) -> list[float]:
         if horizon_min != FORECAST_HORIZON_MIN:
             raise ValueError(f"horizon_min is fixed at {FORECAST_HORIZON_MIN} in this build")
-        # STUB: forecaster (ENGINE.md section 3) not built; the TickState forecast_kw is only a persistence placeholder.
-        raise NotImplementedError("STUB: Kitchen.forecast (ENGINE.md section 3 forecaster)")
+        # Before the first decision tick there is no forecast yet: an empty list (no recomputation here).
+        return list(self._forecast_kw) if self._forecast_kw is not None else []
 
     # ------------------------------------------------------------------------------------------------------------------
     # later modules

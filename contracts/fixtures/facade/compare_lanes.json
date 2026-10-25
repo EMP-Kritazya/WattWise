@@ -19,8 +19,8 @@
             "importance": "flexible",
             "state": "on",
             "power_kw": 6.87,
-            "rated_kw": 12.0,
-            "power_pct": 57,
+            "rated_kw": 8.0,
+            "power_pct": 86,
             "source": "simulated",
             "physical": {
               "indoor_temp_c": 22.5
@@ -33,8 +33,8 @@
             "importance": "flexible",
             "state": "on",
             "power_kw": 6.87,
-            "rated_kw": 12.0,
-            "power_pct": 57,
+            "rated_kw": 8.0,
+            "power_pct": 86,
             "source": "simulated",
             "physical": {
               "indoor_temp_c": 22.5
@@ -182,7 +182,7 @@
         ],
         "acks": [
           {
-            "command_id": "c_0022",
+            "command_id": "c_0016",
             "lane": "without",
             "ok": false,
             "applied_value": null,
@@ -196,16 +196,30 @@
         "total_kw": 37.64,
         "block_avg_kw": 34.42,
         "block_start": "2026-07-18T02:15:00Z",
-        "month_peak_kw": 47.8,
-        "on_peak_month_peak_kw": 47.8,
+        "month_peak_kw": 47.71,
+        "on_peak_month_peak_kw": 47.71,
         "peak_mode": "cap",
         "peak_cap_kw": 40.0,
         "target_kw": 40.0,
-        "energy_kwh_today": 326.433,
-        "energy_kwh_month": 5821.395,
+        "energy_kwh_today": 326.332,
+        "energy_kwh_month": 5821.295,
         "price_usd_per_kwh_now": 0.38,
-        "cost_usd_today": 239.44,
-        "cost_usd_month": 2964.15
+        "cost_usd_today": 236.76,
+        "cost_usd_month": 2961.56,
+        "demand_peaks": [
+          {
+            "name": "max_demand",
+            "peak_kw": 47.71,
+            "usd_per_kw": 20.0,
+            "cost_usd": 954.2
+          },
+          {
+            "name": "peak_demand",
+            "peak_kw": 47.71,
+            "usd_per_kw": 8.0,
+            "cost_usd": 381.68
+          }
+        ]
       },
       "customers_per_hour": 72,
       "new_decisions": [],
@@ -232,7 +246,7 @@
         "lane": "with",
         "tick_id": 120,
         "ts": "2026-07-18T02:30:00Z",
-        "total_kw": 38.0,
+        "total_kw": 39.6,
         "customers_per_hour": 72,
         "devices": [
           {
@@ -240,13 +254,13 @@
             "type_id": "hvac",
             "name": "HVAC 1",
             "importance": "flexible",
-            "state": "reduced",
-            "power_kw": 4.8,
-            "rated_kw": 12.0,
-            "power_pct": 40,
+            "state": "on",
+            "power_kw": 8.0,
+            "rated_kw": 8.0,
+            "power_pct": 100,
             "source": "simulated",
             "physical": {
-              "indoor_temp_c": 23.6
+              "indoor_temp_c": 24.7
             }
           },
           {
@@ -255,12 +269,12 @@
             "name": "HVAC 2",
             "importance": "flexible",
             "state": "reduced",
-            "power_kw": 4.8,
-            "rated_kw": 12.0,
+            "power_kw": 3.2,
+            "rated_kw": 8.0,
             "power_pct": 40,
             "source": "simulated",
             "physical": {
-              "indoor_temp_c": 23.6
+              "indoor_temp_c": 24.7
             }
           },
           {
@@ -274,7 +288,7 @@
             "power_pct": 100,
             "source": "simulated",
             "physical": {
-              "box_temp_c": 3.2
+              "box_temp_c": 3.3
             }
           },
           {
@@ -388,7 +402,7 @@
             "power_pct": 100,
             "source": "simulated",
             "physical": {
-              "box_temp_c": 60.6
+              "box_temp_c": 62.4
             }
           },
           {
@@ -405,7 +419,7 @@
         ],
         "acks": [
           {
-            "command_id": "c_0023",
+            "command_id": "c_0017",
             "lane": "with",
             "ok": false,
             "applied_value": null,
@@ -416,24 +430,38 @@
       },
       "meter": {
         "ts": "2026-07-18T02:30:00Z",
-        "total_kw": 38.0,
-        "block_avg_kw": 38.12,
+        "total_kw": 39.6,
+        "block_avg_kw": 38.7,
         "block_start": "2026-07-18T02:15:00Z",
         "month_peak_kw": 42.54,
         "on_peak_month_peak_kw": 42.54,
         "peak_mode": "cap",
         "peak_cap_kw": 40.0,
         "target_kw": 40.0,
-        "energy_kwh_today": 321.914,
-        "energy_kwh_month": 5816.876,
+        "energy_kwh_today": 319.194,
+        "energy_kwh_month": 5814.156,
         "price_usd_per_kwh_now": 0.38,
-        "cost_usd_today": 90.32,
-        "cost_usd_month": 2815.04
+        "cost_usd_today": 89.29,
+        "cost_usd_month": 2814.09,
+        "demand_peaks": [
+          {
+            "name": "max_demand",
+            "peak_kw": 42.54,
+            "usd_per_kw": 20.0,
+            "cost_usd": 850.8
+          },
+          {
+            "name": "peak_demand",
+            "peak_kw": 42.54,
+            "usd_per_kw": 8.0,
+            "cost_usd": 340.32
+          }
+        ]
       },
       "customers_per_hour": 72,
       "new_decisions": [
         {
-          "decision_id": "d_0021",
+          "decision_id": "d_0016",
           "ts": "2026-07-18T02:30:00Z",
           "device_id": "hvac_2",
           "action": "restore",
@@ -442,69 +470,44 @@
           "inside_rules": true,
           "status": "executed",
           "effect": {
-            "peak_before_kw": 36.6,
-            "peak_after_kw": 36.1,
-            "saving_usd": -0.23
-          }
-        },
-        {
-          "decision_id": "d_0022",
-          "ts": "2026-07-18T02:30:00Z",
-          "device_id": "hvac_1",
-          "action": "restore",
-          "value": null,
-          "reason_code": "catch_up",
-          "inside_rules": true,
-          "status": "executed",
-          "effect": {
-            "peak_before_kw": 36.1,
-            "peak_after_kw": 37.5,
-            "saving_usd": -0.02
+            "peak_before_kw": 37.0,
+            "peak_after_kw": 36.8,
+            "saving_usd": -0.12
           }
         }
       ],
       "new_commands": [
         {
-          "command_id": "c_0024",
+          "command_id": "c_0018",
           "lane": "with",
           "ts": "2026-07-18T02:30:00Z",
           "device_id": "hvac_2",
           "action": "restore",
           "value": null,
-          "decision_id": "d_0021",
-          "issued_by": "engine"
-        },
-        {
-          "command_id": "c_0025",
-          "lane": "with",
-          "ts": "2026-07-18T02:30:00Z",
-          "device_id": "hvac_1",
-          "action": "restore",
-          "value": null,
-          "decision_id": "d_0022",
+          "decision_id": "d_0016",
           "issued_by": "engine"
         }
       ],
       "new_escalations": [],
       "warnings": [],
-      "indoor_temp_c": 23.6,
+      "indoor_temp_c": 24.7,
       "forecast_kw": [
-        37.5,
-        33.6,
-        35.5,
-        31.9,
+        36.1,
+        36.7,
         33.8,
-        34.4,
-        34.2,
-        28.9
+        34.8,
+        31.6,
+        36.8,
+        32.1,
+        31.4
       ]
     }
   },
   "returns": {
     "ts": "2026-07-18T02:30:00Z",
-    "saved_today_usd": 149.12,
-    "peak_avoided_kw": 5.26,
-    "month_peak_without_kw": 47.8,
+    "saved_today_usd": 147.47,
+    "peak_avoided_kw": 5.17,
+    "month_peak_without_kw": 47.71,
     "month_peak_with_kw": 42.54
   }
 }

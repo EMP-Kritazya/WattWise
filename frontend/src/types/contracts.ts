@@ -190,6 +190,8 @@ export interface Escalation {
   problem: { forecast_peak_kw: number; target_kw: number; excess_kw: number; reason: string };
   options: EscalationOption[];
   default_option_id: string;
+  active_option_id?: string | null;
+  updated_ts?: string;
   deadline_sim_ts: string;
   status: EscalationStatus;
   resolved_by: "claude" | "owner" | "default" | null;
@@ -202,13 +204,24 @@ export interface Meter {
   block_avg_kw: number;
   block_start: string;
   month_peak_kw: number;
+  /** Month peak of the highest-rate windowed demand charge that applies this month; null if none (CONTRACTS.md Meter). */
+  on_peak_month_peak_kw?: number | null;
   peak_mode: "minimize" | "cap";
   peak_cap_kw: number | null;
   target_kw: number;
   energy_kwh_today: number;
+  energy_kwh_month?: number;
   price_usd_per_kwh_now: number;
   cost_usd_today: number;
   cost_usd_month: number;
+  /** One entry per demand charge that applies this month, tariff order; engine-computed cost (the UI never multiplies). */
+  demand_peaks?: DemandPeak[];
+}
+export interface DemandPeak {
+  name: string;
+  peak_kw: number;
+  usd_per_kw: number;
+  cost_usd: number;
 }
 export interface TickState {
   lane: Lane;
@@ -258,6 +271,7 @@ export interface Bill {
   energy_kwh: number;
   energy_cost_usd: number;
   demand_charges: DemandCharge[];
+  fixed_usd: number;
   total_usd: number;
   tariff_id: string;
 }
@@ -267,6 +281,29 @@ export interface BacktestResult {
   policies: { without: Bill; timer: Bill; with: Bill };
   checks: { baseline_matches_raw: boolean; energy_conserved: boolean; rule_violations: number };
   assumptions_id: string;
+  tariff_id: string;
+  partial: boolean;
+  saved_usd: number;
+  saved_vs_timer_usd: number;
+}
+export interface PolicyCosts {
+  without: number;
+  timer: number;
+  with: number;
+}
+/** One per replayed local day: the Proof chart's running line (CONTRACTS.md section 1 BacktestPoint). */
+export interface BacktestPoint {
+  dataset: string;
+  assumptions_id: string;
+  tariff_id: string;
+  month: string;
+  day: string;
+  ts: string;
+  partial: boolean;
+  cost_to_date_usd: PolicyCosts;
+  saved_month_to_date_usd: number;
+  saved_vs_timer_month_to_date_usd: number;
+  saved_year_to_date_usd: number;
 }
 
 // STUB: replace with generated REST/OpenAPI types.
@@ -292,8 +329,12 @@ export interface ClockState {
   speed: number;
   sim_ts: string;
   tick_id: number;
-  paused_reason: "escalation" | "approval" | "hub_waiting" | "sim_host_offline" | null;
-  slowed_reason: "escalation" | null;
+  // "escalation" | "approval" are pre-2026-10-24 values some screens still test for; the clock never pauses for them now.
+  paused_reason: "manual" | "hub_waiting" | "sim_host_offline" | "run_complete" | "escalation" | "approval" | null;
+  slowed_reason?: "escalation" | null;
+  day_index?: number;
+  run_days?: number;
+  phase?: "service" | "overnight" | "closed";
 }
 export interface DeviceCommandRequest {
   action: CommandAction;
@@ -326,6 +367,8 @@ export type WsMessage =
   | { type: "chat_delta"; chat_id: string; text: string }
   | { type: "chat_done"; chat_id: string }
   | { type: "backtest_progress"; run_id: string; month: string; pct: number }
+  | { type: "backtest_point"; run_id: string; data: BacktestPoint }
+  | { type: "backtest_month"; run_id: string; data: BacktestResult }
   | { type: "comparison"; data: LaneComparison }
   | { type: "proposal"; data: Proposal }
   | { type: "escalation"; data: Escalation }
@@ -333,7 +376,8 @@ export type WsMessage =
   | { type: "agent_log"; data: AgentLog };
 export type WsMessageType = WsMessage["type"];
 
-// STUB: replace with generated SpacetimeDB row types.
+// SpacetimeDB rows as the app uses them (CONTRACTS.md section 5; snake_case, null for empty options). The generated
+// bindings (`spacetime generate` -> src/module_bindings/, never hand-edited) are normalised into these in src/data/spacetime.ts.
 export interface LiveTickRow {
   lane: Lane;
   ts: string;
@@ -341,13 +385,17 @@ export interface LiveTickRow {
   total_kw: number;
   block_avg_kw: number;
   month_peak_kw: number;
+  on_peak_month_peak_kw: number | null;
   peak_mode: "minimize" | "cap";
   peak_cap_kw: number | null;
   target_kw: number;
   energy_kwh_today: number;
+  energy_kwh_month: number;
   price_usd_per_kwh_now: number;
   cost_usd_today: number;
   cost_usd_month: number;
+  /** Meter.demand_peaks (DemandPeak[]) as a JSON string. */
+  demand_peaks_json: string;
   customers_per_hour: number;
   indoor_temp_c: number;
   forecast_kw_json: string | null;
@@ -402,8 +450,13 @@ export interface LiveEscalationRow {
   escalation_id: string;
   lane: Lane;
   status: EscalationStatus;
+  block_start: string;
+  updated_ts: string;
   problem_json: string;
   options_json: string;
+  default_option_id: string;
+  active_option_id: string | null;
+  deadline_sim_ts: string;
   chosen_option_id: string | null;
   resolved_by: Escalation["resolved_by"];
   rationale: string | null;
@@ -417,6 +470,37 @@ export interface SurgeRequestRow {
   created_at: string;
   consumed: boolean;
 }
+export interface BacktestPointRow {
+  key: string; // "<run_id>:<day>"
+  run_id: string;
+  day: string;
+  month: string;
+  ts: string;
+  partial: boolean;
+  /** BacktestPoint.cost_to_date_usd (PolicyCosts) as a JSON string. */
+  cost_to_date_json: string;
+  saved_month_to_date_usd: number;
+  saved_vs_timer_month_to_date_usd: number;
+  saved_year_to_date_usd: number;
+  dataset: string;
+  tariff_id: string;
+  assumptions_id: string;
+}
+export interface BacktestMonthRow {
+  key: string; // "<run_id>:<month>"
+  run_id: string;
+  month: string;
+  partial: boolean;
+  saved_usd: number;
+  saved_vs_timer_usd: number;
+  /** BacktestResult.policies as a JSON string. */
+  policies_json: string;
+  /** BacktestResult.checks as a JSON string. */
+  checks_json: string;
+  dataset: string;
+  tariff_id: string;
+  assumptions_id: string;
+}
 export interface LiveTables {
   live_tick: LiveTickRow[];
   tick_history: TickHistoryRow[];
@@ -428,6 +512,8 @@ export interface LiveTables {
   live_escalation: LiveEscalationRow[];
   live_agent_log: LiveAgentLogRow[];
   surge_request: SurgeRequestRow[];
+  backtest_point: BacktestPointRow[];
+  backtest_month: BacktestMonthRow[];
 }
 
 // STUB: replace with generated hub-protocol types.

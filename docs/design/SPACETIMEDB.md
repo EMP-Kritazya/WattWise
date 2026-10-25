@@ -25,12 +25,24 @@ SpacetimeDB is what ticks: every viewer and judge sees and plays in the same kit
 
 ## Tables and reducers
 CONTRACTS.md section 5 (`live_tick`, `tick_history`, `live_device`, `live_comparison`, `live_feed`, `live_clock`,
-`live_context`, `live_escalation`, `live_agent_log`, `surge_request`; reducers `publish_ticks`, `publish_feed`, `set_clock`,
-`publish_context`, `publish_escalation`, `log_agent`, `reset_all`, `request_surge`, `consume_surge`, scheduled `prune`).
+`live_context`, `live_escalation`, `live_agent_log`, `surge_request`, `backtest_point`, `backtest_month`; reducers
+`publish_ticks`, `publish_feed`, `set_clock`, `publish_context`, `publish_escalation`, `log_agent`, `publish_backtest_point`,
+`publish_backtest_month`, `reset_backtest`, `reset_all`, `request_surge`, `consume_surge`, scheduled `prune`).
+
+Module notes (`spacetime/src/index.ts`, SDK `spacetimedb` 2.13.0): `tick_history` stores its `lane` + `ts` key as one string
+primary key `key = "<lane>:<ts>"` (an extra column in the generated row; the app drops it). Private tables `runtime_config`
+(the identity stored at `init`) and `prune_schedule` (every 60 s). Bounds are applied on every write and again by `prune`.
+`reset_all` clears the live tables only (not backtest rows or surge requests). Option arguments (`set_clock.paused_reason`)
+travel over HTTP as SATS sums `{"some": v}` / `{"none": []}` (`SPACETIME_OPTION_ENCODING=null` sends plain null instead).
+Unit tests run the module on SpacetimeDB's in-process test datastore (`cd spacetime && npm test`).
 
 ## Python client (`backend/live/spacetime_client.py`)
 - Calls reducers over HTTP: `POST /v1/database/<db>/call/<reducer>` with a JSON array of arguments and the runtime identity's
   bearer token. Verify against the installed SpacetimeDB version in Phase 1 (first task) and record the result here.
+  **Status 2026-10-24: NOT yet verified** (the `spacetime` CLI is not installed on the build machine). To verify:
+  `curl -sSf https://install.spacetimedb.com | sh`, `spacetime start`, `cd spacetime && spacetime build && spacetime publish
+  wattwise`, then `SPACETIME_TOKEN=$(spacetime login show --token) npm run seed` (exercises every reducer over HTTP, including
+  the Option encoding) and record the version and result here.
 - Reads new surge requests through the SQL endpoint each tick.
 - Never blocks the run loop: a bounded queue keeps the latest tick (drop older ticks), never drops feed, escalations or agent log.
 - `fakes/fake_live.py` + `spacetime/seed.ts` write plausible rows so the frontend can build before the runtime exists.

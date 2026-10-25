@@ -6,7 +6,7 @@
     "lane": "without",
     "tick_id": 50,
     "ts": "2026-07-18T01:20:00Z",
-    "total_kw": 45.64,
+    "total_kw": 45.6,
     "customers_per_hour": 107,
     "devices": [
       {
@@ -15,9 +15,9 @@
         "name": "HVAC 1",
         "importance": "flexible",
         "state": "on",
-        "power_kw": 8.02,
-        "rated_kw": 12.0,
-        "power_pct": 67,
+        "power_kw": 8.0,
+        "rated_kw": 8.0,
+        "power_pct": 100,
         "source": "simulated",
         "physical": {
           "indoor_temp_c": 22.5
@@ -29,9 +29,9 @@
         "name": "HVAC 2",
         "importance": "flexible",
         "state": "on",
-        "power_kw": 8.02,
-        "rated_kw": 12.0,
-        "power_pct": 67,
+        "power_kw": 8.0,
+        "rated_kw": 8.0,
+        "power_pct": 100,
         "source": "simulated",
         "physical": {
           "indoor_temp_c": 22.5
@@ -182,19 +182,33 @@
   },
   "meter": {
     "ts": "2026-07-18T01:20:00Z",
-    "total_kw": 45.64,
-    "block_avg_kw": 48.55,
+    "total_kw": 45.6,
+    "block_avg_kw": 48.5,
     "block_start": "2026-07-18T01:15:00Z",
-    "month_peak_kw": 43.86,
-    "on_peak_month_peak_kw": 43.86,
+    "month_peak_kw": 43.85,
+    "on_peak_month_peak_kw": 43.85,
     "peak_mode": "cap",
     "peak_cap_kw": 40.0,
     "target_kw": 40.0,
-    "energy_kwh_today": 279.506,
-    "energy_kwh_month": 5774.469,
+    "energy_kwh_today": 279.501,
+    "energy_kwh_month": 5774.463,
     "price_usd_per_kwh_now": 0.38,
-    "cost_usd_today": 111.21,
-    "cost_usd_month": 2835.93
+    "cost_usd_today": 110.88,
+    "cost_usd_month": 2835.68,
+    "demand_peaks": [
+      {
+        "name": "max_demand",
+        "peak_kw": 43.85,
+        "usd_per_kw": 20.0,
+        "cost_usd": 877.0
+      },
+      {
+        "name": "peak_demand",
+        "peak_kw": 43.85,
+        "usd_per_kw": 8.0,
+        "cost_usd": 350.8
+      }
+    ]
   },
   "customers_per_hour": 107,
   "new_decisions": [],
@@ -203,9 +217,9 @@
   "warnings": [],
   "indoor_temp_c": 22.5,
   "forecast_kw": [
-    47.7,
-    45.1,
-    42.4,
+    47.6,
+    44.9,
+    42.2,
     34.9,
     34.8,
     40.2,

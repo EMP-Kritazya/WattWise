@@ -55,6 +55,17 @@ class HistoryView:
         self._guard(block_start)
         return self._history._device.get(block_start, {}).get(device_id)
 
+    def last_closed_device_kw(self, device_id: str, end_by: datetime) -> Optional[float]:
+        """avg kW of the device's most recent stored block that ends at or before `end_by` (and before now)."""
+        limit = min(end_by, self.now)
+        for block_start in reversed(self._history._device):
+            if block_start + BLOCK > limit:
+                continue  # not closed by then (never read)
+            kw = self._history._device[block_start].get(device_id)
+            if kw is not None:
+                return kw
+        return None
+
     def total_block_kw(self, block_start: datetime) -> Optional[float]:
         self._guard(block_start)
         return self._history._total.get(block_start)

@@ -157,7 +157,7 @@
     "lane": "with",
     "device_id": "water_heater_1",
     "block_start": "2026-07-18T00:30:00Z",
-    "avg_kw": 2.7,
+    "avg_kw": 3.9,
     "source": "simulated"
   },
   {

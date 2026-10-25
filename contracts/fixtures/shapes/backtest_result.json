@@ -18,6 +18,7 @@
           "cost_usd": 340.3
         }
       ],
+      "fixed_usd": 0.0,
       "total_usd": 2786.88,
       "tariff_id": "demo_tariff_v1"
     },
@@ -37,6 +38,7 @@
           "cost_usd": 339.44
         }
       ],
+      "fixed_usd": 0.0,
       "total_usd": 2783.23,
       "tariff_id": "demo_tariff_v1"
     },
@@ -56,6 +58,7 @@
           "cost_usd": 312.0
         }
       ],
+      "fixed_usd": 0.0,
       "total_usd": 2687.84,
       "tariff_id": "demo_tariff_v1"
     }
@@ -65,5 +68,9 @@
     "energy_conserved": true,
     "rule_violations": 0
   },
-  "assumptions_id": "base"
+  "assumptions_id": "base",
+  "tariff_id": "demo_tariff_v1",
+  "partial": true,
+  "saved_usd": 99.04,
+  "saved_vs_timer_usd": 95.39
 }

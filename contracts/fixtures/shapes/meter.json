@@ -1,16 +1,30 @@
 {
   "ts": "2026-07-18T01:20:00Z",
-  "total_kw": 35.95,
-  "block_avg_kw": 36.15,
+  "total_kw": 30.0,
+  "block_avg_kw": 32.9,
   "block_start": "2026-07-18T01:15:00Z",
   "month_peak_kw": 42.54,
   "on_peak_month_peak_kw": 42.54,
   "peak_mode": "cap",
   "peak_cap_kw": 40.0,
   "target_kw": 40.0,
-  "energy_kwh_today": 276.334,
-  "energy_kwh_month": 5771.297,
+  "energy_kwh_today": 275.617,
+  "energy_kwh_month": 5770.579,
   "price_usd_per_kwh_now": 0.38,
-  "cost_usd_today": 73.0,
-  "cost_usd_month": 2797.72
+  "cost_usd_today": 72.73,
+  "cost_usd_month": 2797.53,
+  "demand_peaks": [
+    {
+      "name": "max_demand",
+      "peak_kw": 42.54,
+      "usd_per_kw": 20.0,
+      "cost_usd": 850.8
+    },
+    {
+      "name": "peak_demand",
+      "peak_kw": 42.54,
+      "usd_per_kw": 8.0,
+      "cost_usd": 340.32
+    }
+  ]
 }

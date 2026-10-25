@@ -25,10 +25,13 @@ Record dataset id, county and convention in the table below.
 
 | Field | Value (fill at download) |
 |---|---|
-| Dataset id / file | |
-| County | |
-| Timestamp zone + convention | |
-| Electricity column names used | |
+| Dataset id / file | NREL ComStock `comstock_amy2018_release_3`, upgrade 45 "Electric Kitchen Equipment", `bldg_id 5847` (full-service restaurant, 2,000 ft², 52.0 kW peak, 251 MWh/yr); file `dataset/comstock/timeseries/5847-45.parquet` (gitignored), 35,040 rows; loader `backend/data/comstock.py` |
+| County | San Francisco County, `G0600750` (PG&E territory, CEC climate zone 3); weather year 2018 (AMY, Oakland airport) |
+| Timestamp zone + convention | **Local standard time all year (UTC−8, no DST in the stamps), interval-ending** (first row `2018-01-01 00:15:00`, last `2019-01-01 00:00:00`, no gaps). UTC interval start = `timestamp − 15 min + 8 h`. Verified 2026-10-24: the dinner peak moves 20:30 → 19:30 standard time when DST starts (11 Mar 2018) and back after 4 Nov, so the building follows the wall clock (tested in `tests/data/test_comstock.py`) |
+| Electricity column names used | `out.electricity.{cooling,fans,heating,pumps,heat_rejection,heat_recovery,interior_equipment,interior_lighting,exterior_lighting,refrigeration,water_systems,pv,total}.energy_consumption` (kWh per 15 min, `kW = kWh × 4`); refrigeration, water_systems and pv are 0 for bldg 5847 (the loader raises otherwise) |
+| Calendar (`day_offset`) | **2919 days** (417 weeks): 2018-01-01 (Mon) → 2025-12-29 (Mon). It also maps the 2018 DST switches onto the 2026 ones (11 Mar → 8 Mar, 4 Nov → 1 Nov), so the wall-clock schedule is kept exactly. Replay calendar 2025-12-29 … 2026-12-28: January 2026 is partial (warm-up = first 28 days, scored 26–31 Jan) and **December 2026 is partial too** (1–28 Dec, the data ends) |
+| Tariff | PG&E B-19 Secondary Voluntary, URDB `69de8cdb02f684104e01267d` (`label: "urdb"`), converted by `backend/data/tariff_urdb.py` (equals `contracts/fixtures/shapes/tariff_pge_b19.json`, tested) |
+| Recipe values | `backend/backtest/assumptions.yaml` (step 1 mapping, step-2 `interior_equipment` shares from appliance-split §3, Demo Café roster, sensitivity ids) |
 
 ## Real data in the live product (not only on the Proof screen)
 The same ComStock restaurant and the same URDB tariff feed the live demo, so the live kitchen is "today" in a real, calibrated
@@ -62,7 +65,14 @@ Rules for the live use:
 A fixed recipe. Same input → same output. Devices always sum to the original value exactly.
 
 **Step 1 — total → categories**
-- ComStock: already split (end-use columns).
+- ComStock: already split (end-use columns). Mapping (2026-10-24): **cooling = `cooling` + `fans` + `heating` + `pumps` +
+  `heat_rejection` + `heat_recovery`** (ComStock's own electric HVAC group; for bldg 5847 heating, pumps, heat rejection and
+  recovery are 0, `fans` is a constant 5.739 kW all year because the RTU runs `night_fanon_vent`, and cooling + fans = 74,322 kWh
+  = `calc.enduse_group.electricity.hvac`) → split equally over the `hvac` units. Worst 15-min block 15.714 kW
+  (2018-06-23 18:45 local) = 7.857 kW per unit for two units, under the catalog's 8.0 kW (a validation test replays the whole
+  year's HVAC series and fails if any block would exceed `rated_kw`; the loader raises, it never clips). The other end uses
+  (`interior_equipment`, lighting) → categories by the shares in `backtest/assumptions.yaml` (from appliance-split §3).
+  Every device row sums exactly to the dataset's `total` for that row; the baseline is never altered.
 - Real meter (total only): apply ComStock's category shares for that hour of day as a template, scaled to the real total.
 
 **Step 2 — category → devices** using fixed shares per device (from rated power × typical duty cycle).
@@ -85,6 +95,9 @@ Shares and windows are **assumptions**: keep them in `backtest/assumptions.yaml`
 - Replay step = 15 minutes; the decider runs on **every** step (live mode runs it every 5 sim minutes).
 - First 4 weeks = warm-up history, not scored (the forecaster and the `minimize` target both use the previous 4 weeks).
   So **January is scored from day 29 and labeled "partial"** on the Proof screen. "All 12 months" means 11 full months + partial January.
+- Bills and BacktestPoints cover **scored blocks only** (2026-10-24, `engine/replay.py`): January's mark is the bill of 26–31 Jan,
+  billed by `engine.meter.MonthBill` from the HubReports each lane's Kitchen metered (the Meter `cost_usd_month` definition,
+  3-decimal peaks). The last point of a month equals its mark to the cent by construction.
 - Run each month three ways through the **same** loop and bill them with the **same** tariff function:
 
 | Policy | What it does |

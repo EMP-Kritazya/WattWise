@@ -3,7 +3,7 @@
   "lane": "without",
   "tick_id": 50,
   "ts": "2026-07-18T01:20:00Z",
-  "total_kw": 45.64,
+  "total_kw": 45.6,
   "customers_per_hour": 107,
   "devices": [
     {
@@ -12,9 +12,9 @@
       "name": "HVAC 1",
       "importance": "flexible",
       "state": "on",
-      "power_kw": 8.02,
-      "rated_kw": 12.0,
-      "power_pct": 67,
+      "power_kw": 8.0,
+      "rated_kw": 8.0,
+      "power_pct": 100,
       "source": "simulated",
       "physical": {
         "indoor_temp_c": 22.5
@@ -26,9 +26,9 @@
       "name": "HVAC 2",
       "importance": "flexible",
       "state": "on",
-      "power_kw": 8.02,
-      "rated_kw": 12.0,
-      "power_pct": 67,
+      "power_kw": 8.0,
+      "rated_kw": 8.0,
+      "power_pct": 100,
       "source": "simulated",
       "physical": {
         "indoor_temp_c": 22.5

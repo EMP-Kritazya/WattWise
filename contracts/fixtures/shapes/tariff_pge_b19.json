@@ -1,0 +1,203 @@
+{
+  "tariff_id": "pge_b19_secondary_voluntary",
+  "name": "PG&E B-19 Medium General Demand TOU (Secondary) Voluntary",
+  "label": "urdb",
+  "currency": "USD",
+  "timezone": "America/Los_Angeles",
+  "energy": [
+    {
+      "name": "off_peak_winter",
+      "start": "21:00",
+      "end": "16:00",
+      "usd_per_kwh": 0.12026,
+      "months": [
+        1,
+        2,
+        10,
+        11,
+        12
+      ],
+      "days": "all"
+    },
+    {
+      "name": "off_peak_winter",
+      "start": "21:00",
+      "end": "09:00",
+      "usd_per_kwh": 0.12026,
+      "months": [
+        3,
+        4,
+        5
+      ],
+      "days": "all"
+    },
+    {
+      "name": "super_off_peak_spring",
+      "start": "09:00",
+      "end": "14:00",
+      "usd_per_kwh": 0.06442,
+      "months": [
+        3,
+        4,
+        5
+      ],
+      "days": "all"
+    },
+    {
+      "name": "off_peak_winter",
+      "start": "14:00",
+      "end": "16:00",
+      "usd_per_kwh": 0.12026,
+      "months": [
+        3,
+        4,
+        5
+      ],
+      "days": "all"
+    },
+    {
+      "name": "peak_winter",
+      "start": "16:00",
+      "end": "21:00",
+      "usd_per_kwh": 0.16188,
+      "months": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        10,
+        11,
+        12
+      ],
+      "days": "all"
+    },
+    {
+      "name": "off_peak_summer",
+      "start": "23:00",
+      "end": "14:00",
+      "usd_per_kwh": 0.12037,
+      "months": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "days": "all"
+    },
+    {
+      "name": "part_peak_summer",
+      "start": "14:00",
+      "end": "16:00",
+      "usd_per_kwh": 0.14775,
+      "months": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "days": "all"
+    },
+    {
+      "name": "peak_summer",
+      "start": "16:00",
+      "end": "21:00",
+      "usd_per_kwh": 0.18648,
+      "months": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "days": "all"
+    },
+    {
+      "name": "part_peak_summer",
+      "start": "21:00",
+      "end": "23:00",
+      "usd_per_kwh": 0.14775,
+      "months": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "days": "all"
+    }
+  ],
+  "demand": [
+    {
+      "name": "max_demand",
+      "windows": null,
+      "months": null,
+      "days": "all",
+      "usd_per_kw": 37.37
+    },
+    {
+      "name": "peak_demand_winter",
+      "windows": [
+        {
+          "start": "16:00",
+          "end": "21:00"
+        }
+      ],
+      "months": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        10,
+        11,
+        12
+      ],
+      "days": "all",
+      "usd_per_kw": 2.31
+    },
+    {
+      "name": "peak_demand_summer",
+      "windows": [
+        {
+          "start": "16:00",
+          "end": "21:00"
+        }
+      ],
+      "months": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "days": "all",
+      "usd_per_kw": 46.16
+    },
+    {
+      "name": "part_peak_demand_summer",
+      "windows": [
+        {
+          "start": "14:00",
+          "end": "16:00"
+        },
+        {
+          "start": "21:00",
+          "end": "23:00"
+        }
+      ],
+      "months": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "days": "all",
+      "usd_per_kw": 10.52
+    }
+  ],
+  "fixed_charges": [
+    {
+      "name": "customer_charge",
+      "usd": 11.36882,
+      "per": "day"
+    }
+  ]
+}

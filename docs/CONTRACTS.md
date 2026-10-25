@@ -159,21 +159,41 @@ day's close, and `POST /api/sim/control {action: "next_day"}` adds one more day 
     }
   ],
   "demand": [
-    { "name": "max_demand", "window": null, "usd_per_kw": 20.0 },
+    { "name": "max_demand", "windows": null, "months": null, "days": "all", "usd_per_kw": 20.0 },
     {
       "name": "peak_demand",
-      "window": { "start": "16:00", "end": "21:00" },
+      "windows": [{ "start": "16:00", "end": "21:00" }],
+      "months": null,
+      "days": "all",
       "usd_per_kw": 8.0
     }
-  ]
+  ],
+  "fixed_charges": []
 }
 ```
 
-Demo: one made-up tariff, identical in every run (`label: "illustrative"`). Later: a real OpenEI URDB rate for the restaurant's
-area (`label: "urdb"`), same shape. Demand charges bill the highest 15-min average kW in the month (inside `window` when set).
-The owner's bill always uses the tariff; Context grid prices are a market signal only.
-The engine keeps one month peak per demand charge: `window: null` → Meter `month_peak_kw`; the windowed charge → Meter
-`on_peak_month_peak_kw`. A block counts for a window when its local start is in `[start, end)`. Billing month = local calendar month.
+Demo: one made-up tariff, identical in every run (`label: "illustrative"`). Real: an OpenEI URDB rate (`label: "urdb"`, the main
+one is PG&E B-19, see below), same shape, converted by `backend/data/tariff_urdb.py`. The owner's bill always uses the tariff;
+Context grid prices are a market signal only. All times and months are local (`timezone`); billing month = local calendar month.
+
+**Seasons, days and windows (2026-10-24, for B-19).** Every energy period and demand charge may carry:
+`months`: list of local months 1–12 it applies in (`null` = every month) · `days`: `"all"` (default) | `"weekdays"` | `"weekends"`
+(Mon–Fri vs Sat–Sun; holidays are not modelled) · energy `start`/`end` and window `start`/`end` "HH:MM" (`end` may be "24:00";
+`[start, end)`; `end` < `start` wraps past midnight, e.g. 21:00–09:00; the day type and month are those of the minute itself).
+- **Energy:** for every local minute of the year **exactly one** energy period matches (month, day type, time); the tariff is
+  rejected otherwise (`ValueError` at `Kitchen(...)` / loader).
+- **Demand:** a charge **applies in a month** if `months` is null or contains it. `windows: null` = every hour; otherwise a list of
+  `{start, end}` and a 15-min block counts when its local start is in **any** window (one charge, one peak: B-19 summer part-peak
+  is one charge with two windows, 14:00–16:00 and 21:00–23:00) and its day type matches. Each applicable charge bills
+  `usd_per_kw × the highest closed 15-min block average kW that counts for it this billing month`. Any number of charges.
+- **`fixed_charges`:** `[{ "name": "customer_charge", "usd": 11.37, "per": "day" | "month" }]` (default `[]`), billed to both
+  lanes alike; included in Bill `fixed_usd` and the Meter costs.
+- Not modelled (documented exclusions): PG&E Peak Day Pricing event days, demand ratchets, tiered energy, power-factor charges.
+
+PG&E B-19 (URDB `69de8cdb02f684104e01267d`) in this shape: `max_demand` all months, all hours, $37.37/kW · `peak_demand_winter`
+months 1–5, 10–12, 16:00–21:00, $2.31/kW · `peak_demand_summer` months 6–9, 16:00–21:00, $46.16/kW · `part_peak_demand_summer`
+months 6–9, windows 14:00–16:00 + 21:00–23:00, $10.52/kW · six energy periods by season (incl. spring super-off-peak 09:00–14:00,
+months 3–5) · a daily fixed charge. Values come from the URDB record unchanged (golden rule 6).
 
 ### WarmUpHistory (built by `backend/data/warmup.py` from NREL ComStock, or the fixture history until then; passed to `Kitchen.warm_up(history)`)
 
@@ -183,7 +203,7 @@ The engine keeps one month peak per demand charge: `window: null` → Meter `mon
   "label": "calibrated_model",
   "dataset_id": "<ComStock release / building id>",
   "scale": 0.42,
-  "day_offset": 2919,
+  "day_offset": -1098,
   "start": "2026-06-19T07:00:00Z",
   "end": "2026-07-18T00:30:00Z",
   "blocks": [
@@ -199,14 +219,14 @@ The engine keeps one month peak per demand charge: `window: null` → Meter `mon
 
 `blocks`: 15-min average kW per device of this kitchen for the 4 weeks before `end` (= the run's `start_sim_ts`), from the
 ComStock restaurant scaled to the kitchen (`scale`) and spread onto devices by the distribution recipe (DATA_AND_PROOF.md).
-`day_offset`: whole days added to the dataset dates so weekdays line up with the sim calendar (a multiple of 7; e.g. 2919 maps a
-2018 dataset onto 2026; 0 for the fixture history). Every block ends at or before `end`.
-`month_to_date`: **null in this build**: the engine meters the history blocks of the current month itself. The non-null form
-`{ "month": "2026-07", "month_peak_kw": 44.2, "on_peak_month_peak_kw": 41.0, "energy_kwh_month": 7400.0, "cost_usd_month": 2650.0 }`
-is reserved for resuming a run after a backend restart, which this build doesn't do (a restart, `reset` or new kitchen starts a new
-run from the warm-up; reading the old `live_tick` row back would double-count). Month to date is published in `live_tick`.
+`day_offset`: whole days added to the dataset dates so weekdays line up with the sim calendar. Every block ends at or before `end`.
+`month_to_date`: null (the engine meters the history blocks of the current month itself) or
+`{ "month": "2026-07", "month_peak_kw": 44.2, "on_peak_month_peak_kw": 41.0, "energy_kwh_month": 7400.0, "cost_usd_month": 2650.0,
+"demand_peaks": [{ "name": "max_demand", "peak_kw": 44.2, "usd_per_kw": 37.37, "cost_usd": 1651.75 }] }` (`demand_peaks` = the Meter's, one per
+applicable charge, so every seasonal peak is restored; `live_tick.demand_peaks_json` carries it)
+(restored from the SpacetimeDB `live_tick` row of the same month).
 `source` / `label`: `nrel_comstock` / `calibrated_model` (real build) or `fixture_synthetic` / `simulated` (the fake 2-month history in
-`contracts/fixtures/history/`, generated by the next `fixture-builder` run and used until the ComStock extract exists). `blocks` may start earlier than 4 weeks before `end`
+`contracts/fixtures/history/`, used until the ComStock extract exists). `blocks` may start earlier than 4 weeks before `end`
 (the fixture covers about 2 months so the previous month can be billed); the forecaster and `minimize` target use only the last
 4 weeks, and the engine meters only the current month's blocks into month to date.
 
@@ -220,8 +240,7 @@ run from the warm-up; reading the old `live_tick` row back would double-count). 
 }
 ```
 
-Codes and `data` in section 2 (ws `warning`). The engine emits only `cap_unreachable` (once per block, on the decision tick that
-block first becomes unreachable); the others come from the runtime.
+Codes and `data` in section 2 (ws `warning`). The engine emits only `cap_unreachable`; the others come from the runtime.
 
 ### ClaudeAuthority (owner-set bounds for resolving escalations without asking)
 
@@ -236,7 +255,11 @@ block first becomes unreachable); the others come from the runtime.
 ```
 
 Engine marks each escalation option `within_authority` against these. The refrigeration food-safety floor (50 %) is never
-crossable, whatever the authority says. `enabled: false` → every escalation goes to the owner.
+crossable, whatever the authority says. `enabled: false` → Claude chooses nothing and the engine's default applies.
+**Full authority (Oct 24):** the Builder no longer shows these settings; it always sends
+`{ "enabled": true, "max_cap_overrun_kw": 1000, "max_extra_delay_min": 0, "max_extra_reduce_min": 1440, "may_go_below_min_power": false }`
+(the peak may run over the cap and flexible units stay reduced longer, but deadlines and minimum power stay hard). Claude is
+offered only the `within_authority` options, never `ask_owner`, so escalations never wait for the owner and never pause the clock.
 
 ### Device (live state of one unit)
 
@@ -358,8 +381,6 @@ limit (`reason: out_of_range`). `ok: false` → not applied (`reason`: job_runni
 ```
 
 `status`: executed | undone. (The hard case is carried by the Escalation, not by a Decision status.)
-`inside_rules`: false for an `escalation_fallback` / `escalation_choice` decision whose option breaks a rule, and for an
-`owner_override` beyond the device's limits; true otherwise.
 There is no per-decision owner approval any more: anything outside the rules becomes an Escalation.
 `reason_code`: avoid_new_peak | stay_under_cap | release_into_valley | catch_up | owner_override | escalation_fallback | escalation_choice.
 `effect` is computed by the engine. Nobody else changes it. `saving_usd = baseline_cost_usd − optimized_cost_usd` over the
@@ -423,9 +444,9 @@ shown, not used by the forecast in this build (no HVAC model). Fetched periodica
   "updated_ts": "<sim ts>",
   "block_start": "<sim ts>",
   "problem": {
-    "forecast_peak_kw": 43.0,
+    "forecast_peak_kw": 44.0,
     "target_kw": 40.0,
-    "excess_kw": 3.0,
+    "excess_kw": 4.0,
     "reason": "dinner rush + Giants game"
   },
   "options": [
@@ -509,24 +530,21 @@ shown, not used by the forecast in this build (no HVAC model). Fetched periodica
 `status`: open | resolved | awaiting*owner | expired_default | obsolete. `resolved_by`: claude | owner | default.
 Active = `open` or `awaiting_owner`; at most one active escalation per lane per `block_start`.
 **Opens** on a decision tick when a block starting within the next 30 sim min (the block in progress included) is still over the
-target after every in-rules move. `problem.forecast_peak_kw` = that block's forecast after every in-rules move (the peak
-`accept_overrun` leaves), `excess_kw` = it − `target_kw`. `problem.target_kw` = Meter `target_kw` (cap mode: `peak_cap_kw`; minimize mode: the day's target).
+target after every in-rules move. `problem.target_kw` = Meter `target_kw` (cap mode: `peak_cap_kw`; minimize mode: the day's target).
 **Fallback.** `default_option_id` = the rank-1 option if it is within authority, else `ask_owner`. The fallback is applied **when the
 escalation opens** (its Commands are in that step's `new_commands`, Decisions `reason_code: escalation_fallback`);
 `active_option_id` = the option in force (`null` while nothing extra is applied). The clock never slows or pauses for an escalation.
 **Ranking.** `harm_score` (engine) = Σ rule-break amount ÷ the owner's tolerance for that kind (ENGINE.md section 6); `rank`: within
 authority first, then lower `harm_score`, then lower `cost_delta_usd`. `ask_owner`: both null. Claude sees the ranked list and may pick any option.
-**Updates in place.** While active, each decision tick may change `problem`, `options` (projections, ranks) and `updated_ts`; an
-update never changes `escalation_id`, `deadline_sim_ts`, `default_option_id` or `active_option_id` (only a resolve changes the last). `obsolete` (terminal): a newer forecast shows the in-rules plan alone holds
+**Updates in place.** While active, each decision tick may change `problem`, `options` (projections, ranks) and `updated_ts`; never
+`escalation_id`, `deadline_sim_ts` or `active_option_id`. `obsolete` (terminal): a newer forecast shows the in-rules plan alone holds
 the block; executed commands are never reversed automatically. Risk returning after closure → a new escalation.
 **Resolve.** Revalidated against the latest state. `claude`: an option within authority before the deadline → `resolved` (the next step
 switches devices from the active option to it, Decisions `escalation_choice`); outside authority, or `ask_owner` → `awaiting_owner`
-(`chosen_option_id` and `rationale` hold Claude's pick, `resolved_by: "claude"`; the fallback stays). `owner`: any current option before the
-deadline → `resolved`, `resolved_by: "owner"`. Already closed → returned unchanged. Unknown option id → RuleError.
-The runtime asks Claude once, when the escalation opens; later updates are published (ws `escalation`, `live_escalation`), not re-asked.
+(`chosen_option_id` and `rationale` hold Claude's pick, `resolved_by: "claude"`; the fallback stays). `owner`: any current option until the
+block ends → `resolved`, `resolved_by: "owner"`. Already closed → returned unchanged. Unknown option id → RuleError.
 `deadline_sim_ts` = `max(ts + 5 min, min(ts + 15 min, block_start − 5 min))`. Still active at the deadline, or when the block ends →
-`expired_default` with `resolved_by: "default"` (`chosen_option_id` keeps Claude's pick, if any, for the record); the fallback stays
-in force (default `ask_owner` → nothing extra, physically the overrun). `obsolete` keeps `resolved_by: null`.
+`expired_default`; the fallback stays in force (default `ask_owner` → nothing extra, physically the overrun).
 Option ids are by type: `deep_reduce*<type*id>`, `extend_delay*<type*id>`; `actions`list every affected device.
 Option`actions` are templates (`decision_id: null`); applying an option issues **new** Commands with Decisions.
 `rule_breaks[].kind`: cap_overrun | below_min_power | past_deadline | over_max_reduce | over_max_delay. Every option whose
@@ -553,16 +571,24 @@ Food-safety breaks are never generated as options.
   "energy_kwh_month": 7712.4,
   "price_usd_per_kwh_now": 0.31,
   "cost_usd_today": 61.2,
-  "cost_usd_month": 1830.55
+  "cost_usd_month": 1830.55,
+  "demand_peaks": [
+    { "name": "max_demand", "peak_kw": 46.0, "usd_per_kw": 20.0, "cost_usd": 920.0 },
+    { "name": "peak_demand", "peak_kw": 44.0, "usd_per_kw": 8.0, "cost_usd": 352.0 }
+  ]
 }
 ```
 
 Every field is engine-computed from HubReports, warm-up history and the tariff (`price_usd_per_kwh_now`: current energy price the bill uses).
-`month_peak_kw`: highest closed 15-min block this billing month (the `window: null` demand charge). `on_peak_month_peak_kw`: the
-same inside the tariff's windowed demand charge (null if the tariff has none). Day and month are local (`tariff.timezone`).
+`month_peak_kw`: highest closed 15-min block this billing month (any hour). `on_peak_month_peak_kw`: the month peak of the
+**highest-rate windowed charge that applies this month** (B-19: `peak_demand_summer` in June–September, `peak_demand_winter`
+otherwise; null if no windowed charge applies). `demand_peaks`: one entry per demand charge **that applies this month**, in tariff
+order, with its month peak so far and its cost (`usd_per_kw × peak_kw`); the UI shows these, it never multiplies.
+Day and month are local (`tariff.timezone`).
 `cost_usd_today` = energy cost today + demand charges added today (peak increases since local midnight × rate).
-`cost_usd_month` = energy cost month to date + every demand charge on its peak so far.
-`target_kw`: what the engine is holding now (= `peak_cap_kw` in `cap` mode; in `minimize` mode the day's target, the highest 15-min peak of the 4 previous same weekdays). `peak_cap_kw` null in `minimize` mode.
+`cost_usd_month` = energy cost month to date + every applicable demand charge on its peak so far + fixed charges to date.
+(`cost_usd_today` also includes today's fixed charges.)
+`target_kw`: what the engine is holding now (= `peak_cap_kw` in `cap` mode; engine-chosen in `minimize` mode). `peak_cap_kw` null in `minimize` mode.
 
 ### TickState (engine → runtime every step; runtime publishes it to SpacetimeDB)
 
@@ -583,7 +609,7 @@ same inside the tariff's windowed demand charge (null if the tariff has none). D
 ```
 
 `new_escalations`: every escalation opened **or changed** in this step (full object; upsert by `escalation_id`).
-`warnings`: engine warnings raised in this step (`cap_unreachable`, once per block), empty otherwise; the runtime forwards them as ws `warning` messages.
+`warnings`: engine warnings raised in this step (`cap_unreachable`), empty otherwise; the runtime forwards them as ws `warning` messages.
 `forecast_kw`: next 2 h in 15-min steps (8 values, the first is the block in progress); present only on re-plan ticks, otherwise null.
 `hub`: the HubReport this step was computed from (echoed). `customers_per_hour` copied from it; `indoor_temp_c` = the kitchen's one
 dining-room temperature (shared by every HVAC unit's `physical.indoor_temp_c`). Both lanes carry `forecast_kw` on decision ticks.
@@ -639,10 +665,13 @@ Applied by code (never by the model) when the owner confirms; the result is the 
   "demand_charges": [
     { "name": "max_demand", "peak_kw": 46.0, "cost_usd": 920.0 }
   ],
+  "fixed_usd": 0.0,
   "total_usd": 5130.55,
   "tariff_id": "demo_tariff_v1"
 }
 ```
+`demand_charges`: one entry per tariff demand charge that applies in `period` (seasonal charges outside their months are absent).
+`total_usd` = `energy_cost_usd` + Σ `demand_charges[].cost_usd` + `fixed_usd`.
 
 ### BacktestResult
 
@@ -656,9 +685,56 @@ Applied by code (never by the model) when the owner confirms; the result is the 
     "energy_conserved": true,
     "rule_violations": 0
   },
-  "assumptions_id": "base"
+  "assumptions_id": "base",
+  "tariff_id": "pge_b19_secondary_voluntary",
+  "partial": false,
+  "saved_usd": 412.35,
+  "saved_vs_timer_usd": 160.1
 }
 ```
+The month mark of the Proof chart. `saved_usd` = `policies.without.total_usd − policies.with.total_usd` and `saved_vs_timer_usd` =
+`policies.timer.total_usd − policies.with.total_usd`, computed by the engine (the browser never subtracts). `partial`: true for a
+month with fewer scored days than calendar days (the first month after the 4 warm-up weeks). `month` is in the replay calendar
+(dataset dates + `day_offset`).
+
+### BacktestPoint (one per replayed local day; the Proof chart's running line)
+```json
+{
+  "dataset": "<label>",
+  "assumptions_id": "base",
+  "tariff_id": "pge_b19_secondary_voluntary",
+  "month": "2026-07",
+  "day": "2026-07-14",
+  "ts": "2026-07-15T07:00:00Z",
+  "partial": false,
+  "cost_to_date_usd": { "without": 2210.4, "timer": 2105.9, "with": 2001.2 },
+  "saved_month_to_date_usd": 209.2,
+  "saved_vs_timer_month_to_date_usd": 104.7,
+  "saved_year_to_date_usd": 1530.8
+}
+```
+`ts` = end of the local day (UTC). `cost_to_date_usd[policy]` = that policy's month-to-date bill on the tariff (energy so far + each
+applicable demand charge on its month peak so far + fixed charges so far: the Meter `cost_usd_month` definition), so the saved line
+can jump when a policy sets a new demand peak. The last point of a month equals that month's BacktestResult to the cent
+(`saved_month_to_date_usd == saved_usd`). `saved_year_to_date_usd` = Σ `saved_usd` of earlier months + `saved_month_to_date_usd`.
+
+### BacktestInputs (built by the caller, passed to `run_backtest`; the engine reads no files)
+```json
+{
+  "config": "<KitchenConfig>",
+  "tariff": "<Tariff>",
+  "catalog": ["<EquipmentType>"],
+  "seed": 42,
+  "series": "<WarmUpHistory: per-device 15-min blocks covering the 4 warm-up weeks + every replayed month>",
+  "assumptions": { "assumptions_id": "base", "flex_scale": 1.0, "draw_scale": 1.0, "forecast_noise_pct": 0.0 }
+}
+```
+`series` uses the WarmUpHistory shape (`source: "nrel_comstock"`, `label: "calibrated_model"`): built by `backend/data/`
+(`load_backtest_inputs(months, assumptions_id)`) from the ComStock year with the distribution recipe (DATA_AND_PROOF.md) and
+`assumptions.yaml`; the per-device blocks sum exactly to the dataset's electricity total of every row, and no block exceeds its
+device's `rated_kw` (the loader raises otherwise; it never clips). `assumptions` are the sensitivity knobs the engine applies
+itself (seeded, labelled): `flex_scale` scales owner limits' flexibility, `draw_scale` scales device draw, `forecast_noise_pct` adds
+seeded forecast noise. `base` = 1.0 / 1.0 / 0.0.
 
 ---
 
@@ -666,32 +742,32 @@ Applied by code (never by the model) when the owner confirms; the result is the 
 
 ### REST
 
-| Method | Path                                          | Body → Returns                                                                                                                                                                                                                        |
-| ------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | `/api/catalog`                                | → list[EquipmentType]                                                                                                                                                                                                                 |
-| POST   | `/api/kitchen`                                | KitchenConfig → `{ kitchen_id }` (builds both engine lanes with `Kitchen.build_lanes`, warms them up from `data.warmup.build_warmup(...)` (the fixture history until the ComStock extract exists), sends `sim_build` to the sim host) |
-| GET    | `/api/kitchen`                                | → `{ config: KitchenConfig, devices: list[Device], tariff: Tariff }`                                                                                                                                                                  |
-| PUT    | `/api/kitchen/devices/{device_id}/importance` | `{ importance, limits }` → Device                                                                                                                                                                                                     |
-| PUT    | `/api/kitchen/peak-cap`                       | `{ peak_mode, peak_cap_kw }` → Meter (`peak_cap_kw` required for `cap`, null for `minimize`)                                                                                                                                          |
-| POST   | `/api/sim/control`                            | `{ action: "play" \| "pause" \| "reset" \| "next_day", speed?: 120 }` → ClockState (`next_day` only while `paused_reason` is `run_complete`; else 422)                                                                                |
-| POST   | `/api/devices/{device_id}/command`            | `{ action, value? }` → Command (manual click, `issued_by: owner`; the runtime applies it to both lanes and returns the `with` lane's Command)                                                                                         |
-| POST   | `/api/events/customers`                       | `{ customers: 40, duration_min: 60 }` → ok (queued as a surge in the next `sim_tick`)                                                                                                                                                 |
-| POST   | `/api/decisions/{decision_id}/undo`           | → Decision (status `undone`); 422 unless it is an executed reduce / delay whose command is still in force                                                                                                                             |
-| GET    | `/api/decisions?limit=50`                     | → list[Decision]                                                                                                                                                                                                                      |
-| POST   | `/api/backtest/run`                           | `{ months: ["2026-07"], assumptions_id }` → `{ run_id: "run_0001" }`                                                                                                                                                                  |
-| GET    | `/api/backtest/{run_id}`                      | → list[BacktestResult]                                                                                                                                                                                                                |
-| POST   | `/api/chat`                                   | `{ message }` → `{ chat_id: "chat_0001" }` (reply streams over WebSocket)                                                                                                                                                             |
-| GET    | `/api/proposals?status=pending`               | → list[Proposal]                                                                                                                                                                                                                      |
-| POST   | `/api/proposals/{proposal_id}/confirm`        | `{ confirm: true \| false }` → Proposal (owner confirmation from the UI)                                                                                                                                                              |
-| PUT    | `/api/kitchen/authority`                      | ClaudeAuthority → ok (owner only)                                                                                                                                                                                                     |
-| PUT    | `/api/kitchen/preferences`                    | `{ text }` → ok                                                                                                                                                                                                                       |
-| GET    | `/api/context`                                | → Context                                                                                                                                                                                                                             |
-| POST   | `/api/context`                                | partial Context → ok (agents, header `X-Agent-Token`)                                                                                                                                                                                 |
-| POST   | `/api/context/crowd-effect`                   | `{ value, reason }` → ok (Concierge, `X-Agent-Token`)                                                                                                                                                                                 |
-| GET    | `/api/escalations?status=open`                | → list[Escalation]                                                                                                                                                                                                                    |
-| POST   | `/api/escalations/{id}/resolve`               | `{ option_id }` → Escalation (owner choice from the UI, before the deadline; after it → returned unchanged)                                                                                                                           |
-| POST   | `/api/agent-log`                              | AgentLog → ok (agents, `X-Agent-Token`)                                                                                                                                                                                               |
-| GET    | `/api/health`                                 | → `{ ok, kitchen_impl, live_transport, store, hardware, sim_host }` (Azure health probe)                                                                                                                                              |
+| Method | Path                                          | Body → Returns                                                                                                                                                                |
+| ------ | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/api/catalog`                                | → list[EquipmentType]                                                                                                                                                         |
+| POST   | `/api/kitchen`                                | KitchenConfig → `{ kitchen_id }` (builds both engine lanes with `Kitchen.build_lanes`, warms them up from `data.warmup.build_warmup(...)`, sends `sim_build` to the sim host) |
+| GET    | `/api/kitchen`                                | → `{ config: KitchenConfig, devices: list[Device], tariff: Tariff }`                                                                                                          |
+| PUT    | `/api/kitchen/devices/{device_id}/importance` | `{ importance, limits }` → Device                                                                                                                                             |
+| PUT    | `/api/kitchen/peak-cap`                       | `{ peak_mode, peak_cap_kw }` → Meter (`peak_cap_kw` required for `cap`, null for `minimize`)                                                                                  |
+| POST   | `/api/sim/control`                            | `{ action: "play" \| "pause" \| "reset" \| "next_day", speed?: 120 }` → ClockState (`next_day` only while `paused_reason` is `run_complete`; else 422)                        |
+| POST   | `/api/devices/{device_id}/command`            | `{ action, value? }` → Command (manual click, `issued_by: owner`)                                                                                                             |
+| POST   | `/api/events/customers`                       | `{ customers: 40, duration_min: 60 }` → ok (queued as a surge in the next `sim_tick`)                                                                                         |
+| POST   | `/api/decisions/{decision_id}/undo`           | → Decision (status `undone`)                                                                                                                                                  |
+| GET    | `/api/decisions?limit=50`                     | → list[Decision]                                                                                                                                                              |
+| POST   | `/api/backtest/run`                           | `{ months: ["2026-07"], assumptions_id }` → `{ run_id: "run_0001" }`                                                                                                          |
+| GET    | `/api/backtest/{run_id}`                      | → list[BacktestResult]                                                                                                                                                        |
+| POST   | `/api/chat`                                   | `{ message }` → `{ chat_id: "chat_0001" }` (reply streams over WebSocket)                                                                                                     |
+| GET    | `/api/proposals?status=pending`               | → list[Proposal]                                                                                                                                                              |
+| POST   | `/api/proposals/{proposal_id}/confirm`        | `{ confirm: true \| false }` → Proposal (owner confirmation from the UI)                                                                                                      |
+| PUT    | `/api/kitchen/authority`                      | ClaudeAuthority → ok (owner only)                                                                                                                                             |
+| PUT    | `/api/kitchen/preferences`                    | `{ text }` → ok                                                                                                                                                               |
+| GET    | `/api/context`                                | → Context                                                                                                                                                                     |
+| POST   | `/api/context`                                | partial Context → ok (agents, header `X-Agent-Token`)                                                                                                                         |
+| POST   | `/api/context/crowd-effect`                   | `{ value, reason }` → ok (Concierge, `X-Agent-Token`)                                                                                                                         |
+| GET    | `/api/escalations?status=open`                | → list[Escalation]                                                                                                                                                            |
+| POST   | `/api/escalations/{id}/resolve`               | `{ option_id }` → Escalation (owner choice from the UI)                                                                                                                       |
+| POST   | `/api/agent-log`                              | AgentLog → ok (agents, `X-Agent-Token`)                                                                                                                                       |
+| GET    | `/api/health`                                 | → `{ ok, kitchen_impl, live_transport, store, hardware, sim_host }` (Azure health probe)                                                                                      |
 
 Conventions: "→ ok" = `{ "ok": true }`. Errors: `{ "detail": "text" }` with 422 (RuleError, invalid body) or 404 (unknown id).
 Health values: `kitchen_impl` fake | real · `live_transport` spacetime | ws · `store` convex | memory · `hardware` off | sim_bridge | esp32 ·
@@ -711,6 +787,8 @@ ClockState = `{ playing, speed, sim_ts, tick_id, paused_reason, day_index, run_d
 { "type": "chat_delta", "chat_id": "...", "text": "partial text" }
 { "type": "chat_done", "chat_id": "..." }
 { "type": "backtest_progress", "run_id": "...", "month": "2026-07", "pct": 40 }
+{ "type": "backtest_point", "run_id": "...", "data": "<BacktestPoint>" }
+{ "type": "backtest_month", "run_id": "...", "data": "<BacktestResult>" }
 { "type": "comparison", "data": "<LaneComparison>" }
 { "type": "proposal", "data": "<Proposal>" }
 { "type": "escalation", "data": "<Escalation>" }
@@ -723,8 +801,7 @@ separate socket, `/ws/hub` (section 8).
 `paused_reason`: null | manual (owner or presenter pressed pause) | hub_waiting (no `hub_report` within 2 real s) | sim_host_offline
 (no hub connected) | run_complete (the last planned day has closed; `phase: closed`). The clock never slows or pauses for an escalation or a proposal: the engine applies its fallback at once and
 Claude answers asynchronously (ENGINE.md section 6). Manual pause/resume is a runtime control, invisible to the engine and the backtest.
-Ticks are sent for both lanes. The UI throttles rendering to ~4 per second. `escalation` is sent when an escalation opens and on
-every change (same id).
+Ticks are sent for both lanes. The UI throttles rendering to ~4 per second.
 `warning.data` per code: cap_unreachable `{ unavoidable_kw, peak_cap_kw, target_kw }` (`peak_cap_kw` null in minimize mode) · sim_host_offline `{ last_tick_id }` ·
 hub_offline `{ device_id, hub_id }` · live_transport_down `{}` · store_down `{}`.
 `warning.code`: cap_unreachable | sim_host_offline (no `/sim` tab connected; clock paused) |
@@ -745,27 +822,27 @@ the runtime and FakeKitchen build against; how the engine works behind them is i
 Call order is part of the contract: every tick the runtime steps `without`, then `with`, and calls id-creating methods
 (`owner_command`, `undo`, `resolve_escalation`) in that lane order, so the shared id counters are deterministic.
 
-| Call                                                                   | Returns                                                                                                                                                                                          | Notes                                                                                                                                                                                                                                                                                                                                                                                    |
-| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Kitchen.build_lanes(config, tariff, catalog, seed)`                   | `{"without": Kitchen, "with": Kitchen}`                                                                                                                                                          | `catalog`: list[EquipmentType], the same list `GET /api/catalog` serves and `sim_build.catalog` carries (`backend/data/equipment_catalog.json`, loaded by the runtime; the engine reads no files). Both lanes sharing one id allocator (`d_`, `c_`, `e_` counters, monotonically increasing, never reset during a run).                                                                  |
-| `Kitchen(config, tariff, catalog, control, seed, ids=None)`            | Kitchen                                                                                                                                                                                          | `tariff`: Tariff (section 1). `catalog`: list[EquipmentType]; every `config.equipment[].type_id` must be in it (else `RuleError`). `control`: `"without"` or `"with"`. Single lane (tests).                                                                                                                                                                                              |
-| `warm_up(history)`                                                     | None                                                                                                                                                                                             | `history`: WarmUpHistory (section 1; `month_to_date: null` in this build). Call once per lane before the first `step`. Raises `ValueError` if a block ends after `history.end`. Not called → the engine runs on live history only.                                                                                                                                                       |
-| `step(minutes, hub_report)`                                            | TickState                                                                                                                                                                                        | Meters this lane's HubReport for the minute just simulated; replans every 5 sim min; returns `new_commands` to deliver next tick.                                                                                                                                                                                                                                                        |
-| `ingest_reading(reading)`                                              | Device                                                                                                                                                                                           | Overrides that device's power in the next `step` with a measured Reading; `source` becomes measured. `with` lane only.                                                                                                                                                                                                                                                                   |
-| `owner_command(device_id, action, value)`                              | Command                                                                                                                                                                                          | Manual click on any device. Records an `owner_override` Decision; the engine won't override the device for 30 sim min. Returned in the next step's `new_commands`, delivered in the following `sim_tick`. The runtime calls it on both lanes (`without` first) so the comparison stays fair.                                                                                             |
-| `set_importance(device_id, importance, limits)`                        | Device                                                                                                                                                                                           | Raises `RuleError` for unsafe limits.                                                                                                                                                                                                                                                                                                                                                    |
-| `set_peak_cap(peak_mode, peak_cap_kw)`                                 | Meter                                                                                                                                                                                            | `with` lane decisions only; raises `RuleError` for `cap` without a number                                                                                                                                                                                                                                                                                                                |
-| `undo(decision_id)`                                                    | Decision                                                                                                                                                                                         | `with` lane. Only `executed` reduce / delay decisions whose command is still in force (else RuleError): reduce → `restore`; delay → `start` (job waiting) or `delay 0` (idle hold). Status `undone`; device protected 30 sim min.                                                                                                                                                        |
-| `set_context(context)`                                                 | None                                                                                                                                                                                             | Merges context; used from the next step. Plain object, no I/O.                                                                                                                                                                                                                                                                                                                           |
-| `set_authority(authority)` · `set_preferences(text)`                   | None                                                                                                                                                                                             | `with` lane only                                                                                                                                                                                                                                                                                                                                                                         |
-| `open_escalations()`                                                   | list[Escalation]                                                                                                                                                                                 |                                                                                                                                                                                                                                                                                                                                                                                          |
-| `resolve_escalation(escalation_id, option_id, resolved_by, rationale)` | Escalation                                                                                                                                                                                       | Revalidates on the latest state: `claude` + within authority + before the deadline → `resolved`; `claude` + outside authority or `ask_owner` → `awaiting_owner` (runtime makes a Proposal); `owner` may pick any current option before the deadline; already closed (incl. past the deadline) → returned unchanged; unknown option → RuleError. The fallback was applied when it opened. |
-| `forecast(horizon_min)`                                                | list[float]                                                                                                                                                                                      | kW per 15 min, 8 values. `horizon_min` is fixed at 120 in this build (other values → ValueError). Latest decision tick's forecast.                                                                                                                                                                                                                                                       |
-| `what_if(device_id, action, value, at)`                                | Effect `{peak_before_kw, peak_after_kw, saving_usd}`                                                                                                                                             | `at`: sim ts where the hypothetical command starts, within `[now, now + 120 min)` (else RuleError). Read-only: no state, commands, ids or escalations change. Per lane; the runtime picks the lane (default `with`).                                                                                                                                                                     |
-| `snapshot()`                                                           | `{ tick_id, sim_ts, lane, control, peak_mode, config, meter, forecast_kw, forecast_ts, devices, active_commands, owed_kwh, open_escalations, warnings, recent_decisions, context, id_counters }` | Per lane; pure (no side effects, no I/O). `recent_decisions`: last 20, newest first. `devices`: latest HubReport state. `active_commands`: Commands acked and still in force. The runtime and AI use the `with` lane                                                                                                                                                                     |
-| `run_backtest(months, assumptions_id, on_progress)`                    | list[BacktestResult]                                                                                                                                                                             | Module-level function.                                                                                                                                                                                                                                                                                                                                                                   |
-| `compare_lanes(without, with_)`                                        | LaneComparison                                                                                                                                                                                   | Module-level function over two TickStates.                                                                                                                                                                                                                                                                                                                                               |
-| `RuleError`                                                            | exception                                                                                                                                                                                        | Raised for unsafe limits or moves. API maps it to HTTP 422.                                                                                                                                                                                                                                                                                                                              |
+| Call                                                                   | Returns                                                                                                                                                                                          | Notes                                                                                                                                                                                                                                                                                                                                                           |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Kitchen.build_lanes(config, tariff, catalog, seed)` | `{"without": Kitchen, "with": Kitchen}`                                                                                                                                                          | `catalog`: list[EquipmentType], the same list `GET /api/catalog` serves and `sim_build.catalog` carries (`backend/data/equipment_catalog.json`, loaded by the runtime; the engine reads no files). Both lanes sharing one id allocator (`d_`, `c_`, `e_` counters, monotonically increasing, never reset during a run). |
+| `Kitchen(config, tariff, catalog, control, seed, ids=None)` | Kitchen                                                                                                                                                                                          | `catalog`: list[EquipmentType]; every `config.equipment[].type_id` must be in it (else `RuleError`). `tariff`: Tariff (section 1). `control`: `"without"` or `"with"`. Single lane (tests). |
+| `warm_up(history)`                                                     | None                                                                                                                                                                                             | `history`: WarmUpHistory (section 1). Call once per lane before the first `step`. Raises `ValueError` if a block ends after `history.end`. Not called → the engine runs on live history only.                                                                                                                                                                   |
+| `step(minutes, hub_report)`                                            | TickState                                                                                                                                                                                        | Meters this lane's HubReport for the minute just simulated; replans every 5 sim min; returns `new_commands` to deliver next tick.                                                                                                                                                                                                                               |
+| `ingest_reading(reading)`                                              | Device                                                                                                                                                                                           | Overrides that device's power in the next `step` with a measured Reading; `source` becomes measured. `with` lane only.                                                                                                                                                                                                                                          |
+| `owner_command(device_id, action, value)`                              | Command                                                                                                                                                                                          | Manual click on any device. Records an `owner_override` Decision; the engine won't override the device for 30 sim min. Returned in the next step's `new_commands`, delivered in the following `sim_tick`. The runtime calls it on both lanes (`without` first) so the comparison stays fair.                                                                    |
+| `set_importance(device_id, importance, limits)`                        | Device                                                                                                                                                                                           | Raises `RuleError` for unsafe limits.                                                                                                                                                                                                                                                                                                                           |
+| `set_peak_cap(peak_mode, peak_cap_kw)`                                 | Meter                                                                                                                                                                                            | `with` lane decisions only; raises `RuleError` for `cap` without a number                                                                                                                                                                                                                                                                                       |
+| `undo(decision_id)`                                                    | Decision                                                                                                                                                                                         | `with` lane. Only `executed` reduce / delay decisions (else RuleError): reduce → `restore`; delay → `start` (job waiting) or `delay 0` (idle hold). Status `undone`; device protected 30 sim min.                                                                                                                                                               |
+| `set_context(context)`                                                 | None                                                                                                                                                                                             | Merges context; used from the next step. Plain object, no I/O.                                                                                                                                                                                                                                                                                                  |
+| `set_authority(authority)` · `set_preferences(text)`                   | None                                                                                                                                                                                             | `with` lane only                                                                                                                                                                                                                                                                                                                                                |
+| `open_escalations()`                                                   | list[Escalation]                                                                                                                                                                                 |                                                                                                                                                                                                                                                                                                                                                                 |
+| `resolve_escalation(escalation_id, option_id, resolved_by, rationale)` | Escalation                                                                                                                                                                                       | Revalidates on the latest state: `claude` + within authority + before the deadline → `resolved`; `claude` + outside authority or `ask_owner` → `awaiting_owner` (runtime makes a Proposal); `owner` may pick any current option until the block ends; already closed → returned unchanged; unknown option → RuleError. The fallback was applied when it opened. |
+| `forecast(horizon_min)`                                                | list[float]                                                                                                                                                                                      | kW per 15 min, 8 values. `horizon_min` is fixed at 120 in this build (other values → ValueError). Latest decision tick's forecast.                                                                                                                                                                                                                              |
+| `what_if(device_id, action, value, at)`                                | Effect `{peak_before_kw, peak_after_kw, saving_usd}`                                                                                                                                             | `at`: sim ts where the hypothetical command starts, within `[now, now + 120 min)` (else RuleError). Read-only: no state, commands, ids or escalations change. Per lane; the runtime picks the lane (default `with`).                                                                                                                                            |
+| `snapshot()`                                                           | `{ tick_id, sim_ts, lane, control, peak_mode, config, meter, forecast_kw, forecast_ts, devices, active_commands, owed_kwh, open_escalations, warnings, recent_decisions, context, id_counters }` | Per lane; pure (no side effects, no I/O). `recent_decisions`: last 20, newest first. `devices`: latest HubReport state. `active_commands`: Commands acked and still in force. The runtime and AI use the `with` lane                                                                                                                                            |
+| `run_backtest(inputs, months, assumptions_id, on_progress=None)` | list[BacktestResult] | Module-level, pure (no I/O). `inputs`: BacktestInputs built by the caller with `backend/data` (`load_backtest_inputs`); the engine never opens a file. Replays every month in `months` under `without` / `timer` / `with` at full speed (15-min steps, decider every step, escalations end on the fallback, no Claude). `on_progress(event)` is called synchronously with plain objects in order: `{"type": "backtest_point", "data": BacktestPoint}` once per local day, `{"type": "backtest_month", "data": BacktestResult}` at each month end, `{"type": "backtest_progress", "month", "pct"}`. The caller paces publishing (the engine never sleeps). Same inputs → identical events. |
+| `compare_lanes(without, with_)`                                        | LaneComparison                                                                                                                                                                                   | Module-level function over two TickStates.                                                                                                                                                                                                                                                                                                                      |
+| `RuleError`                                                            | exception                                                                                                                                                                                        | Raised for unsafe limits or moves. API maps it to HTTP 422.                                                                                                                                                                                                                                                                                                     |
 
 `FakeKitchen` (in `backend/fakes/`) implements every call above with canned results from `contracts/fixtures/facade/`.
 Customer arrivals are simulated in the browser (section 9); surges reach them through `sim_tick.surges`.
@@ -774,22 +851,23 @@ Customer arrivals are simulated in the browser (section 9); surges reach them th
 
 ## 4. AI tools (Claude tool use, implemented by the API on top of the facade)
 
-| Tool                        | Calls                                                                                                | Notes                                                                                                                                                 |
-| --------------------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `get_kitchen_state`         | `snapshot()`                                                                                         |                                                                                                                                                       |
-| `get_forecast`              | `forecast(120)`                                                                                      | Input `{}`                                                                                                                                            |
-| `explain_decision`          | decision from `snapshot().recent_decisions` (last 20), else the stored Decision (Convex `decisions`) | Input `{ decision_id }`. Returns facts; the AI writes the sentence                                                                                    |
-| `what_if`                   | `what_if(...)`                                                                                       | Input `{ device_id, action, value, at, lane? }` (`lane` default `with`; `at` = sim ts the hypothetical starts). For "what if I delay the dishwasher?" |
-| `get_bill`                  | `snapshot()` meter, or a stored engine Bill / BacktestResult                                         | Input `{ period: "YYYY-MM" }`. Never computed by the agent or the store                                                                               |
-| `propose_importance_change` | —                                                                                                    | Input `{ device_id, importance, limits, summary }` → Proposal (`kind: importance`)                                                                    |
-| `propose_peak_cap_change`   | —                                                                                                    | Input `{ peak_mode, peak_cap_kw, summary }` → Proposal (`kind: peak_cap`)                                                                             |
-| `propose_escalation_choice` | —                                                                                                    | Input `{ escalation_id, option_id, summary }` → Proposal (`kind: resolve_escalation`) when the owner says "do option 2"                               |
-| `propose_undo`              | —                                                                                                    | Input `{ decision_id, summary }` → Proposal (`kind: undo_decision`)                                                                                   |
-| `propose_customer_event`    | —                                                                                                    | Input `{ customers, duration_min, start_sim_ts, summary }` → Proposal (`kind: customer_event`), applied as a surge                                    |
-| `get_context`               | `snapshot()` context                                                                                 |                                                                                                                                                       |
-| `get_escalation`            | `open_escalations()`                                                                                 | Options with engine numbers                                                                                                                           |
-| `choose_escalation_option`  | → runtime → `resolve_escalation(..., "claude", rationale)`                                           | Input is an `option_id` from the offered list (enum-constrained). Code validates authority                                                            |
-| `set_crowd_effect`          | → `POST /api/context/crowd-effect`                                                                   | Input is a category (enum), never a number                                                                                                            |
+| Tool                        | Calls                                                        | Notes                                                                                                                                                 |
+| --------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `get_kitchen_state`         | `snapshot()`                                                 |                                                                                                                                                       |
+| `get_forecast`              | `forecast(120)`                                              | Input `{}`                                                                                                                                            |
+| `explain_decision`          | decision from `snapshot()`                                   | Input `{ decision_id }`. Returns facts; the AI writes the sentence                                                                                    |
+| `what_if`                   | `what_if(...)`                                               | Input `{ device_id, action, value, at, lane? }` (`lane` default `with`; `at` = sim ts the hypothetical starts). For "what if I delay the dishwasher?" |
+| `get_bill`                  | `snapshot()` meter, or a stored engine Bill / BacktestResult | Input `{ period: "YYYY-MM" }`. Never computed by the agent or the store                                                                               |
+| `propose_importance_change` | —                                                            | Input `{ device_id, importance, limits, summary }` → Proposal (`kind: importance`)                                                                    |
+| `propose_peak_cap_change`   | —                                                            | Input `{ peak_mode, peak_cap_kw, summary }` → Proposal (`kind: peak_cap`)                                                                             |
+| `propose_escalation_choice` | —                                                            | Input `{ escalation_id, option_id, summary }` → Proposal (`kind: resolve_escalation`) when the owner says "do option 2"                               |
+| `propose_undo`              | —                                                            | Input `{ decision_id, summary }` → Proposal (`kind: undo_decision`)                                                                                   |
+| `propose_customer_event`    | —                                                            | Input `{ customers, duration_min, start_sim_ts, summary }` → Proposal (`kind: customer_event`), applied as a surge                                    |
+
+| `get_context` | `snapshot()` context | |
+| `get_escalation` | `open_escalations()` | Options with engine numbers |
+| `choose_escalation_option` | → runtime → `resolve_escalation(..., "claude", rationale)` | Input is an `option_id` from the offered list (enum-constrained). Code validates authority |
+| `set_crowd_effect` | → `POST /api/context/crowd-effect` | Input is a category (enum), never a number |
 
 Rules:
 
@@ -807,18 +885,20 @@ Rules:
 
 Current state only, small rows, one batched write per real tick. Fields mirror section 1.
 
-| Table             | Key                            | Fields                                                                                                                                                                                                                                                                                                                                                                                                        | Written by |
-| ----------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `live_tick`       | `lane`                         | ts, tick_id, total_kw, block_avg_kw, month_peak_kw, on_peak_month_peak_kw, peak_mode, peak_cap_kw, target_kw, energy_kwh_today, energy_kwh_month, price_usd_per_kwh_now, cost_usd_today, cost_usd_month, customers_per_hour, indoor_temp_c, forecast_kw_json, forecast_ts. Also where month to date lives (month peaks, energy, cost); not read back in this build (`WarmUpHistory.month_to_date` stays null) | runtime    |
-| `tick_history`    | `lane` + `ts`                  | ts, total_kw, block_avg_kw (last 180 sim minutes per lane; older rows deleted)                                                                                                                                                                                                                                                                                                                                | runtime    |
-| `live_device`     | `key` = `"<lane>:<device_id>"` | key, lane, device_id, type_id, name, importance, state, power_kw, rated_kw, power_pct, source, physical_json (what the kitchen floor draws, for every tab)                                                                                                                                                                                                                                                    | runtime    |
-| `live_comparison` | single row (`id` = 0)          | LaneComparison fields                                                                                                                                                                                                                                                                                                                                                                                         | runtime    |
-| `live_feed`       | `decision_id`                  | lane, ts, device_id, action, value, status, reason_code, effect_json, explanation, explanation_source (last 50)                                                                                                                                                                                                                                                                                               | runtime    |
-| `live_clock`      | single row (`id` = 0)          | playing, speed, sim_ts, tick_id, paused_reason, day_index, run_days, phase, sim_host (connected \| offline)                                                                                                                                                                                                                                                                                                   | runtime    |
-| `live_context`    | single row (`id` = 0)          | weather_summary, weather_label, prices_summary, prices_label, events_summary, events_label, crowd_effect                                                                                                                                                                                                                                                                                                      | runtime    |
-| `live_escalation` | `escalation_id`                | lane, status, block_start, updated_ts, problem_json, options_json (with `harm_score`, `rank`), default_option_id, active_option_id, deadline_sim_ts, chosen_option_id, resolved_by, rationale (last 20; upserted on every change)                                                                                                                                                                             | runtime    |
-| `live_agent_log`  | auto id                        | ts_real, from_agent, to_agent, kind, summary (last 300)                                                                                                                                                                                                                                                                                                                                                       | runtime    |
-| `surge_request`   | auto id                        | customers, duration_min, requested_by (identity), created_at, consumed                                                                                                                                                                                                                                                                                                                                        | any viewer |
+| Table             | Key                            | Fields                                                                                                                                                                                                                                                                                                                                                                                               | Written by |
+| ----------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `live_tick`       | `lane`                         | ts, tick_id, total_kw, block_avg_kw, month_peak_kw, on_peak_month_peak_kw, peak_mode, peak_cap_kw, target_kw, energy_kwh_today, energy_kwh_month, price_usd_per_kwh_now, cost_usd_today, cost_usd_month, demand_peaks_json, customers_per_hour, indoor_temp_c, forecast_kw_json, forecast_ts. Also the month-to-date store: on a rebuild in the same month the runtime reads it back into `WarmUpHistory.month_to_date` | runtime    |
+| `tick_history`    | `lane` + `ts`                  | ts, total_kw, block_avg_kw (last 180 sim minutes per lane; older rows deleted)                                                                                                                                                                                                                                                                                                                       | runtime    |
+| `live_device`     | `key` = `"<lane>:<device_id>"` | key, lane, device_id, type_id, name, importance, state, power_kw, rated_kw, power_pct, source, physical_json (what the kitchen floor draws, for every tab)                                                                                                                                                                                                                                           | runtime    |
+| `live_comparison` | single row (`id` = 0)          | LaneComparison fields                                                                                                                                                                                                                                                                                                                                                                                | runtime    |
+| `live_feed`       | `decision_id`                  | lane, ts, device_id, action, value, status, reason_code, effect_json, explanation, explanation_source (last 50)                                                                                                                                                                                                                                                                                      | runtime    |
+| `live_clock`      | single row (`id` = 0)          | playing, speed, sim_ts, tick_id, paused_reason, day_index, run_days, phase, sim_host (connected \| offline)                                                                                                                                                                                                                                                                                          | runtime    |
+| `live_context`    | single row (`id` = 0)          | weather_summary, weather_label, prices_summary, prices_label, events_summary, events_label, crowd_effect                                                                                                                                                                                                                                                                                             | runtime    |
+| `live_escalation` | `escalation_id`                | lane, status, block_start, updated_ts, problem_json, options_json (with `harm_score`, `rank`), default_option_id, active_option_id, deadline_sim_ts, chosen_option_id, resolved_by, rationale (last 20; upserted on every change)                                                                                                                                                                    | runtime    |
+| `live_agent_log`  | auto id                        | ts_real, from_agent, to_agent, kind, summary (last 300)                                                                                                                                                                                                                                                                                                                                              | runtime    |
+| `backtest_point`  | `key` = `"<run_id>:<day>"`     | run_id, day, month, ts, partial, cost_to_date_json, saved_month_to_date_usd, saved_vs_timer_month_to_date_usd, saved_year_to_date_usd, dataset, tariff_id, assumptions_id (latest run only; ≤ 366 rows) | runtime |
+| `backtest_month`  | `key` = `"<run_id>:<month>"`   | run_id, month, partial, saved_usd, saved_vs_timer_usd, policies_json, checks_json, dataset, tariff_id, assumptions_id (latest run only; ≤ 12 rows) | runtime |
+| `surge_request`   | auto id                        | customers, duration_min, requested_by (identity), created_at, consumed                                                                                                                                                                                                                                                                                                                               | any viewer |
 
 | Reducer                                                                                           | Who may call          | Does                                                                                                                                                                                          |
 | ------------------------------------------------------------------------------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -826,6 +906,7 @@ Current state only, small rows, one batched write per real tick. Fields mirror s
 | `publish_feed(decision_json)`                                                                     | runtime identity only | Upserts a live*feed row (template text first, AI text later). Other `publish*\*`/`log_agent` reducers also take the row as a JSON string                                                      |
 | `set_clock(playing, speed, sim_ts, tick_id, paused_reason, day_index, run_days, phase, sim_host)` | runtime identity only | Updates live_clock                                                                                                                                                                            |
 | `publish_context(json)` · `publish_escalation(json)` · `log_agent(json)`                          | runtime identity only | Upserts / appends                                                                                                                                                                             |
+| `publish_backtest_point(json)` · `publish_backtest_month(json)` · `reset_backtest(run_id)` | runtime identity only | Upsert a Proof row · clear the previous run's rows when a new run starts |
 | `reset_all()`                                                                                     | runtime identity only | Clears live tables (new kitchen)                                                                                                                                                              |
 | `request_surge(customers, duration_min)`                                                          | anyone                | Inserts surge_request (customers 1 to 80, duration 15 to 120 min)                                                                                                                             |
 | `consume_surge(id)`                                                                               | runtime identity only | Marks a surge consumed                                                                                                                                                                        |
@@ -933,8 +1014,7 @@ Rules:
 - Speed only changes the server's send interval (`0.5 s × 120 / speed`); one tick is always 1 sim minute.
 - Cadence: the hub reports every tick (needed for exact energy, 15-min peak blocks and smooth live charts); the engine meters
   every report and makes decisions on every 5th tick (`tick_id % 5 == 0`). Commands can therefore appear only in the tick after a
-  decision tick (including an escalation's fallback, issued on the decision tick that opens it), or after an owner action, an undo
-  or an escalation choice.
+  decision tick, or after an owner action / escalation choice.
 - `inputs` are physical facts from context (outdoor temperature, crowd multiplier, opening hours), never engine decisions.
   Missing context → the simulation's built-in summer-day curve and multiplier 1.0.
 - The hub never sends numbers the simulation did not produce, and never receives forecasts or decisions, only Commands.
@@ -946,8 +1026,7 @@ Rules:
 | `overnight` | close → next open (720 ticks for 22:00–10:00) | back to back, as fast as hub reports arrive | false | true |
 | `closed` | after the last planned day's close | none (`paused_reason: run_complete`) | – | – |
 
-- Every overnight tick is a normal tick: the hub reports it, the engine meters it and replans on every 5th tick (but starts no
-  reductions or holds while closed, ENGINE.md section 5), so always-on and
+- Every overnight tick is a normal tick: the hub reports it, the engine meters it and decides on every 5th tick, so always-on and
   cycling loads (refrigeration, freezer, ice machine, standby water heater, HVAC setback) are billed exactly. Nothing is skipped.
 - `fast_forward: true` tells the hub not to re-render per tick; the physics is identical.
 - Day _d_ < `run_days` ends at close → the runtime runs that night → day _d + 1_ starts at open. After the last day's close the

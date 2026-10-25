@@ -9,18 +9,7 @@
     "crowd_multiplier": 1.25,
     "is_open": true
   },
-  "commands": [
-    {
-      "command_id": "c_0007",
-      "lane": "with",
-      "ts": "2026-07-18T01:05:00Z",
-      "device_id": "water_heater_1",
-      "action": "restore",
-      "value": null,
-      "decision_id": "d_0007",
-      "issued_by": "engine"
-    }
-  ],
+  "commands": [],
   "replay": true,
   "fast_forward": false
 }

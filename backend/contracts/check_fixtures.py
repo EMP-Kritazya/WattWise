@@ -196,7 +196,12 @@ FACADE: dict[str, Check] = {
     "open_escalations": ret(list[shapes.Escalation]),
     "owner_command": ret(shapes.Command),
     "resolve_escalation": ret(shapes.Escalation),
-    "run_backtest": ret(list[shapes.BacktestResult]),
+    "run_backtest": all_of(
+        # `inputs` (BacktestInputs) is checked when the fixture carries it inline (it may be a file reference)
+        lambda o: _ta(shapes.BacktestInputs).validate_python(o["args"]["inputs"])
+        if isinstance(o["args"].get("inputs"), dict) else None,
+        ret(list[shapes.BacktestResult]),
+    ),
     "set_authority": lambda o: _ta(shapes.ClaudeAuthority).validate_python(o["args"]["authority"]),
     "set_context": lambda o: _ta(shapes.Context).validate_python(o["args"]["context"]),
     "set_importance": ret(shapes.Device),
@@ -211,6 +216,8 @@ FACADE: dict[str, Check] = {
 }
 
 SPACETIME_TABLES: dict[str, Any] = {
+    "backtest_month": live.BacktestMonthRow,
+    "backtest_point": live.BacktestPointRow,
     "live_agent_log": live.LiveAgentLogRow,
     "live_clock": live.LiveClockRow,
     "live_comparison": live.LiveComparisonRow,
@@ -226,11 +233,14 @@ SPACETIME_TABLES: dict[str, Any] = {
 REDUCERS: dict[str, Check] = {
     "consume_surge": lambda o: _ta(int).validate_python(o["args"][0]),
     "log_agent": reducer_json(shapes.AgentLog),
+    "publish_backtest_month": reducer_json(live.BacktestMonthRow),
+    "publish_backtest_point": reducer_json(live.BacktestPointRow),
     "publish_context": reducer_json(live.LiveContextRow),
     "publish_escalation": reducer_json(live.LiveEscalationRow),
     "publish_feed": reducer_json(live.LiveFeedRow),
     "publish_ticks": reducer_json(live.PublishTicksPayload),
     "request_surge": request_surge_args,
+    "reset_backtest": lambda o: _ta(tuple[str]).validate_python(o["args"]),
     "reset_all": lambda o: None if o["args"] == [] else (_ for _ in ()).throw(ValueError("reset_all takes no args")),
     "set_clock": set_clock_args,
 }
@@ -262,6 +272,7 @@ def checker_for(rel: str) -> Optional[Check]:
     if top == "shapes":
         table: dict[str, Any] = {
             "agent_log": shapes.AgentLog, "backtest_result": shapes.BacktestResult, "bill": shapes.Bill,
+            "backtest_point": shapes.BacktestPoint, "backtest_inputs": shapes.BacktestInputs,
             "claude_authority": shapes.ClaudeAuthority, "context": shapes.Context, "decision": shapes.Decision,
             "equipment_catalog": list[shapes.EquipmentType], "lane_comparison": shapes.LaneComparison,
             "meter": shapes.Meter, "reading": shapes.Reading, "tariff": shapes.Tariff,

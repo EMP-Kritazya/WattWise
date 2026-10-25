@@ -168,15 +168,49 @@ class KitchenConfig(ContractModel):
 
 
 # ---------------------------------------------------------------------------------------------------------------------
-# Tariff
+# Tariff (seasons, day types and windows: 2026-10-24, for PG&E B-19)
 # ---------------------------------------------------------------------------------------------------------------------
+
+Month = Annotated[int, Field(ge=1, le=12)]
+DayType = Literal["all", "weekdays", "weekends"]
+"""`weekdays` = Mon-Fri, `weekends` = Sat-Sun (local); holidays are not modelled."""
+
+_MINUTES_PER_DAY = 24 * 60
+
+
+def _hhmm_to_min(value: str) -> int:
+    hours, minutes = value.split(":")
+    return int(hours) * 60 + int(minutes)
+
+
+def _months_of(months: Optional[list[int]]) -> list[int]:
+    return list(range(1, 13)) if months is None else sorted(set(months))
+
+
+def _day_types_of(days: str) -> list[str]:
+    return ["weekdays", "weekends"] if days == "all" else [days]
+
+
+def _minute_spans(period: "EnergyPeriod") -> list[tuple[int, int, str]]:
+    """`[start, end)` in local minutes of the day; end < start wraps midnight (the engine's reading); start == end is empty."""
+    start, end = _hhmm_to_min(period.start), _hhmm_to_min(period.end)
+    if start < end:
+        return [(start, end, period.name)]
+    if start > end:
+        spans = [(start, _MINUTES_PER_DAY, period.name)] if start < _MINUTES_PER_DAY else []
+        return spans + ([(0, end, period.name)] if end > 0 else [])
+    return []
 
 
 class EnergyPeriod(ContractModel):
+    """One energy price period. `[start, end)` local; `end` may be "24:00"."""
+
     name: str
     start: LocalTime
     end: LocalTime
     usd_per_kwh: NonNegFloat
+    months: Optional[Annotated[list[Month], Field(min_length=1)]] = None  # null = every month
+    days: DayType = "all"
 
 
 class DemandWindow(ContractModel):
@@ -185,9 +219,19 @@ class DemandWindow(ContractModel):
 
 
 class DemandCharge(ContractModel):
+    """Bills `usd_per_kw x` the highest closed 15-min block that counts for it this billing month."""
+
     name: str
-    window: Optional[DemandWindow]
+    windows: Optional[Annotated[list[DemandWindow], Field(min_length=1)]]  # null = every hour; else any window counts
+    months: Optional[Annotated[list[Month], Field(min_length=1)]] = None  # null = applies in every month
+    days: DayType = "all"
     usd_per_kw: NonNegFloat
+
+
+class FixedCharge(ContractModel):
+    name: str
+    usd: NonNegFloat
+    per: Literal["day", "month"]
 
 
 class Tariff(ContractModel):
@@ -196,8 +240,40 @@ class Tariff(ContractModel):
     label: Literal["illustrative", "urdb"]
     currency: str
     timezone: str
-    energy: list[EnergyPeriod]
-    demand: list[DemandCharge]
+    energy: Annotated[list[EnergyPeriod], Field(min_length=1)]
+    demand: list[DemandCharge]  # any number of charges
+    fixed_charges: list[FixedCharge] = []
+
+    @model_validator(mode="after")
+    def _check(self) -> "Tariff":
+        # For every local minute of the year exactly one energy period matches (month, day type, time).
+        for month in range(1, 13):
+            for day_type in ("weekdays", "weekends"):
+                spans = sorted(
+                    span
+                    for p in self.energy
+                    if month in _months_of(p.months) and day_type in _day_types_of(p.days)
+                    for span in _minute_spans(p)
+                )
+                cursor = 0
+                for start, end, name in spans:
+                    if start > cursor:
+                        raise ValueError(
+                            f"tariff {self.tariff_id}: no energy period covers month {month} {day_type} "
+                            f"{cursor // 60:02d}:{cursor % 60:02d}"
+                        )
+                    if start < cursor:
+                        raise ValueError(
+                            f"tariff {self.tariff_id}: energy periods overlap at month {month} {day_type} "
+                            f"{start // 60:02d}:{start % 60:02d} ({name!r})"
+                        )
+                    cursor = end
+                if cursor != _MINUTES_PER_DAY:
+                    raise ValueError(
+                        f"tariff {self.tariff_id}: no energy period covers month {month} {day_type} "
+                        f"{cursor // 60:02d}:{cursor % 60:02d}"
+                    )
+        return self
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -217,6 +293,7 @@ class MonthToDate(ContractModel):
     on_peak_month_peak_kw: Optional[NonNegFloat]
     energy_kwh_month: NonNegFloat
     cost_usd_month: NonNegFloat
+    demand_peaks: Optional[list["DemandPeak"]] = None  # every applicable charge's month peak (seasonal tariffs)
 
 
 _HISTORY_LABEL = {"nrel_comstock": "calibrated_model", "fixture_synthetic": "simulated"}
@@ -605,13 +682,23 @@ class Escalation(ContractModel):
 # ---------------------------------------------------------------------------------------------------------------------
 
 
+class DemandPeak(ContractModel):
+    """Meter `demand_peaks[]`: one demand charge that applies this month, its month peak so far and its cost."""
+
+    name: str
+    peak_kw: NonNegFloat
+    usd_per_kw: NonNegFloat
+    cost_usd: float  # usd_per_kw x peak_kw, engine-computed (the UI never multiplies)
+
+
 class Meter(ContractModel):
     ts: UtcDatetime
     total_kw: NonNegFloat
     block_avg_kw: NonNegFloat
     block_start: UtcDatetime
     month_peak_kw: NonNegFloat
-    on_peak_month_peak_kw: Optional[NonNegFloat]  # null if the tariff has no windowed demand charge
+    # month peak of the highest-rate windowed charge that applies this month; null if no windowed charge applies
+    on_peak_month_peak_kw: Optional[NonNegFloat]
     peak_mode: PeakMode
     peak_cap_kw: Optional[float]  # null in minimize mode
     target_kw: float
@@ -620,6 +707,7 @@ class Meter(ContractModel):
     price_usd_per_kwh_now: float
     cost_usd_today: float
     cost_usd_month: float
+    demand_peaks: list[DemandPeak]  # one per demand charge that applies this month, in tariff order
 
     @model_validator(mode="after")
     def _check(self) -> "Meter":
@@ -750,6 +838,14 @@ Proposal = Annotated[
 # ---------------------------------------------------------------------------------------------------------------------
 
 
+USD_TOLERANCE = 0.011
+"""Cent-level tolerance for the sums the prose defines (rounding to the cent may differ by one cent)."""
+
+
+def _usd_equal(a: float, b: float) -> bool:
+    return abs(a - b) <= USD_TOLERANCE
+
+
 class BillDemandCharge(ContractModel):
     name: str
     peak_kw: NonNegFloat
@@ -760,9 +856,19 @@ class Bill(ContractModel):
     period: YearMonth
     energy_kwh: NonNegFloat
     energy_cost_usd: float
-    demand_charges: list[BillDemandCharge]
+    demand_charges: list[BillDemandCharge]  # only the charges that apply in `period`
+    fixed_usd: NonNegFloat
     total_usd: float
     tariff_id: str
+
+    @model_validator(mode="after")
+    def _check(self) -> "Bill":
+        expected = self.energy_cost_usd + sum(c.cost_usd for c in self.demand_charges) + self.fixed_usd
+        if not _usd_equal(self.total_usd, expected):
+            raise ValueError(
+                f"total_usd {self.total_usd} != energy_cost_usd + demand_charges + fixed_usd ({expected:.2f})"
+            )
+        return self
 
 
 class BacktestPolicies(ContractModel):
@@ -778,11 +884,85 @@ class BacktestChecks(ContractModel):
 
 
 class BacktestResult(ContractModel):
+    """One replayed month (the Proof chart's month mark). Savings are engine-computed; the browser never subtracts."""
+
     dataset: str
-    month: YearMonth
+    month: YearMonth  # replay calendar (dataset dates + day_offset)
     policies: BacktestPolicies
     checks: BacktestChecks
     assumptions_id: str
+    tariff_id: str
+    partial: bool  # fewer scored days than calendar days (first month after the 4 warm-up weeks)
+    saved_usd: float  # policies.without.total_usd - policies.with.total_usd
+    saved_vs_timer_usd: float  # policies.timer.total_usd - policies.with.total_usd
+
+    @model_validator(mode="after")
+    def _check(self) -> "BacktestResult":
+        p = self.policies
+        if not _usd_equal(self.saved_usd, p.without.total_usd - p.with_.total_usd):
+            raise ValueError("saved_usd must equal policies.without.total_usd - policies.with.total_usd")
+        if not _usd_equal(self.saved_vs_timer_usd, p.timer.total_usd - p.with_.total_usd):
+            raise ValueError("saved_vs_timer_usd must equal policies.timer.total_usd - policies.with.total_usd")
+        return self
+
+
+LocalDate = Annotated[str, Field(pattern=r"^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$")]
+"""Local calendar day `"YYYY-MM-DD"` (tariff timezone, replay calendar)."""
+
+
+class PolicyCosts(ContractModel):
+    """BacktestPoint `cost_to_date_usd`: each policy's month-to-date bill (the Meter `cost_usd_month` definition)."""
+
+    without: float
+    timer: float
+    with_: float = Field(alias="with")
+
+
+class BacktestPoint(ContractModel):
+    """One replayed local day (the Proof chart's running line)."""
+
+    dataset: str
+    assumptions_id: str
+    tariff_id: str
+    month: YearMonth
+    day: LocalDate
+    ts: UtcDatetime  # end of the local day
+    partial: bool
+    cost_to_date_usd: PolicyCosts
+    saved_month_to_date_usd: float
+    saved_vs_timer_month_to_date_usd: float
+    saved_year_to_date_usd: float  # sum of saved_usd of earlier months + saved_month_to_date_usd
+
+    @model_validator(mode="after")
+    def _check(self) -> "BacktestPoint":
+        if not self.day.startswith(self.month + "-"):
+            raise ValueError(f"day {self.day} is not in month {self.month}")
+        c = self.cost_to_date_usd
+        if not _usd_equal(self.saved_month_to_date_usd, c.without - c.with_):
+            raise ValueError("saved_month_to_date_usd must equal cost_to_date_usd.without - cost_to_date_usd.with")
+        if not _usd_equal(self.saved_vs_timer_month_to_date_usd, c.timer - c.with_):
+            raise ValueError("saved_vs_timer_month_to_date_usd must equal cost_to_date_usd.timer - cost_to_date_usd.with")
+        return self
+
+
+class BacktestAssumptions(ContractModel):
+    """Sensitivity knobs the engine applies itself (seeded, labelled). `base` = 1.0 / 1.0 / 0.0."""
+
+    assumptions_id: str
+    flex_scale: NonNegFloat
+    draw_scale: NonNegFloat
+    forecast_noise_pct: NonNegFloat
+
+
+class BacktestInputs(ContractModel):
+    """Built by the caller (`backend/data` `load_backtest_inputs(months, assumptions_id)`), passed to `run_backtest`."""
+
+    config: KitchenConfig
+    tariff: Tariff
+    catalog: list[EquipmentType]
+    seed: int
+    series: WarmUpHistory  # per-device 15-min blocks covering the 4 warm-up weeks + every replayed month
+    assumptions: BacktestAssumptions
 
 
 # ---------------------------------------------------------------------------------------------------------------------

@@ -3,7 +3,7 @@
   "lane": "with",
   "tick_id": 50,
   "ts": "2026-07-18T01:20:00Z",
-  "total_kw": 35.95,
+  "total_kw": 30.0,
   "customers_per_hour": 107,
   "devices": [
     {
@@ -12,12 +12,12 @@
       "name": "HVAC 1",
       "importance": "flexible",
       "state": "reduced",
-      "power_kw": 4.8,
-      "rated_kw": 12.0,
+      "power_kw": 3.2,
+      "rated_kw": 8.0,
       "power_pct": 40,
       "source": "simulated",
       "physical": {
-        "indoor_temp_c": 22.9
+        "indoor_temp_c": 23.4
       }
     },
     {
@@ -26,12 +26,12 @@
       "name": "HVAC 2",
       "importance": "flexible",
       "state": "reduced",
-      "power_kw": 4.8,
-      "rated_kw": 12.0,
+      "power_kw": 3.2,
+      "rated_kw": 8.0,
       "power_pct": 40,
       "source": "simulated",
       "physical": {
-        "indoor_temp_c": 22.9
+        "indoor_temp_c": 23.4
       }
     },
     {
@@ -39,13 +39,13 @@
       "type_id": "walk_in_cooler",
       "name": "Walk-in cooler 1",
       "importance": "flexible",
-      "state": "reduced",
-      "power_kw": 1.75,
+      "state": "on",
+      "power_kw": 3.5,
       "rated_kw": 3.5,
-      "power_pct": 50,
+      "power_pct": 100,
       "source": "simulated",
       "physical": {
-        "box_temp_c": 4.7
+        "box_temp_c": 3.2
       }
     },
     {
@@ -154,12 +154,12 @@
       "name": "Water heater 1",
       "importance": "flexible",
       "state": "on",
-      "power_kw": 4.5,
+      "power_kw": 0.0,
       "rated_kw": 4.5,
-      "power_pct": 100,
+      "power_pct": 0,
       "source": "simulated",
       "physical": {
-        "box_temp_c": 62.6
+        "box_temp_c": 63.2
       }
     },
     {

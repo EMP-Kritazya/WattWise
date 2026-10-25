@@ -1,8 +1,8 @@
 import { useSim, type LiveSourceKind } from "@/store/sim";
 import { transport } from "@/transport";
-import type { WsMessage } from "@/types";
+import type { LiveTables, WsMessage } from "@/types";
 import { callRequestSurge, connectSpacetime } from "./spacetime";
-import { ingestViewerMessages, startLiveRows } from "./useLive";
+import { ingestViewerMessages, startLiveRows, useLive } from "./useLive";
 
 const FLUSH_MS = 250; // ticks arrive ~2/s per lane; render at most ~4 times per second (UI.md)
 
@@ -15,15 +15,27 @@ const FLUSH_MS = 250; // ticks arrive ~2/s per lane; render at most ~4 times per
 const wanted = (import.meta.env.VITE_LIVE_TRANSPORT ?? "spacetime") as "spacetime" | "ws";
 const spacetimeUri: string | undefined = import.meta.env.VITE_SPACETIME_URI;
 const spacetimeDb: string | undefined = import.meta.env.VITE_SPACETIME_DB;
+const spacetimeToken: string | undefined = import.meta.env.VITE_SPACETIME_TOKEN;
 
 /** Start live data. Chat, proposals and escalation choices always come over /ws as well. Returns a stop function. */
 export function startLive(): () => void {
   const stopRows = startLiveRows();
-  let buffer: WsMessage[] = [];
-  const push = (msgs: WsMessage[]) => {
-    buffer.push(...msgs);
+  let buffer: WsMessage[] = []; // /ws (and mock) messages: legacy screen store + row store
+  let tableBuffer: WsMessage[] = []; // messages derived from SpacetimeDB rows: legacy screen store only
+  let latestTables: LiveTables | null = null; // newest SpacetimeDB snapshot, written to the row store on flush
+  const pushFromTables = (msgs: WsMessage[]) => {
+    tableBuffer.push(...msgs);
   };
   const timer = setInterval(() => {
+    if (latestTables) {
+      useLive.getState().replaceTables(latestTables);
+      latestTables = null;
+    }
+    if (tableBuffer.length) {
+      const batch = tableBuffer;
+      tableBuffer = [];
+      useSim.getState().applyMessages(batch);
+    }
     if (!buffer.length) return;
     const batch = buffer;
     buffer = [];
@@ -47,7 +59,14 @@ export function startLive(): () => void {
   setSource(transport.kind === "mock" ? "mock" : "ws");
 
   if (transport.kind !== "mock" && wanted === "spacetime" && spacetimeUri && spacetimeDb) {
-    connectSpacetime({ uri: spacetimeUri, database: spacetimeDb }, push, () => {})
+    connectSpacetime(
+      { uri: spacetimeUri, database: spacetimeDb, token: spacetimeToken },
+      (tables) => {
+        latestTables = tables;
+      },
+      pushFromTables,
+      () => {},
+    )
       .then((stop) => {
         usingSpacetime = true;
         stopSpacetime = stop;
@@ -55,14 +74,12 @@ export function startLive(): () => void {
       })
       .catch((err) => {
         console.warn("SpacetimeDB unavailable, staying on /ws:", err);
-        push([
-          {
-            type: "warning",
-            code: "live_transport_down",
-            message: "Live sync is down, so this screen is following the server directly. Other viewers may lag.",
-            data: {},
-          },
-        ]);
+        buffer.push({
+          type: "warning",
+          code: "live_transport_down",
+          message: "Live sync is down, so this screen is following the server directly. Other viewers may lag.",
+          data: {},
+        });
       });
   }
 
@@ -75,7 +92,9 @@ export function startLive(): () => void {
 }
 
 /** Message types that SpacetimeDB carries when it's the live source (CONTRACTS.md section 5). */
-const LIVE_TABLE_TYPES = new Set<WsMessage["type"]>(["tick", "decision", "clock", "comparison", "context", "escalation", "agent_log"]);
+const LIVE_TABLE_TYPES = new Set<WsMessage["type"]>([
+  "tick", "decision", "clock", "comparison", "context", "escalation", "agent_log", "backtest_point", "backtest_month",
+]);
 
 /** Add customers. Over SpacetimeDB anyone (even a judge's phone) can call `request_surge`; otherwise REST. */
 export async function requestSurge(customers: number, durationMin = 60): Promise<void> {

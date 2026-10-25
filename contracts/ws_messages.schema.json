@@ -172,6 +172,167 @@
       "title": "AuthorityProposal",
       "type": "object"
     },
+    "BacktestChecks": {
+      "additionalProperties": false,
+      "properties": {
+        "baseline_matches_raw": {
+          "title": "Baseline Matches Raw",
+          "type": "boolean"
+        },
+        "energy_conserved": {
+          "title": "Energy Conserved",
+          "type": "boolean"
+        },
+        "rule_violations": {
+          "minimum": 0,
+          "title": "Rule Violations",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "baseline_matches_raw",
+        "energy_conserved",
+        "rule_violations"
+      ],
+      "title": "BacktestChecks",
+      "type": "object"
+    },
+    "BacktestMonthMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "backtest_month",
+          "title": "Type",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/BacktestResult"
+        }
+      },
+      "required": [
+        "type",
+        "run_id",
+        "data"
+      ],
+      "title": "BacktestMonthMessage",
+      "type": "object"
+    },
+    "BacktestPoint": {
+      "additionalProperties": false,
+      "description": "One replayed local day (the Proof chart's running line).",
+      "properties": {
+        "dataset": {
+          "title": "Dataset",
+          "type": "string"
+        },
+        "assumptions_id": {
+          "title": "Assumptions Id",
+          "type": "string"
+        },
+        "tariff_id": {
+          "title": "Tariff Id",
+          "type": "string"
+        },
+        "month": {
+          "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+          "title": "Month",
+          "type": "string"
+        },
+        "day": {
+          "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
+          "title": "Day",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "partial": {
+          "title": "Partial",
+          "type": "boolean"
+        },
+        "cost_to_date_usd": {
+          "$ref": "#/$defs/PolicyCosts"
+        },
+        "saved_month_to_date_usd": {
+          "title": "Saved Month To Date Usd",
+          "type": "number"
+        },
+        "saved_vs_timer_month_to_date_usd": {
+          "title": "Saved Vs Timer Month To Date Usd",
+          "type": "number"
+        },
+        "saved_year_to_date_usd": {
+          "title": "Saved Year To Date Usd",
+          "type": "number"
+        }
+      },
+      "required": [
+        "dataset",
+        "assumptions_id",
+        "tariff_id",
+        "month",
+        "day",
+        "ts",
+        "partial",
+        "cost_to_date_usd",
+        "saved_month_to_date_usd",
+        "saved_vs_timer_month_to_date_usd",
+        "saved_year_to_date_usd"
+      ],
+      "title": "BacktestPoint",
+      "type": "object"
+    },
+    "BacktestPointMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "backtest_point",
+          "title": "Type",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/BacktestPoint"
+        }
+      },
+      "required": [
+        "type",
+        "run_id",
+        "data"
+      ],
+      "title": "BacktestPointMessage",
+      "type": "object"
+    },
+    "BacktestPolicies": {
+      "additionalProperties": false,
+      "properties": {
+        "without": {
+          "$ref": "#/$defs/Bill"
+        },
+        "timer": {
+          "$ref": "#/$defs/Bill"
+        },
+        "with": {
+          "$ref": "#/$defs/Bill"
+        }
+      },
+      "required": [
+        "without",
+        "timer",
+        "with"
+      ],
+      "title": "BacktestPolicies",
+      "type": "object"
+    },
     "BacktestProgressMessage": {
       "additionalProperties": false,
       "properties": {
@@ -203,6 +364,135 @@
         "pct"
       ],
       "title": "BacktestProgressMessage",
+      "type": "object"
+    },
+    "BacktestResult": {
+      "additionalProperties": false,
+      "description": "One replayed month (the Proof chart's month mark). Savings are engine-computed; the browser never subtracts.",
+      "properties": {
+        "dataset": {
+          "title": "Dataset",
+          "type": "string"
+        },
+        "month": {
+          "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+          "title": "Month",
+          "type": "string"
+        },
+        "policies": {
+          "$ref": "#/$defs/BacktestPolicies"
+        },
+        "checks": {
+          "$ref": "#/$defs/BacktestChecks"
+        },
+        "assumptions_id": {
+          "title": "Assumptions Id",
+          "type": "string"
+        },
+        "tariff_id": {
+          "title": "Tariff Id",
+          "type": "string"
+        },
+        "partial": {
+          "title": "Partial",
+          "type": "boolean"
+        },
+        "saved_usd": {
+          "title": "Saved Usd",
+          "type": "number"
+        },
+        "saved_vs_timer_usd": {
+          "title": "Saved Vs Timer Usd",
+          "type": "number"
+        }
+      },
+      "required": [
+        "dataset",
+        "month",
+        "policies",
+        "checks",
+        "assumptions_id",
+        "tariff_id",
+        "partial",
+        "saved_usd",
+        "saved_vs_timer_usd"
+      ],
+      "title": "BacktestResult",
+      "type": "object"
+    },
+    "Bill": {
+      "additionalProperties": false,
+      "properties": {
+        "period": {
+          "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+          "title": "Period",
+          "type": "string"
+        },
+        "energy_kwh": {
+          "minimum": 0,
+          "title": "Energy Kwh",
+          "type": "number"
+        },
+        "energy_cost_usd": {
+          "title": "Energy Cost Usd",
+          "type": "number"
+        },
+        "demand_charges": {
+          "items": {
+            "$ref": "#/$defs/BillDemandCharge"
+          },
+          "title": "Demand Charges",
+          "type": "array"
+        },
+        "fixed_usd": {
+          "minimum": 0,
+          "title": "Fixed Usd",
+          "type": "number"
+        },
+        "total_usd": {
+          "title": "Total Usd",
+          "type": "number"
+        },
+        "tariff_id": {
+          "title": "Tariff Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "period",
+        "energy_kwh",
+        "energy_cost_usd",
+        "demand_charges",
+        "fixed_usd",
+        "total_usd",
+        "tariff_id"
+      ],
+      "title": "Bill",
+      "type": "object"
+    },
+    "BillDemandCharge": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "peak_kw": {
+          "minimum": 0,
+          "title": "Peak Kw",
+          "type": "number"
+        },
+        "cost_usd": {
+          "title": "Cost Usd",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "peak_kw",
+        "cost_usd"
+      ],
+      "title": "BillDemandCharge",
       "type": "object"
     },
     "CapUnreachableData": {
@@ -957,6 +1247,38 @@
         "must_finish_by"
       ],
       "title": "DeferrableLimits",
+      "type": "object"
+    },
+    "DemandPeak": {
+      "additionalProperties": false,
+      "description": "Meter `demand_peaks[]`: one demand charge that applies this month, its month peak so far and its cost.",
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "peak_kw": {
+          "minimum": 0,
+          "title": "Peak Kw",
+          "type": "number"
+        },
+        "usd_per_kw": {
+          "minimum": 0,
+          "title": "Usd Per Kw",
+          "type": "number"
+        },
+        "cost_usd": {
+          "title": "Cost Usd",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "peak_kw",
+        "usd_per_kw",
+        "cost_usd"
+      ],
+      "title": "DemandPeak",
       "type": "object"
     },
     "Device": {
@@ -2354,6 +2676,13 @@
         "cost_usd_month": {
           "title": "Cost Usd Month",
           "type": "number"
+        },
+        "demand_peaks": {
+          "items": {
+            "$ref": "#/$defs/DemandPeak"
+          },
+          "title": "Demand Peaks",
+          "type": "array"
         }
       },
       "required": [
@@ -2370,7 +2699,8 @@
         "energy_kwh_month",
         "price_usd_per_kwh_now",
         "cost_usd_today",
-        "cost_usd_month"
+        "cost_usd_month",
+        "demand_peaks"
       ],
       "title": "Meter",
       "type": "object"
@@ -2529,6 +2859,31 @@
         "payload"
       ],
       "title": "PeakCapProposal",
+      "type": "object"
+    },
+    "PolicyCosts": {
+      "additionalProperties": false,
+      "description": "BacktestPoint `cost_to_date_usd`: each policy's month-to-date bill (the Meter `cost_usd_month` definition).",
+      "properties": {
+        "without": {
+          "title": "Without",
+          "type": "number"
+        },
+        "timer": {
+          "title": "Timer",
+          "type": "number"
+        },
+        "with": {
+          "title": "With",
+          "type": "number"
+        }
+      },
+      "required": [
+        "without",
+        "timer",
+        "with"
+      ],
+      "title": "PolicyCosts",
       "type": "object"
     },
     "PricesContext": {
@@ -3364,6 +3719,8 @@
       "discriminator": {
         "mapping": {
           "agent_log": "#/$defs/AgentLogMessage",
+          "backtest_month": "#/$defs/BacktestMonthMessage",
+          "backtest_point": "#/$defs/BacktestPointMessage",
           "backtest_progress": "#/$defs/BacktestProgressMessage",
           "chat_delta": "#/$defs/ChatDeltaMessage",
           "chat_done": "#/$defs/ChatDoneMessage",
@@ -3453,6 +3810,12 @@
         },
         {
           "$ref": "#/$defs/BacktestProgressMessage"
+        },
+        {
+          "$ref": "#/$defs/BacktestPointMessage"
+        },
+        {
+          "$ref": "#/$defs/BacktestMonthMessage"
         },
         {
           "$ref": "#/$defs/ComparisonMessage"

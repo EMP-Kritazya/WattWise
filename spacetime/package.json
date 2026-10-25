@@ -1,0 +1,22 @@
+{
+  "name": "wattwise-spacetime",
+  "private": true,
+  "version": "0.1.0",
+  "description": "WattWise live shared kitchen: SpacetimeDB TypeScript module (CONTRACTS.md section 5)",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "seed": "node --experimental-strip-types seed.ts",
+    "build": "spacetime build",
+    "generate": "spacetime generate --lang typescript --out-dir ../frontend/src/module_bindings --project-path .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "spacetimedb": "2.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "~5.9.3",
+    "vitest": "^5.0.5"
+  }
+}

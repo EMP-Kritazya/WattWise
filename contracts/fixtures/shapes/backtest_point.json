@@ -1,0 +1,17 @@
+{
+  "dataset": "Simulated fixture data (contracts/fixtures/history, fixture_synthetic): not ComStock, not a measured bill",
+  "assumptions_id": "base",
+  "tariff_id": "demo_tariff_v1",
+  "month": "2026-07",
+  "day": "2026-07-14",
+  "ts": "2026-07-15T07:00:00Z",
+  "partial": true,
+  "cost_to_date_usd": {
+    "without": 2539.52,
+    "timer": 2536.0,
+    "with": 2440.48
+  },
+  "saved_month_to_date_usd": 99.04,
+  "saved_vs_timer_month_to_date_usd": 95.52,
+  "saved_year_to_date_usd": 180.72
+}

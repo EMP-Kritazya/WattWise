@@ -1,11 +1,11 @@
 {
   "call": "undo",
   "args": {
-    "decision_id": "d_0014"
+    "decision_id": "d_0010"
   },
   "returns": {
-    "decision_id": "d_0014",
-    "ts": "2026-07-18T02:00:00Z",
+    "decision_id": "d_0010",
+    "ts": "2026-07-18T02:10:00Z",
     "device_id": "hvac_2",
     "action": "reduce",
     "value": 40,
@@ -13,9 +13,9 @@
     "inside_rules": true,
     "status": "undone",
     "effect": {
-      "peak_before_kw": 43.2,
-      "peak_after_kw": 40.8,
-      "saving_usd": 18.61
+      "peak_before_kw": 40.6,
+      "peak_after_kw": 37.4,
+      "saving_usd": 0.61
     }
   }
 }

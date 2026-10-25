@@ -146,7 +146,7 @@ def duty(type_id):
 # is the truth). type_id, power numbers, params and default_limits below already equal that file.
 SOURCE_NOTES = {
     "hvac":
-        "Modeled 10-ton rooftop unit input; rated draw is an explicit demo assumption informed by DOE commercial unitary AC/heat-pump test procedures (10 CFR 431.96).",
+        "One 5-ton packaged RTU (PSZ-AC, gas furnace), per unit: DX compressor ~5.45 kW (60 kBtu/h / EER 11) + share of the constant ventilation fans. Sized on NREL ComStock bldg 5847 upgrade 45 (2018): HVAC = cooling + fans + heating (ComStock's electric HVAC group, 74,322 kWh/yr); fans are a constant 5.739 kW (night_fanon_vent); worst 15-min block 15.714 kW (2018-06-23 18:45) = 7.857 kW per unit for 2 units, so 8.0 kW covers the whole year without clipping. 40 % min = 3.2 kW >= the 2.87 kW ventilation fan share per unit. derived",
     "walk_in_cooler":
         "Modeled walk-in condensing load; ENERGY STAR V5 explicitly excludes walk-ins, so this is a transparent demo assumption rather than an ENERGY STAR rating.",
     "reach_in_fridge":
@@ -175,7 +175,7 @@ def cat(type_id, name, category, imp, rated, model, params, limits):
 
 
 CATALOG = [
-    cat("hvac", "HVAC", "cooling", "flexible", 12.0, "thermal", {"setpoint_c": SETPOINT_C}, {"min_power_pct": 40, "max_reduce_min": 30}),
+    cat("hvac", "HVAC", "cooling", "flexible", 8.0, "thermal", {"setpoint_c": SETPOINT_C}, {"min_power_pct": 40, "max_reduce_min": 30}),
     cat("walk_in_cooler", "Walk-in cooler", "refrigeration", "flexible", 3.5, "cycling", duty("walk_in_cooler"),
         {"min_power_pct": 50, "max_reduce_min": 30}),
     cat("reach_in_fridge", "Reach-in fridge", "refrigeration", "always_on", 0.8, "cycling", duty("reach_in_fridge"), {}),
@@ -222,27 +222,118 @@ def make_config(run_days):
 
 CONFIG = make_config(1)
 
+def _energy(name, start, end, usd, months=None, days="all"):
+    return {"name": name, "start": start, "end": end, "usd_per_kwh": usd, "months": months, "days": days}
+
+
+def _demand(name, windows, usd, months=None, days="all"):
+    return {"name": name, "windows": None if windows is None else [{"start": a, "end": b} for a, b in windows],
+            "months": months, "days": days, "usd_per_kw": usd}
+
+
+# demo_tariff_v1 (CONTRACTS.md section 1): the made-up rate of the live demo; every field written out (months null = every
+# month, days "all"), no fixed charges.
 TARIFF = {
     "tariff_id": "demo_tariff_v1", "name": "WattWise demo commercial rate", "label": "illustrative", "currency": "USD",
     "timezone": "America/Los_Angeles",
-    "energy": [{"name": "off_peak", "start": "00:00", "end": "16:00", "usd_per_kwh": 0.22},
-               {"name": "peak", "start": "16:00", "end": "21:00", "usd_per_kwh": 0.38},
-               {"name": "off_peak", "start": "21:00", "end": "24:00", "usd_per_kwh": 0.22}],
-    "demand": [{"name": "max_demand", "window": None, "usd_per_kw": 20.0},
-               {"name": "peak_demand", "window": {"start": "16:00", "end": "21:00"}, "usd_per_kw": 8.0}],
+    "energy": [_energy("off_peak", "00:00", "16:00", 0.22), _energy("peak", "16:00", "21:00", 0.38),
+               _energy("off_peak", "21:00", "24:00", 0.22)],
+    "demand": [_demand("max_demand", None, 20.0), _demand("peak_demand", [("16:00", "21:00")], 8.0)],
+    "fixed_charges": [],
 }
-CHARGES = [(c["name"], c["usd_per_kw"], None if c["window"] is None else (hm(c["window"]["start"]), hm(c["window"]["end"])))
-           for c in TARIFF["demand"]]
-ENERGY = [(hm(e["start"]), hm(e["end"]), e["usd_per_kwh"]) for e in TARIFF["energy"]]
+
+# PG&E B-19 Secondary Voluntary, OpenEI URDB 69de8cdb02f684104e01267d (dataset/tariffs/, gitignored), converted as CONTRACTS.md
+# section 1 describes. The URDB numbers below are copied unchanged; check.py re-derives every hour of every month from the URDB
+# record when dataset/ is present. URDB energy periods 0..5 (rate $/kWh): 0 0.06442 spring super-off-peak (months 3-5,
+# 09-14) · 1 0.12026 winter off-peak · 2 0.16188 winter peak (16-21) · 3 0.12037 summer off-peak · 4 0.14775 summer part-peak
+# (14-16, 21-23) · 5 0.18648 summer peak (16-21). Demand: flat 37.37 $/kW in both flat periods (all months); TOU periods
+# 1 2.31 (winter 16-21), 2 10.52 (summer 14-16 + 21-23), 3 46.16 (summer 16-21); period 0 is $0 (no charge). Weekday and
+# weekend schedules are identical (days "all"). Fixed: fixedchargefirstmeter 11.36882, fixedchargeunits "$/day".
+B19_URDB_ID = "69de8cdb02f684104e01267d"
+_WINTER, _SPRING, _NONSPRING_WINTER, _SUMMER = [1, 2, 3, 4, 5, 10, 11, 12], [3, 4, 5], [1, 2, 10, 11, 12], [6, 7, 8, 9]
+TARIFF_B19 = {
+    "tariff_id": "pge_b19_secondary_voluntary",
+    "name": "PG&E B-19 Medium General Demand TOU (Secondary) Voluntary",
+    "label": "urdb", "currency": "USD", "timezone": "America/Los_Angeles",
+    "energy": [
+        _energy("off_peak_winter", "21:00", "16:00", 0.12026, _NONSPRING_WINTER),
+        _energy("off_peak_winter", "21:00", "09:00", 0.12026, _SPRING),
+        _energy("super_off_peak_spring", "09:00", "14:00", 0.06442, _SPRING),
+        _energy("off_peak_winter", "14:00", "16:00", 0.12026, _SPRING),
+        _energy("peak_winter", "16:00", "21:00", 0.16188, _WINTER),
+        _energy("off_peak_summer", "23:00", "14:00", 0.12037, _SUMMER),
+        _energy("part_peak_summer", "14:00", "16:00", 0.14775, _SUMMER),
+        _energy("peak_summer", "16:00", "21:00", 0.18648, _SUMMER),
+        _energy("part_peak_summer", "21:00", "23:00", 0.14775, _SUMMER),
+    ],
+    "demand": [
+        _demand("max_demand", None, 37.37),
+        _demand("peak_demand_winter", [("16:00", "21:00")], 2.31, _WINTER),
+        _demand("peak_demand_summer", [("16:00", "21:00")], 46.16, _SUMMER),
+        _demand("part_peak_demand_summer", [("14:00", "16:00"), ("21:00", "23:00")], 10.52, _SUMMER),
+    ],
+    "fixed_charges": [{"name": "customer_charge", "usd": 11.36882, "per": "day"}],
+}
 
 
-def in_window(lm, w):
-    return w is None or w[0] <= lm < w[1]
+def in_span(lm, a, b):
+    """`[a, b)` in local minutes of the day; b < a wraps past midnight; a == b is empty."""
+    if a < b:
+        return a <= lm < b
+    if a > b:
+        return lm >= a or lm < b
+    return False
+
+
+def day_type(d):
+    return "weekends" if d.weekday() >= 5 else "weekdays"
+
+
+class TariffCalc:
+    """The bill function of CONTRACTS.md section 1 Tariff (months, day types, windows, fixed charges)."""
+
+    def __init__(self, t):
+        self.t = t
+        self.energy = [(hm(e["start"]), hm(e["end"]), e["usd_per_kwh"], e["months"], e["days"]) for e in t["energy"]]
+        self.charges = [{"name": c["name"], "rate": c["usd_per_kw"], "months": c["months"], "days": c["days"],
+                         "windows": None if c["windows"] is None else [(hm(w["start"]), hm(w["end"])) for w in c["windows"]]}
+                        for c in t["demand"]]
+        self.fixed_day = sum(f["usd"] for f in t["fixed_charges"] if f["per"] == "day")
+        self.fixed_month = sum(f["usd"] for f in t["fixed_charges"] if f["per"] == "month")
+
+    @staticmethod
+    def _match(months, days, d):
+        return (months is None or d.month in months) and (days == "all" or days == day_type(d))
+
+    def price(self, dt):
+        x = loc(dt)
+        lm = x.hour * 60 + x.minute
+        hits = [p for a, b, p, mo, dy in self.energy if self._match(mo, dy, x.date()) and in_span(lm, a, b)]
+        assert len(hits) == 1, (iso(dt), hits)
+        return hits[0]
+
+    def applicable(self, month):
+        """Charges that apply in a local month (1..12), tariff order."""
+        return [c for c in self.charges if c["months"] is None or month in c["months"]]
+
+    def counts(self, c, block_start):
+        """A closed block counts for a charge when its local start is in any window, its month applies, its day type matches."""
+        x = loc(block_start)
+        lm = x.hour * 60 + x.minute
+        return self._match(c["months"], c["days"], x.date()) and (
+            c["windows"] is None or any(in_span(lm, a, b) for a, b in c["windows"]))
+
+    def on_peak_name(self, month):
+        """The highest-rate windowed charge that applies this month (first in tariff order on a tie), or None."""
+        win = [c for c in self.applicable(month) if c["windows"] is not None]
+        return max(win, key=lambda c: c["rate"])["name"] if win else None
+
+
+TC = TariffCalc(TARIFF)
 
 
 def tariff_price(dt):
-    lm = lmin(dt)
-    return next(p for a, b, p in ENERGY if a <= lm < b)
+    return TC.price(dt)
 
 
 DEVICES = []
@@ -378,6 +469,8 @@ def base_cph(dt):
 # ----------------------------------------------------------------------------- simulation (toy physics, both lanes)
 RACKS_PER_CUSTOMER = 0.06
 HVAC_BASE = 34
+HVAC_LOAD_KW = 0.12        # dining-room cooling load per load point, in kW: the load belongs to the room, not to the unit, so
+                           # each 8 kW unit (catalog) meets it up to its rated_kw and runs at a higher duty than a bigger one
 RACK_THRESHOLD = 8.0
 MIN_PHYSICAL_PCT = 20       # appliances cannot run below 20 % (a lower reduce is clamped, ack reason out_of_range)
 ICE_LOW = 25.0
@@ -497,7 +590,8 @@ class Sim:
             elif model == "thermal":
                 room = st["_room"]["temp"]
                 sp = d["params"]["setpoint_c"] + (0.0 if open_ or preheat else SETBACK_C)
-                need = min(100.0, max(0.0, HVAC_BASE + 5 * (t_out - 24) + 0.1 * cph + 8 * (room - sp)))
+                load_kw = HVAC_LOAD_KW * (HVAC_BASE + 5 * (t_out - 24) + 0.1 * cph + 8 * (room - sp))
+                need = min(100.0, max(0.0, 100 * load_kw / rated))
                 act = min(need, s["cap"])
                 power = rated * act / 100
                 shortfalls.append((need - act, sp))
@@ -628,8 +722,10 @@ def build_history():
 def history_meter_init(totals):
     """What the engine meters from the history blocks of the current month (month_to_date null): the run's starting Meter."""
     day, month = ldate(START - timedelta(minutes=1)), (2026, 7)
-    peaks = {name: 0.0 for name, _, _ in CHARGES}
+    peaks = {c["name"]: 0.0 for c in TC.charges}
+    month_peak = 0.0
     peaks_mid = None
+    days = set()
     e_today = c_today = e_month = c_month = 0.0
     for bs, tot in totals:
         d = ldate(bs)
@@ -637,6 +733,7 @@ def history_meter_init(totals):
             continue
         if d == day and peaks_mid is None:
             peaks_mid = dict(peaks)
+        days.add(d)
         e = tot * 0.25
         c = e * tariff_price(bs)
         e_month += e
@@ -644,12 +741,14 @@ def history_meter_init(totals):
         if d == day:
             e_today += e
             c_today += c
-        lm = lmin(bs)
-        for name, _, w in CHARGES:
-            if in_window(lm, w):
-                peaks[name] = max(peaks[name], tot)
+        month_peak = max(month_peak, tot)
+        for ch in TC.applicable(d.month):
+            if TC.counts(ch, bs):
+                peaks[ch["name"]] = max(peaks[ch["name"]], tot)
     return {"day": day, "month": month, "energy_today": e_today, "ecost_today": c_today, "energy_month": e_month,
-            "ecost_month": c_month, "peaks": peaks, "peaks_midnight": peaks_mid if peaks_mid is not None else dict(peaks)}
+            "ecost_month": c_month, "peaks": peaks, "month_peak": month_peak,
+            "peaks_midnight": peaks_mid if peaks_mid is not None else dict(peaks),
+            "fixed_days": len(days)}
 
 
 # ----------------------------------------------------------------------------- recorded context (Fetch agents, demo mode)
@@ -710,13 +809,23 @@ def agent_logs(tick, ctx):
 
 
 # ----------------------------------------------------------------------------- meter (engine-style, per lane)
+def demand_peaks_of(peaks, month):
+    """Meter `demand_peaks`: every charge that applies this month, tariff order; cost on the published (0.01 kW) peak."""
+    return [{"name": c["name"], "peak_kw": rnd(peaks[c["name"]], 2), "usd_per_kw": c["rate"],
+             "cost_usd": rnd(c["rate"] * rnd(peaks[c["name"]], 2), 2)} for c in TC.applicable(month)]
+
+
 class LaneMeter:
+    """Engine-style meter for one lane (ENGINE.md section 1): one month peak per demand charge, any number of charges."""
+
     def __init__(self, init):
         self.day, self.month = init["day"], init["month"]
         self.e_today, self.c_today = init["energy_today"], init["ecost_today"]
         self.e_month, self.c_month = init["energy_month"], init["ecost_month"]
         self.peaks = dict(init["peaks"])
+        self.month_peak = init["month_peak"]
         self.peaks_mid = dict(init["peaks_midnight"])
+        self.fixed_days = init["fixed_days"]             # local days of this month already metered (fixed charges per day)
         self.bk, self.bsum, self.bn = None, 0.0, 0
 
     def step(self, n, total):
@@ -727,9 +836,12 @@ class LaneMeter:
                 self.month = (d.year, d.month)
                 self.e_month = self.c_month = 0.0
                 self.peaks = {k: 0.0 for k in self.peaks}
+                self.month_peak = 0.0
+                self.fixed_days = 0
             self.day = d
             self.e_today = self.c_today = 0.0
             self.peaks_mid = dict(self.peaks)
+            self.fixed_days += 1
         e = total / 60
         c = e * tariff_price(dt)
         self.e_today += e
@@ -742,19 +854,34 @@ class LaneMeter:
         self.bsum += total
         self.bn += 1
         avg = self.bsum / self.bn
+        mo = self.month[1]
         if n % 15 == 0:                     # ts reaches block_start + 15: the block closes
-            lm = lmin(block_start_dt(k))
-            for name, _, w in CHARGES:
-                if in_window(lm, w):
-                    self.peaks[name] = max(self.peaks[name], avg)
-        demand_today = sum(rate * (self.peaks[name] - self.peaks_mid[name]) for name, rate, _ in CHARGES)
-        demand_month = sum(rate * self.peaks[name] for name, rate, _ in CHARGES)
+            bs = block_start_dt(k)
+            self.month_peak = max(self.month_peak, avg)
+            for ch in TC.applicable(mo):
+                if TC.counts(ch, bs):
+                    self.peaks[ch["name"]] = max(self.peaks[ch["name"]], avg)
+        dps = demand_peaks_of(self.peaks, mo)
+        demand_today = sum(c_["rate"] * (rnd(self.peaks[c_["name"]], 2) - rnd(self.peaks_mid[c_["name"]], 2))
+                           for c_ in TC.applicable(mo))
+        demand_month = sum(c_["rate"] * rnd(self.peaks[c_["name"]], 2) for c_ in TC.applicable(mo))
+        fixed_today = TC.fixed_day + (TC.fixed_month if d.day == 1 else 0.0)
+        fixed_month = TC.fixed_day * self.fixed_days + TC.fixed_month
+        op = TC.on_peak_name(mo)
         return {"ts": iso(rep_dt(n)), "total_kw": total, "block_avg_kw": rnd(avg, 2), "block_start": iso(block_start_dt(k)),
-                "month_peak_kw": rnd(self.peaks["max_demand"], 2), "on_peak_month_peak_kw": rnd(self.peaks["peak_demand"], 2),
+                "month_peak_kw": rnd(self.month_peak, 2),
+                "on_peak_month_peak_kw": None if op is None else rnd(self.peaks[op], 2),
                 "peak_mode": "cap", "peak_cap_kw": CAP, "target_kw": CAP,
                 "energy_kwh_today": rnd(self.e_today, 3), "energy_kwh_month": rnd(self.e_month, 3),
                 "price_usd_per_kwh_now": tariff_price(rep_dt(n)),
-                "cost_usd_today": rnd(self.c_today + demand_today, 2), "cost_usd_month": rnd(self.c_month + demand_month, 2)}
+                "cost_usd_today": rnd(self.c_today + demand_today + fixed_today, 2),
+                "cost_usd_month": rnd(self.c_month + demand_month + fixed_month, 2),
+                "demand_peaks": dps}
+
+
+def meter_peaks(m):
+    """{charge name: month peak so far} from a Meter (what a plan must not beat)."""
+    return {dp["name"]: dp["peak_kw"] for dp in m["demand_peaks"]}
 
 
 # ----------------------------------------------------------------------------- forecasting (toy stand-in for the forecaster)
@@ -818,9 +945,9 @@ def plan_cost(f, n, peaks, blocks=None):
     """cost(x) = sum_c rate_c x max(peak_c(x), month_peak_c) + energy cost over the 2 h horizon (ENGINE.md section 5)."""
     b = f.r1 if blocks is None else blocks
     dem = 0.0
-    for name, rate, w in CHARGES:
-        pk = max([b[j] for j in range(8) if in_window(lmin(block_start_dt(f.k0 + j)), w)] or [0.0])
-        dem += rate * max(pk, peaks[name])
+    for c in TC.applicable(ldate(block_start_dt(f.k0)).month):
+        pk = max([b[j] for j in range(8) if TC.counts(c, block_start_dt(f.k0 + j))] or [0.0])
+        dem += c["rate"] * max(pk, peaks[c["name"]])
     return dem + sum(f.totals[t] / 60 * tariff_price(sim_dt(t)) for t in range(n + 1, n + 121))
 
 
@@ -1030,7 +1157,7 @@ class ToyEngine:
     # ---- one step of the with lane
     def step(self, n, meter):
         out = {"decisions": [], "commands": [], "escalations": [], "warnings": [], "forecast": None}
-        peaks = {"max_demand": meter["month_peak_kw"], "peak_demand": meter["on_peak_month_peak_kw"]}
+        peaks = meter_peaks(meter)
         if self.switch is not None:
             sw, self.switch = self.switch, None
             before = self.fc(n, [], self.restores())
@@ -1576,8 +1703,7 @@ class Run:
             p2 = {k: list(v) for k, v in base_plan.items()}
             p2.setdefault(n + 2, []).append(mv)
             after = forward(lane, n, p2, mult)
-            peaks = {"max_demand": self.recs[n]["states"][lane_name]["meter"]["month_peak_kw"],
-                     "peak_demand": self.recs[n]["states"][lane_name]["meter"]["on_peak_month_peak_kw"]}
+            peaks = meter_peaks(self.recs[n]["states"][lane_name]["meter"])
             dec = {"decision_id": did, "ts": ts, "device_id": device_id, "action": action, "value": value,
                    "reason_code": "owner_override", "inside_rules": True, "status": "executed",
                    "effect": effect_of(before, after, n, peaks)}
@@ -1657,7 +1783,9 @@ class Run:
         # ---- between steps: Claude's answer, owner clicks, read-only examples
         for e in states["with"]["new_escalations"]:
             if e["status"] == "open" and e["ts"] == iso(rep_dt(n)):
-                rec["after"].append(self.claude_answer(e, n))
+                ans = self.claude_answer(e, n)
+                if ans is not None:
+                    rec["after"].append(ans)
         if not self.owner_done and n >= OWNER_MIN_TICK and all(
                 reports[l]["devices"][IDX[OWNER_DEVICE]]["state"] == "running_job" for l in LANES):
             self.owner_done = True
@@ -1668,14 +1796,15 @@ class Run:
         rec["clock"] = self.clock_after(n)
 
     def claude_answer(self, e, n):
-        """Scripted stand-in for Claude: pick the cheapest option inside the authority (ties: the engine's rank)."""
+        """Scripted stand-in for Claude: it is offered only the within-authority options (never ask_owner, CONTRACTS.md
+        ClaudeAuthority) and picks the cheapest (ties: the engine's rank). Nothing offered -> no answer, the fallback stays."""
         cands = [o for o in e["options"] if o["option_id"] != "ask_owner" and o["within_authority"]]
         if not cands:
-            return self.engine.resolve(e["escalation_id"], "ask_owner", "claude",
-                                       "No option is inside my authority, so the owner decides.", n)
+            return None
         o = min(cands, key=lambda x: (x["projected"]["cost_delta_usd"], x["rank"]))
-        why = ("The owner wants a comfortable dining room tonight, so I left HVAC alone. " if not o["option_id"].startswith(
-            "deep_reduce_hvac") else "")
+        hvac_offered = any(x["option_id"].startswith("deep_reduce_hvac") for x in e["options"])
+        why = ("The owner wants a comfortable dining room tonight, so I left HVAC alone. " if hvac_offered and not
+               o["option_id"].startswith("deep_reduce_hvac") else "")
         rationale = why + "%s: projected peak %.1f kW, extra cost $%.2f, inside my authority." % (
             o["summary"], o["projected"]["peak_kw"], o["projected"]["cost_delta_usd"])
         self.self_rationale = rationale
@@ -1691,16 +1820,23 @@ def run_ticks_for_days(days):
 BACKTEST_DATASET = "Simulated fixture data (contracts/fixtures/history, fixture_synthetic): not ComStock, not a measured bill"
 
 
-def bill_from_blocks(period, rows):
-    """rows: [(block_start, total_kw)] of one local month. Same per-charge function as the Meter (ENGINE.md section 1)."""
+def bill_from_blocks(period, rows, tc=None):
+    """rows: [(block_start, total_kw)] of one local month (or its first days). Same per-charge function as the Meter (ENGINE.md
+    section 1): energy at each block's price, every charge that applies in the month on its peak, fixed charges per local day
+    metered (+ per month)."""
+    tc = tc or TC
+    month = int(period[5:])
     e = sum(t * 0.25 for _, t in rows)
-    c = sum(t * 0.25 * tariff_price(bs) for bs, t in rows)
+    c = sum(t * 0.25 * tc.price(bs) for bs, t in rows)
     dcs = []
-    for name, rate, w in CHARGES:
-        pk = max([t for bs, t in rows if in_window(lmin(bs), w)] or [0.0])
-        dcs.append({"name": name, "peak_kw": rnd(pk, 3), "cost_usd": rnd(rnd(pk, 3) * rate, 2)})
+    for ch in tc.applicable(month):
+        pk = max([t for bs, t in rows if tc.counts(ch, bs)] or [0.0])
+        dcs.append({"name": ch["name"], "peak_kw": rnd(pk, 3), "cost_usd": rnd(rnd(pk, 3) * ch["rate"], 2)})
+    days = len({ldate(bs) for bs, _ in rows})
+    fixed = rnd(tc.fixed_day * days + (tc.fixed_month if rows else 0.0), 2)
     return {"period": period, "energy_kwh": rnd(e, 3), "energy_cost_usd": rnd(c, 2), "demand_charges": dcs,
-            "total_usd": rnd(rnd(c, 2) + sum(d["cost_usd"] for d in dcs), 2), "tariff_id": TARIFF["tariff_id"]}
+            "fixed_usd": fixed, "total_usd": rnd(rnd(c, 2) + sum(d["cost_usd"] for d in dcs) + fixed, 2),
+            "tariff_id": tc.t["tariff_id"]}
 
 
 def history_matrix(hist):
@@ -1795,34 +1931,82 @@ def replay_policy(mat, policy):
     return rows, violations
 
 
+BACKTEST_MONTHS = ("2026-06", "2026-07")
+BACKTEST_RUN = "run_0001"
+POLICIES = ("without", "timer", "with")
+
+
 def build_backtest(hist):
+    """Fake run_backtest over the history: one BacktestResult per month, one BacktestPoint per local day, and the on_progress
+    events in the contract order (points per day, the month at its end, progress). Illustrative, never savings."""
     mat = history_matrix(hist)
-    results = []
     raw_total = {}
-    for m in ("2026-06", "2026-07"):
+    for m in BACKTEST_MONTHS:
         y, mo = int(m[:4]), int(m[5:])
         raw_total[m] = [(bs, sum(v)) for bs, v in mat if (ldate(bs).year, ldate(bs).month) == (y, mo)]
-    bills = {}
-    energy = {}
+    rows_by = {}
     viol = 0
-    for pol in ("without", "timer", "with"):
+    for pol in POLICIES:
         rows, v = (mat, 0) if pol == "without" else replay_policy(mat, pol)
         viol += v
-        for m in ("2026-06", "2026-07"):
+        for m in BACKTEST_MONTHS:
             y, mo = int(m[:4]), int(m[5:])
-            mrows = [(bs, sum(x)) for bs, x in rows if (ldate(bs).year, ldate(bs).month) == (y, mo)]
-            bills[(pol, m)] = bill_from_blocks(m, mrows)
-            energy[(pol, m)] = sum(t for _, t in mrows)
-    for m in ("2026-06", "2026-07"):
+            rows_by[(pol, m)] = [(bs, sum(x)) for bs, x in rows if (ldate(bs).year, ldate(bs).month) == (y, mo)]
+    results, points, events = [], [], []
+    saved_before = 0.0
+    hist_end_local = ldate(START - timedelta(minutes=1))
+    for m in BACKTEST_MONTHS:
+        y, mo = int(m[:4]), int(m[5:])
+        bills = {p: bill_from_blocks(m, rows_by[(p, m)]) for p in POLICIES}
         raw_bill = bill_from_blocks(m, raw_total[m])
-        conserved = all(abs(energy[(p, m)] - energy[("without", m)]) <= 1e-6 * max(1.0, energy[("without", m)])
+        e_without = sum(t for _, t in rows_by[("without", m)])
+        conserved = all(abs(sum(t for _, t in rows_by[(p, m)]) - e_without) <= 1e-6 * max(1.0, e_without)
                         for p in ("timer", "with"))
-        results.append({"dataset": BACKTEST_DATASET, "month": m,
-                        "policies": {p: bills[(p, m)] for p in ("without", "timer", "with")},
-                        "checks": {"baseline_matches_raw": raw_bill == bills[("without", m)], "energy_conserved": conserved,
-                                   "rule_violations": viol},
-                        "assumptions_id": "base"})
-    return results
+        days = sorted({ldate(bs) for bs, _ in rows_by[("without", m)]})
+        n_cal = (date(y + mo // 12, mo % 12 + 1, 1) - date(y, mo, 1)).days
+        partial = len(days) < n_cal or days[-1] == hist_end_local
+        res = {"dataset": BACKTEST_DATASET, "month": m, "policies": bills,
+               "checks": {"baseline_matches_raw": raw_bill == bills["without"], "energy_conserved": conserved,
+                          "rule_violations": viol},
+               "assumptions_id": "base", "tariff_id": TARIFF["tariff_id"], "partial": partial,
+               "saved_usd": rnd(bills["without"]["total_usd"] - bills["with"]["total_usd"], 2),
+               "saved_vs_timer_usd": rnd(bills["timer"]["total_usd"] - bills["with"]["total_usd"], 2)}
+        for i, d in enumerate(days):
+            cost = {p: bill_from_blocks(m, [(bs, t) for bs, t in rows_by[(p, m)] if ldate(bs) <= d])["total_usd"]
+                    for p in POLICIES}
+            saved = rnd(cost["without"] - cost["with"], 2)
+            pt = {"dataset": BACKTEST_DATASET, "assumptions_id": "base", "tariff_id": TARIFF["tariff_id"], "month": m,
+                  "day": d.isoformat(), "ts": iso(utc_of_local(d + timedelta(days=1), 0)), "partial": partial,
+                  "cost_to_date_usd": cost, "saved_month_to_date_usd": saved,
+                  "saved_vs_timer_month_to_date_usd": rnd(cost["timer"] - cost["with"], 2),
+                  "saved_year_to_date_usd": rnd(saved_before + saved, 2)}
+            points.append(pt)
+            events.append({"type": "backtest_point", "data": pt})
+            if i + 1 == len(days):
+                events.append({"type": "backtest_month", "data": res})
+            pct = int(100 * (i + 1) // len(days))
+            if pct // 25 > int(100 * i // len(days)) // 25:            # progress every quarter of the month
+                events.append({"type": "backtest_progress", "month": m, "pct": pct})
+        assert points[-1]["saved_month_to_date_usd"] == res["saved_usd"], (m, points[-1], res["saved_usd"])
+        saved_before += res["saved_usd"]
+        results.append(res)
+    return results, points, events
+
+
+BACKTEST_INPUT_DAYS = 3
+
+
+def backtest_inputs(hist):
+    """BacktestInputs (CONTRACTS.md section 1) as the caller would pass it, with the series cut to the first
+    BACKTEST_INPUT_DAYS local days of the first replayed month to keep the file small (the real series covers the 4 warm-up
+    weeks + every replayed month). Fixture history, so `fixture_synthetic` / `simulated`."""
+    first = date(int(BACKTEST_MONTHS[0][:4]), int(BACKTEST_MONTHS[0][5:]), 1)
+    a, b = utc_of_local(first, 0), utc_of_local(first + timedelta(days=BACKTEST_INPUT_DAYS), 0)
+    blocks = [x for x in hist["blocks"] if a <= datetime.strptime(x["block_start"], "%Y-%m-%dT%H:%M:%SZ").replace(
+        tzinfo=UTC) < b]
+    series = dict(hist, start=iso(a), end=iso(b), blocks=blocks)
+    return {"config": CONFIG, "tariff": TARIFF, "catalog": CATALOG, "seed": SEED, "series": series,
+            "assumptions": {"assumptions_id": "base", "flex_scale": 1.0, "draw_scale": 1.0, "forecast_noise_pct": 0.0}}
 
 
 # ----------------------------------------------------------------------------- writers
@@ -1891,7 +2075,8 @@ def live_tick_row(st, n, fc, fc_ts):
             "peak_mode": m["peak_mode"], "peak_cap_kw": m["peak_cap_kw"], "target_kw": m["target_kw"],
             "energy_kwh_today": m["energy_kwh_today"], "energy_kwh_month": m["energy_kwh_month"],
             "price_usd_per_kwh_now": m["price_usd_per_kwh_now"], "cost_usd_today": m["cost_usd_today"],
-            "cost_usd_month": m["cost_usd_month"], "customers_per_hour": st["customers_per_hour"],
+            "cost_usd_month": m["cost_usd_month"], "demand_peaks_json": cj(m["demand_peaks"]),
+            "customers_per_hour": st["customers_per_hour"],
             "indoor_temp_c": st["indoor_temp_c"], "forecast_kw_json": cj(fc), "forecast_ts": fc_ts}
 
 
@@ -1917,6 +2102,22 @@ def escalation_row(e):
             "default_option_id": e["default_option_id"], "active_option_id": e["active_option_id"],
             "deadline_sim_ts": e["deadline_sim_ts"], "chosen_option_id": e["chosen_option_id"],
             "resolved_by": e["resolved_by"], "rationale": e["rationale"]}
+
+
+def backtest_point_row(run_id, p):
+    return {"key": "%s:%s" % (run_id, p["day"]), "run_id": run_id, "day": p["day"], "month": p["month"], "ts": p["ts"],
+            "partial": p["partial"], "cost_to_date_json": cj(p["cost_to_date_usd"]),
+            "saved_month_to_date_usd": p["saved_month_to_date_usd"],
+            "saved_vs_timer_month_to_date_usd": p["saved_vs_timer_month_to_date_usd"],
+            "saved_year_to_date_usd": p["saved_year_to_date_usd"], "dataset": p["dataset"], "tariff_id": p["tariff_id"],
+            "assumptions_id": p["assumptions_id"]}
+
+
+def backtest_month_row(run_id, r):
+    return {"key": "%s:%s" % (run_id, r["month"]), "run_id": run_id, "month": r["month"], "partial": r["partial"],
+            "saved_usd": r["saved_usd"], "saved_vs_timer_usd": r["saved_vs_timer_usd"], "policies_json": cj(r["policies"]),
+            "checks_json": cj(r["checks"]), "dataset": r["dataset"], "tariff_id": r["tariff_id"],
+            "assumptions_id": r["assumptions_id"]}
 
 
 def context_row(c):
@@ -2069,7 +2270,7 @@ def what_if_hook(device_id, action, value):
                                               "value": None})
         mult = run.mult_at(n)
         m = run.recs[n]["states"]["with"]["meter"]
-        peaks = {"max_demand": m["month_peak_kw"], "peak_demand": m["on_peak_month_peak_kw"]}
+        peaks = meter_peaks(m)
         return effect_of(forward(lane, n, base, mult), forward(lane, n, p2, mult), n, peaks)
     return hook
 
@@ -2099,6 +2300,18 @@ def first_escalation_tick(R, upto):
 
 
 MAN = [
+    ("shapes/tariff_pge_b19.json", "§1 Tariff (PG&E B-19 from URDB 69de8cdb02f684104e01267d: seasons, windows, fixed charge)",
+     ["Kritazya (engine tariff/meter tests, backend/data/tariff_urdb.py target)", "Ashirwad (bill breakdown UI)"], "S2"),
+    ("shapes/backtest_", "§1 BacktestResult / BacktestPoint / BacktestInputs (fake, never savings)",
+     ["Kritazya (run_backtest tests)", "Suyog (API backtest route)", "Ashirwad (Proof screen)"], "S1 S2"),
+    ("facade/run_backtest", "§3 run_backtest (inputs, returns, on_progress events in order)",
+     ["Suyog (fakes/fake_kitchen.py replays on_progress)", "Kritazya (engine tests)"], "S2"),
+    ("ws/backtest_", "§2 WebSocket /ws (Proof chart, LIVE_TRANSPORT=ws)", ["Ashirwad (Proof screen /ws mock)", "Suyog (API tests)"],
+     "S1"),
+    ("spacetime/tables/backtest_", "§5 SpacetimeDB backtest_point / backtest_month (Proof chart rows)",
+     ["Ashirwad (Proof screen mock live hook)", "Kritazya (fakes/fake_live.py, spacetime/seed.ts)"], "S3"),
+    ("spacetime/reducers/publish_backtest_", "§5 SpacetimeDB reducers (Proof)", ["Kritazya (live/spacetime_client.py)"], "S3"),
+    ("spacetime/reducers/reset_backtest", "§5 SpacetimeDB reducers (Proof)", ["Kritazya (live/spacetime_client.py)"], "S3"),
     ("shapes/", "§1 Shared shapes", ["Ashirwad", "Suyog", "Kritazya"], "all"),
     ("history/", "§1 WarmUpHistory + daily inputs (G59)", ["Kritazya (engine warm_up, backtest)", "Suyog (runtime warm-up)",
                                                          "Ashirwad (Proof screen)"], "S2"),
@@ -2239,22 +2452,24 @@ def main(out_dir):
                                    "40-person party at 20:00"),
         "resolve_escalation": proposal("p_0006", "resolve_escalation",
                                        {"escalation_id": eid, "option_id": outside["option_id"]},
-                                       "Claude suggests %s (outside its authority)" % outside["option_id"], esc_n,
+                                       "Owner asked for %s (outside Claude's authority)" % outside["option_id"], esc_n,
                                        esc_open["deadline_sim_ts"]),
     }
 
     # ---- bills and backtest
     def meter_bill(m, period="2026-07"):
-        rates = {name: rate for name, rate, _ in CHARGES}
-        peaks = {"max_demand": m["month_peak_kw"], "peak_demand": m["on_peak_month_peak_kw"]}
-        dcs = [{"name": name, "peak_kw": peaks[name], "cost_usd": rnd(peaks[name] * rates[name], 2)} for name, _, _ in CHARGES]
-        ecost = rnd(m["cost_usd_month"] - sum(d["cost_usd"] for d in dcs), 2)
+        """Bill(period) as the engine would return it now: the Meter's month to date, charge by charge."""
+        dcs = [{"name": dp["name"], "peak_kw": dp["peak_kw"], "cost_usd": dp["cost_usd"]} for dp in m["demand_peaks"]]
+        fixed = rnd(TC.fixed_day * loc(START).day + TC.fixed_month, 2)
+        ecost = rnd(m["cost_usd_month"] - sum(d["cost_usd"] for d in dcs) - fixed, 2)
         return {"period": period, "energy_kwh": m["energy_kwh_month"], "energy_cost_usd": ecost, "demand_charges": dcs,
-                "total_usd": m["cost_usd_month"], "tariff_id": TARIFF["tariff_id"]}
+                "fixed_usd": fixed, "total_usd": m["cost_usd_month"], "tariff_id": TARIFF["tariff_id"]}
     bill_with = meter_bill(st(N, "with")["meter"])
     bill_without = meter_bill(st(N, "without")["meter"])
-    backtest = build_backtest(hist)
+    backtest, bt_points, bt_events = build_backtest(hist)
     bt_july = backtest[-1]
+    bt_point = next(p for p in bt_points if p["day"] == "2026-07-14")
+    bt_inputs = backtest_inputs(hist)
     ok = {"ok": True}
 
     def clock_msg(n, run_days=1):
@@ -2313,6 +2528,9 @@ def main(out_dir):
     wjson(S + "proposal_confirmed.json", proposal_confirmed)
     wjson(S + "bill.json", bill_with)
     wjson(S + "backtest_result.json", bt_july)
+    wjson(S + "backtest_point.json", bt_point)
+    wjson_rows(S + "backtest_inputs.json", bt_inputs)
+    wjson(S + "tariff_pge_b19.json", TARIFF_B19)
     wjson(S + "agent_log.json", logs1[0])
     last_block = [b for b in hist["blocks"] if b["block_start"] == iso(START - timedelta(minutes=15))]
     wjson(S + "warm_up_history.json", dict(hist, start=iso(START - timedelta(minutes=15)), blocks=last_block))
@@ -2378,14 +2596,21 @@ def main(out_dir):
     wjson(F + "forecast.json", {"call": "forecast", "args": {"horizon_min": 120}, "returns": snapshot["forecast_kw"]})
     wjson(F + "what_if.json", {"call": "what_if", "args": wi_args, "returns": wi_effect})
     wjson(F + "snapshot.json", {"call": "snapshot", "args": {}, "returns": snapshot})
-    wjson(F + "run_backtest.json", {"call": "run_backtest", "args": {"months": ["2026-06", "2026-07"], "assumptions_id": "base",
-                                    "on_progress": None}, "returns": backtest})
+    wjson_rows(F + "run_backtest.json", {
+        "call": "run_backtest",
+        "note": "FAKE DATA - illustrative, label simulated, never savings. `inputs.series` is cut to the first %d days of %s to "
+                "keep the file small; `returns` is the fixture backtest over the whole fixture history (2026-06 + 2026-07 to "
+                "the 17th 17:30). The on_progress events FakeKitchen replays are in run_backtest_on_progress.jsonl."
+                % (BACKTEST_INPUT_DAYS, BACKTEST_MONTHS[0]),
+        "args": {"inputs": bt_inputs, "months": list(BACKTEST_MONTHS), "assumptions_id": "base", "on_progress": None},
+        "returns": backtest})
+    wjsonl(F + "run_backtest_on_progress.jsonl", bt_events)
     wjson(F + "compare_lanes.json", {"call": "compare_lanes", "args": {"without": st(N, "without"), "with_": st(N, "with")},
                                      "returns": comparison(st(N, "without"), st(N, "with"))})
 
     # ---------------- ai tools
     A = "ai_tools/"
-    offered = [o["option_id"] for o in esc_open["options"]]
+    offered = [o["option_id"] for o in esc_open["options"] if o["within_authority"] and o["option_id"] != "ask_owner"]
     wjson(A + "get_kitchen_state.json", {"tool": "get_kitchen_state", "input": {}, "output": snapshot})
     wjson(A + "get_forecast.json", {"tool": "get_forecast", "input": {}, "output": snapshot["forecast_kw"]})
     wjson(A + "what_if.json", {"tool": "what_if", "input": dict(wi_args, lane="with"), "output": wi_effect})
@@ -2416,7 +2641,9 @@ def main(out_dir):
     wjson(Wd + "chat_delta.json", {"type": "chat_delta", "chat_id": chat_id,
                                    "text": "Tonight I kept the engine's choice for the 18:45 block"})
     wjson(Wd + "chat_done.json", {"type": "chat_done", "chat_id": chat_id})
-    wjson(Wd + "backtest_progress.json", {"type": "backtest_progress", "run_id": "run_0001", "month": "2026-07", "pct": 50})
+    wjson(Wd + "backtest_progress.json", {"type": "backtest_progress", "run_id": BACKTEST_RUN, "month": "2026-07", "pct": 50})
+    wjson(Wd + "backtest_point.json", {"type": "backtest_point", "run_id": BACKTEST_RUN, "data": bt_point})
+    wjson(Wd + "backtest_month.json", {"type": "backtest_month", "run_id": BACKTEST_RUN, "data": bt_july})
     wjson(Wd + "comparison.json", {"type": "comparison", "data": comparison(st(N, "without"), st(N, "with"))})
     wjson(Wd + "proposal.json", {"type": "proposal", "data": proposal_pending})
     wjson(Wd + "escalation.json", {"type": "escalation", "data": esc_open})
@@ -2518,6 +2745,15 @@ def main(out_dir):
     wjson(red + "reset_all.json", {"reducer": "reset_all", "args": []})
     wjson(red + "request_surge.json", {"reducer": "request_surge", "args": [surge["customers"], surge["duration_min"]]})
     wjson(red + "consume_surge.json", {"reducer": "consume_surge", "args": [1]})
+    bt_point_rows = [backtest_point_row(BACKTEST_RUN, p) for p in bt_points]
+    bt_month_rows = [backtest_month_row(BACKTEST_RUN, r) for r in backtest]
+    wjson(SP + "tables/backtest_point.json", bt_point_rows)
+    wjson(SP + "tables/backtest_month.json", bt_month_rows)
+    wjson(red + "publish_backtest_point.json", {"reducer": "publish_backtest_point",
+                                                "args": [cj(backtest_point_row(BACKTEST_RUN, bt_point))]})
+    wjson(red + "publish_backtest_month.json", {"reducer": "publish_backtest_month",
+                                                "args": [cj(backtest_month_row(BACKTEST_RUN, bt_july))]})
+    wjson(red + "reset_backtest.json", {"reducer": "reset_backtest", "args": [BACKTEST_RUN]})
 
     # ---------------- convex
     CV = "convex/"
@@ -2672,7 +2908,9 @@ def main(out_dir):
 
 def init_round(init):
     return {"energy_kwh_today": rnd(init["energy_today"], 3), "energy_kwh_month": rnd(init["energy_month"], 3),
-            "month_peak_kw": rnd(init["peaks"]["max_demand"], 2), "on_peak_month_peak_kw": rnd(init["peaks"]["peak_demand"], 2),
+            "month_peak_kw": rnd(init["month_peak"], 2),
+            "on_peak_month_peak_kw": rnd(init["peaks"][TC.on_peak_name(init["month"][1])], 2),
+            "demand_peaks": demand_peaks_of(init["peaks"], init["month"][1]),
             "energy_cost_usd_today": rnd(init["ecost_today"], 2), "energy_cost_usd_month": rnd(init["ecost_month"], 2)}
 
 

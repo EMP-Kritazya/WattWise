@@ -8,23 +8,28 @@ from __future__ import annotations
 import json
 from typing import Annotated, Any, Literal, Optional
 
-from pydantic import Field, TypeAdapter, field_validator
+from pydantic import Field, TypeAdapter, field_validator, model_validator
 
-from ._base import ContractModel, Importance, Lane, NonNegFloat, NonNegInt, PeakMode, UtcDatetime
+from ._base import ContractModel, Importance, Lane, NonNegFloat, NonNegInt, PeakMode, UtcDatetime, YearMonth
 from .api import ClockState
 from .shapes import (
     AgentLog,
+    BacktestChecks,
+    BacktestPolicies,
     CommandAction,
     ContextLabel,
     CrowdEffectValue,
     DevicePhysical,
     DeviceSource,
+    DemandPeak,
     DeviceState,
     EscalationOption,
     EscalationProblem,
     EscalationStatus,
     Effect,
     LaneComparison,
+    LocalDate,
+    PolicyCosts,
     ReasonCode,
     ResolvedBy,
 )
@@ -46,6 +51,10 @@ _PHYSICAL = TypeAdapter(DevicePhysical)
 _EFFECT = TypeAdapter(Effect)
 _PROBLEM = TypeAdapter(EscalationProblem)
 _OPTIONS = TypeAdapter(list[EscalationOption])
+_DEMAND_PEAKS = TypeAdapter(list[DemandPeak])
+_POLICY_COSTS = TypeAdapter(PolicyCosts)
+_POLICIES = TypeAdapter(BacktestPolicies)
+_CHECKS = TypeAdapter(BacktestChecks)
 
 
 class LiveTickRow(ContractModel):
@@ -64,6 +73,7 @@ class LiveTickRow(ContractModel):
     price_usd_per_kwh_now: float
     cost_usd_today: float
     cost_usd_month: float
+    demand_peaks_json: str  # Meter.demand_peaks (list[DemandPeak]) as a JSON string
     customers_per_hour: NonNegInt
     indoor_temp_c: float
     forecast_kw_json: Optional[str]  # the latest forecast (kept between decision ticks); null before the first one
@@ -73,6 +83,11 @@ class LiveTickRow(ContractModel):
     @classmethod
     def _forecast(cls, v: Optional[str]) -> Optional[str]:
         return _json_of(_FORECAST, v, "forecast_kw_json")
+
+    @field_validator("demand_peaks_json")
+    @classmethod
+    def _demand_peaks(cls, v: str) -> str:
+        return _json_of(_DEMAND_PEAKS, v, "demand_peaks_json")
 
 
 class TickHistoryRow(ContractModel):
@@ -178,6 +193,69 @@ class SurgeRequestRow(ContractModel):
     requested_by: str
     created_at: UtcDatetime
     consumed: bool
+
+
+class BacktestPointRow(ContractModel):
+    """`backtest_point` row (latest run only; <= 366 rows), written by `publish_backtest_point(json)`."""
+
+    key: str  # "<run_id>:<day>"
+    run_id: str
+    day: LocalDate
+    month: YearMonth
+    ts: UtcDatetime
+    partial: bool
+    cost_to_date_json: str  # BacktestPoint.cost_to_date_usd as a JSON string
+    saved_month_to_date_usd: float
+    saved_vs_timer_month_to_date_usd: float
+    saved_year_to_date_usd: float
+    dataset: str
+    tariff_id: str
+    assumptions_id: str
+
+    @field_validator("cost_to_date_json")
+    @classmethod
+    def _cost(cls, v: str) -> str:
+        return _json_of(_POLICY_COSTS, v, "cost_to_date_json")
+
+    @model_validator(mode="after")
+    def _check(self) -> "BacktestPointRow":
+        if self.key != f"{self.run_id}:{self.day}":
+            raise ValueError('key must be "<run_id>:<day>"')
+        if not self.day.startswith(self.month + "-"):
+            raise ValueError(f"day {self.day} is not in month {self.month}")
+        return self
+
+
+class BacktestMonthRow(ContractModel):
+    """`backtest_month` row (latest run only; <= 12 rows), written by `publish_backtest_month(json)`."""
+
+    key: str  # "<run_id>:<month>"
+    run_id: str
+    month: YearMonth
+    partial: bool
+    saved_usd: float
+    saved_vs_timer_usd: float
+    policies_json: str  # BacktestResult.policies as a JSON string
+    checks_json: str  # BacktestResult.checks as a JSON string
+    dataset: str
+    tariff_id: str
+    assumptions_id: str
+
+    @field_validator("policies_json")
+    @classmethod
+    def _policies(cls, v: str) -> str:
+        return _json_of(_POLICIES, v, "policies_json")
+
+    @field_validator("checks_json")
+    @classmethod
+    def _checks(cls, v: str) -> str:
+        return _json_of(_CHECKS, v, "checks_json")
+
+    @model_validator(mode="after")
+    def _check(self) -> "BacktestMonthRow":
+        if self.key != f"{self.run_id}:{self.month}":
+            raise ValueError('key must be "<run_id>:<month>"')
+        return self
 
 
 class PublishTicksPayload(ContractModel):

@@ -8,8 +8,8 @@
     "importance": "flexible",
     "state": "on",
     "power_kw": 6.87,
-    "rated_kw": 12.0,
-    "power_pct": 57,
+    "rated_kw": 8.0,
+    "power_pct": 86,
     "source": "simulated",
     "physical_json": "{\"indoor_temp_c\":22.5}"
   },
@@ -22,8 +22,8 @@
     "importance": "flexible",
     "state": "on",
     "power_kw": 6.87,
-    "rated_kw": 12.0,
-    "power_pct": 57,
+    "rated_kw": 8.0,
+    "power_pct": 86,
     "source": "simulated",
     "physical_json": "{\"indoor_temp_c\":22.5}"
   },
@@ -174,12 +174,12 @@
     "type_id": "hvac",
     "name": "HVAC 1",
     "importance": "flexible",
-    "state": "reduced",
-    "power_kw": 4.8,
-    "rated_kw": 12.0,
-    "power_pct": 40,
+    "state": "on",
+    "power_kw": 8.0,
+    "rated_kw": 8.0,
+    "power_pct": 100,
     "source": "simulated",
-    "physical_json": "{\"indoor_temp_c\":23.6}"
+    "physical_json": "{\"indoor_temp_c\":24.7}"
   },
   {
     "key": "with:hvac_2",
@@ -189,11 +189,11 @@
     "name": "HVAC 2",
     "importance": "flexible",
     "state": "reduced",
-    "power_kw": 4.8,
-    "rated_kw": 12.0,
+    "power_kw": 3.2,
+    "rated_kw": 8.0,
     "power_pct": 40,
     "source": "simulated",
-    "physical_json": "{\"indoor_temp_c\":23.6}"
+    "physical_json": "{\"indoor_temp_c\":24.7}"
   },
   {
     "key": "with:walk_in_cooler_1",
@@ -207,7 +207,7 @@
     "rated_kw": 3.5,
     "power_pct": 100,
     "source": "simulated",
-    "physical_json": "{\"box_temp_c\":3.2}"
+    "physical_json": "{\"box_temp_c\":3.3}"
   },
   {
     "key": "with:reach_in_fridge_1",
@@ -319,7 +319,7 @@
     "rated_kw": 4.5,
     "power_pct": 100,
     "source": "simulated",
-    "physical_json": "{\"box_temp_c\":60.6}"
+    "physical_json": "{\"box_temp_c\":62.4}"
   },
   {
     "key": "with:lights_1",

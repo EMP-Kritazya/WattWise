@@ -1,7 +1,18 @@
 import { create } from "zustand";
-import type { LiveTables, WsMessage } from "@/types";
+import type { Lane, LiveTables, WsMessage } from "@/types";
+import {
+  backtestMonthRow,
+  backtestPointRow,
+  contextRow,
+  escalationRow,
+  feedRow,
+  liveDeviceRows,
+  liveTickRow,
+  tickHistoryRow,
+  upsertRun,
+} from "./rows";
 
-const emptyTables = (): LiveTables => ({
+export const emptyTables = (): LiveTables => ({
   live_tick: [],
   tick_history: [],
   live_device: [],
@@ -12,9 +23,13 @@ const emptyTables = (): LiveTables => ({
   live_escalation: [],
   live_agent_log: [],
   surge_request: [],
+  backtest_point: [],
+  backtest_month: [],
 });
 
 interface LiveRowState extends LiveTables {
+  /** Each lane's latest forecast and the ts of the decision tick that made it (kept between decision ticks). */
+  forecasts: Record<Lane, { kw: number[] | null; ts: string | null }>;
   replaceTables: (tables: LiveTables) => void;
   applyViewerMessages: (messages: WsMessage[]) => void;
 }
@@ -25,9 +40,15 @@ const upsert = <T,>(rows: T[], additions: T[], key: (row: T) => string): T[] => 
   return [...map.values()];
 };
 
-/** Typed live-table hook. Screens consume these rows regardless of SpacetimeDB, fixture, or /ws source. */
+const TICK_HISTORY_ROWS = 360; // 180 sim minutes × 2 lanes (CONTRACTS.md section 5)
+
+/**
+ * Typed live-table hook: the section 5 rows, whatever the source (SpacetimeDB tables replace them wholesale; /ws and the
+ * fixture mock are mapped into the same rows by src/data/rows.ts). Screens read rows only; they never compute.
+ */
 export const useLive = create<LiveRowState>()((set) => ({
   ...emptyTables(),
+  forecasts: { without: { kw: null, ts: null }, with: { kw: null, ts: null } },
   replaceTables: (tables) => set(structuredClone(tables)),
   applyViewerMessages: (messages) =>
     set((state) => {
@@ -42,110 +63,53 @@ export const useLive = create<LiveRowState>()((set) => ({
         live_escalation: [...state.live_escalation],
         live_agent_log: [...state.live_agent_log],
         surge_request: [...state.surge_request],
+        backtest_point: [...state.backtest_point],
+        backtest_month: [...state.backtest_month],
       };
+      const forecasts = { ...state.forecasts };
       for (const message of messages) {
         if (message.type === "tick") {
           const tick = message.data;
-          next.live_tick = upsert(next.live_tick, [{
-            lane: tick.lane,
-            ts: tick.ts,
-            tick_id: tick.hub.tick_id,
-            total_kw: tick.meter.total_kw,
-            block_avg_kw: tick.meter.block_avg_kw,
-            month_peak_kw: tick.meter.month_peak_kw,
-            peak_mode: tick.meter.peak_mode,
-            peak_cap_kw: tick.meter.peak_cap_kw,
-            target_kw: tick.meter.target_kw,
-            energy_kwh_today: tick.meter.energy_kwh_today,
-            price_usd_per_kwh_now: tick.meter.price_usd_per_kwh_now,
-            cost_usd_today: tick.meter.cost_usd_today,
-            cost_usd_month: tick.meter.cost_usd_month,
-            customers_per_hour: tick.customers_per_hour,
-            indoor_temp_c: tick.indoor_temp_c ?? 0,
-            forecast_kw_json: tick.forecast_kw ? JSON.stringify(tick.forecast_kw) : null,
-            forecast_ts: tick.forecast_kw ? tick.ts : null,
-          }], (row) => row.lane);
-          next.tick_history = upsert(next.tick_history, [{
-            lane: tick.lane,
-            ts: tick.ts,
-            total_kw: tick.meter.total_kw,
-            block_avg_kw: tick.meter.block_avg_kw,
-          }], (row) => `${row.lane}:${row.ts}`).slice(-360);
-          next.live_device = upsert(next.live_device, tick.hub.devices.map((device) => ({
-            key: `${tick.lane}:${device.device_id}`,
-            lane: tick.lane,
-            device_id: device.device_id,
-            type_id: device.type_id,
-            name: device.name,
-            importance: device.importance,
-            state: device.state,
-            power_kw: device.power_kw,
-            rated_kw: device.rated_kw,
-            power_pct: device.power_pct,
-            source: device.source,
-            physical_json: device.physical ? JSON.stringify(device.physical) : null,
-          })), (row) => row.key);
+          if (tick.forecast_kw) forecasts[tick.lane] = { kw: tick.forecast_kw, ts: tick.ts };
+          const fc = forecasts[tick.lane];
+          next.live_tick = upsert(next.live_tick, [liveTickRow(tick, fc.kw, fc.ts)], (row) => row.lane);
+          next.tick_history = upsert(next.tick_history, [tickHistoryRow(tick)], (row) => `${row.lane}:${row.ts}`).slice(
+            -TICK_HISTORY_ROWS,
+          );
+          next.live_device = upsert(next.live_device, liveDeviceRows(tick), (row) => row.key);
         } else if (message.type === "comparison") {
           next.live_comparison = [{ id: 0, ...message.data }];
         } else if (message.type === "decision") {
-          const decision = message.data;
-          next.live_feed = upsert(next.live_feed, [{
-            decision_id: decision.decision_id,
-            lane: "with" as const,
-            ts: decision.ts,
-            device_id: decision.device_id,
-            action: decision.action,
-            value: decision.value,
-            status: decision.status,
-            reason_code: decision.reason_code,
-            effect_json: JSON.stringify(decision.effect),
-            explanation: message.explanation,
-            explanation_source: message.explanation_source,
-          }], (row) => row.decision_id).slice(-50);
+          // /ws decision messages carry no lane; only the with lane decides (owner overrides of the without lane are not fed)
+          const row = feedRow(message.data, "with", message.explanation, message.explanation_source);
+          next.live_feed = upsert(next.live_feed, [row], (r) => r.decision_id).slice(-50);
         } else if (message.type === "clock") {
+          const { type: _type, ...clock } = message;
           next.live_clock = [{
             id: 0,
-            playing: message.playing,
-            speed: message.speed,
-            sim_ts: message.sim_ts,
-            tick_id: message.tick_id,
-            paused_reason: message.paused_reason,
-            slowed_reason: message.slowed_reason,
+            ...clock,
             sim_host: message.paused_reason === "sim_host_offline" ? "offline" : "connected",
           }];
         } else if (message.type === "context") {
-          const context = message.data;
-          const weather = context.weather?.hourly[0];
-          const price = context.prices?.hourly[0];
-          const event = context.events?.items[0];
-          next.live_context = [{
-            id: 0,
-            weather_summary: weather ? `${weather.temp_c} °C now` : "Unavailable",
-            weather_label: context.weather?.label ?? "recorded",
-            prices_summary: price ? `${price.usd_per_kwh} USD/kWh now, stress ${context.prices?.stress ?? "normal"}` : "Unavailable",
-            prices_label: context.prices?.label ?? "recorded",
-            events_summary: event ? `${event.name} at ${event.venue}, ${event.distance_km} km` : "No nearby events",
-            events_label: context.events?.label ?? "recorded",
-            crowd_effect: context.crowd_effect?.value ?? "none",
-          }];
+          next.live_context = [contextRow(message.data)];
         } else if (message.type === "escalation") {
-          const escalation = message.data;
-          next.live_escalation = upsert(next.live_escalation, [{
-            escalation_id: escalation.escalation_id,
-            lane: escalation.lane,
-            status: escalation.status,
-            problem_json: JSON.stringify(escalation.problem),
-            options_json: JSON.stringify(escalation.options),
-            chosen_option_id: escalation.chosen_option_id,
-            resolved_by: escalation.resolved_by,
-            rationale: escalation.rationale,
-          }], (row) => row.escalation_id).slice(-20);
+          next.live_escalation = upsert(next.live_escalation, [escalationRow(message.data)], (row) => row.escalation_id).slice(-20);
         } else if (message.type === "agent_log") {
           const id = Math.max(0, ...next.live_agent_log.map((row) => row.id)) + 1;
           next.live_agent_log = [...next.live_agent_log, { id, ...message.data }].slice(-300);
+        } else if (message.type === "backtest_point") {
+          next.backtest_point = upsertRun(next.backtest_point, [backtestPointRow(message.run_id, message.data)]);
+          if (next.backtest_month.some((r) => r.run_id !== message.run_id)) {
+            next.backtest_month = next.backtest_month.filter((r) => r.run_id === message.run_id);
+          }
+        } else if (message.type === "backtest_month") {
+          next.backtest_month = upsertRun(next.backtest_month, [backtestMonthRow(message.run_id, message.data)]);
+          if (next.backtest_point.some((r) => r.run_id !== message.run_id)) {
+            next.backtest_point = next.backtest_point.filter((r) => r.run_id === message.run_id);
+          }
         }
       }
-      return next;
+      return { ...next, forecasts };
     }),
 }));
 
@@ -168,6 +132,7 @@ export function startLiveRows(): () => void {
   };
 }
 
+/** /ws messages into the row store (not in mock mode, which feeds rows itself, nor when SpacetimeDB is the source). */
 export function ingestViewerMessages(messages: WsMessage[]) {
   if (import.meta.env.VITE_MOCKS === "1") return;
   useLive.getState().applyViewerMessages(messages);

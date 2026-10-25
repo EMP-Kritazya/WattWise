@@ -6,13 +6,13 @@
     "value": null
   },
   "returns": {
-    "command_id": "c_0023",
+    "command_id": "c_0017",
     "lane": "with",
     "ts": "2026-07-18T02:28:00Z",
     "device_id": "dishwasher_1",
     "action": "start",
     "value": null,
-    "decision_id": "d_0020",
+    "decision_id": "d_0015",
     "issued_by": "owner"
   }
 }

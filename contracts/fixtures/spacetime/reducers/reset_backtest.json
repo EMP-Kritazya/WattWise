@@ -1,0 +1,6 @@
+{
+  "reducer": "reset_backtest",
+  "args": [
+    "run_0001"
+  ]
+}

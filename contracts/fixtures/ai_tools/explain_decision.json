@@ -5,17 +5,17 @@
   },
   "output": {
     "decision_id": "d_0001",
-    "ts": "2026-07-18T00:35:00Z",
-    "device_id": "water_heater_1",
-    "action": "reduce",
-    "value": 40,
+    "ts": "2026-07-18T00:45:00Z",
+    "device_id": "ice_machine_1",
+    "action": "delay",
+    "value": 60,
     "reason_code": "stay_under_cap",
     "inside_rules": true,
     "status": "executed",
     "effect": {
-      "peak_before_kw": 40.1,
-      "peak_after_kw": 39.8,
-      "saving_usd": 0.11
+      "peak_before_kw": 39.7,
+      "peak_after_kw": 38.9,
+      "saving_usd": 0.0
     }
   }
 }

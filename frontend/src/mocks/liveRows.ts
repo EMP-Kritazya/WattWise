@@ -1,4 +1,6 @@
-import type { Context, LiveTables, WsMessage } from "@/types";
+import type { LiveTables, WsMessage } from "@/types";
+import { contextRow, escalationRow, feedRow } from "@/data/rows";
+import { emptyTables } from "@/data/useLive";
 import { liveRowFrames, seedLiveTables, viewerWsMessages } from "./fixtures";
 
 const FRAME_MS = 500;
@@ -24,21 +26,6 @@ const upsert = <T,>(rows: T[], additions: T[], key: (row: T) => string): T[] => 
   return [...map.values()];
 };
 
-const contextSummary = (context: Context): LiveTables["live_context"][number] => ({
-  id: 0,
-  weather_summary: context.weather?.hourly[0] ? `${context.weather.hourly[0].temp_c} °C now` : "Unavailable",
-  weather_label: context.weather?.label ?? "recorded",
-  prices_summary: context.prices?.hourly[0]
-    ? `${context.prices.hourly[0].usd_per_kwh} USD/kWh now, stress ${context.prices.stress}`
-    : "Unavailable",
-  prices_label: context.prices?.label ?? "recorded",
-  events_summary: context.events?.items[0]
-    ? `${context.events.items[0].name} at ${context.events.items[0].venue}, ${context.events.items[0].distance_km} km`
-    : "No nearby events",
-  events_label: context.events?.label ?? "recorded",
-  crowd_effect: context.crowd_effect?.value ?? "none",
-});
-
 class FixtureLiveRows {
   private tables = seedLiveTables();
   private listeners = new Set<Listener>();
@@ -60,10 +47,9 @@ class FixtureLiveRows {
     this.frame = 0;
     // The table fixtures are final-state seeds for static component work. Clear them before replay so the UI never sees
     // future decisions, agent messages, or the already-consumed surge.
-    this.tables = {
-      live_tick: [], tick_history: [], live_device: [], live_comparison: [], live_feed: [],
-      live_clock: [], live_context: [], live_escalation: [], live_agent_log: [], surge_request: [],
-    };
+    // The backtest tables are a finished run (not part of the live replay), so they stay seeded.
+    const seed = seedLiveTables();
+    this.tables = { ...emptyTables(), backtest_point: seed.backtest_point ?? [], backtest_month: seed.backtest_month ?? [] };
     const advance = () => {
       const payload = liveRowFrames[this.frame++];
       if (!payload) {
@@ -105,51 +91,17 @@ class FixtureLiveRows {
   private applyMessages(messages: WsMessage[]) {
     for (const message of messages) {
       if (message.type === "decision") {
-        const decision = message.data;
-        this.tables.live_feed = upsert(
-          this.tables.live_feed,
-          [{
-            decision_id: decision.decision_id,
-            lane: "with" as const,
-            ts: decision.ts,
-            device_id: decision.device_id,
-            action: decision.action,
-            value: decision.value,
-            status: decision.status,
-            reason_code: decision.reason_code,
-            effect_json: JSON.stringify(decision.effect),
-            explanation: message.explanation,
-            explanation_source: message.explanation_source,
-          }],
-          (row) => row.decision_id,
-        ).slice(-50);
+        const row = feedRow(message.data, "with", message.explanation, message.explanation_source);
+        this.tables.live_feed = upsert(this.tables.live_feed, [row], (r) => r.decision_id).slice(-50);
       } else if (message.type === "clock") {
-        this.tables.live_clock = [{
-          id: 0,
-          playing: message.playing,
-          speed: message.speed,
-          sim_ts: message.sim_ts,
-          tick_id: message.tick_id,
-          paused_reason: message.paused_reason,
-          slowed_reason: message.slowed_reason,
-          sim_host: "connected",
-        }];
+        const { type: _type, ...clock } = message;
+        this.tables.live_clock = [{ id: 0, ...clock, sim_host: "connected" }];
       } else if (message.type === "context") {
-        this.tables.live_context = [contextSummary(message.data)];
+        this.tables.live_context = [contextRow(message.data)];
       } else if (message.type === "escalation") {
-        const escalation = message.data;
         this.tables.live_escalation = upsert(
           this.tables.live_escalation,
-          [{
-            escalation_id: escalation.escalation_id,
-            lane: escalation.lane,
-            status: escalation.status,
-            problem_json: JSON.stringify(escalation.problem),
-            options_json: JSON.stringify(escalation.options),
-            chosen_option_id: escalation.chosen_option_id,
-            resolved_by: escalation.resolved_by,
-            rationale: escalation.rationale,
-          }],
+          [escalationRow(message.data)],
           (row) => row.escalation_id,
         ).slice(-20);
       } else if (message.type === "agent_log") {

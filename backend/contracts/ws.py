@@ -9,6 +9,8 @@ from ._base import ContractModel, Pct, YearMonth
 from .api import ClockState
 from .shapes import (
     AgentLog,
+    BacktestPoint,
+    BacktestResult,
     CapUnreachableWarning,
     Context,
     Decision,
@@ -89,6 +91,18 @@ class BacktestProgressMessage(ContractModel):
     pct: Pct
 
 
+class BacktestPointMessage(ContractModel):
+    type: Literal["backtest_point"]
+    run_id: str
+    data: BacktestPoint
+
+
+class BacktestMonthMessage(ContractModel):
+    type: Literal["backtest_month"]
+    run_id: str
+    data: BacktestResult
+
+
 class ComparisonMessage(ContractModel):
     type: Literal["comparison"]
     data: LaneComparison
@@ -123,6 +137,8 @@ ViewerMessageUnion = Annotated[
         ChatDeltaMessage,
         ChatDoneMessage,
         BacktestProgressMessage,
+        BacktestPointMessage,
+        BacktestMonthMessage,
         ComparisonMessage,
         ProposalMessage,
         EscalationMessage,

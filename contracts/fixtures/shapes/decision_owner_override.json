@@ -1,5 +1,5 @@
 {
-  "decision_id": "d_0035",
+  "decision_id": "d_0027",
   "ts": "2026-07-18T02:30:00Z",
   "device_id": "water_heater_1",
   "action": "reduce",
@@ -8,8 +8,8 @@
   "inside_rules": false,
   "status": "executed",
   "effect": {
-    "peak_before_kw": 34.0,
-    "peak_after_kw": 33.4,
-    "saving_usd": -0.03
+    "peak_before_kw": 35.8,
+    "peak_after_kw": 36.4,
+    "saving_usd": 0.0
   }
 }

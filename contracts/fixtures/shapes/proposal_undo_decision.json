@@ -3,9 +3,9 @@
   "ts": "2026-07-18T02:30:00Z",
   "kind": "undo_decision",
   "payload": {
-    "decision_id": "d_0014"
+    "decision_id": "d_0010"
   },
-  "summary": "Undo: Reduced HVAC 2 to 40 % to stay under the cap (43.2 → 40.8 kW)",
+  "summary": "Undo: Reduced HVAC 2 to 40 % to stay under the cap (40.6 → 37.4 kW)",
   "status": "pending",
   "created_by": "ai",
   "confirmed_via": null,

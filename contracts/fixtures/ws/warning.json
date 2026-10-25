@@ -1,9 +1,9 @@
 {
   "type": "warning",
   "code": "cap_unreachable",
-  "message": "Even with every allowed move the kitchen needs 33.6 kW in the 18:15 block. Raise the cap or change an importance.",
+  "message": "Even with every allowed move the kitchen needs 30.1 kW in the 18:15 block. Raise the cap or change an importance.",
   "data": {
-    "unavoidable_kw": 33.6,
+    "unavoidable_kw": 30.1,
     "peak_cap_kw": 30.0,
     "target_kw": 30.0
   }

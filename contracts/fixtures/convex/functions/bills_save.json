@@ -4,8 +4,8 @@
   "args": {
     "bill": {
       "period": "2026-07",
-      "energy_kwh": 5816.876,
-      "energy_cost_usd": 1623.92,
+      "energy_kwh": 5814.156,
+      "energy_cost_usd": 1622.97,
       "demand_charges": [
         {
           "name": "max_demand",
@@ -18,7 +18,8 @@
           "cost_usd": 340.32
         }
       ],
-      "total_usd": 2815.04,
+      "fixed_usd": 0.0,
+      "total_usd": 2814.09,
       "tariff_id": "demo_tariff_v1"
     },
     "lane": "with"
