@@ -66,7 +66,7 @@ _TOOLS: dict[str, tuple[str, dict]] = {
               "peak_cap_kw": {"type": ["number", "null"], "description": "Required for cap, null for minimize."},
               "summary": _SUMMARY})),
     "propose_escalation_choice": (
-        "Propose an option of an open escalation the owner asked for. Applies only after the owner confirms.",
+        "Reserved for an explicit owner escalation override. Never offer this to Claude.",
         _obj({"escalation_id": _STR, "option_id": _STR, "summary": _SUMMARY})),
     "propose_undo": ("Propose undoing one engine decision. Applies only after the owner confirms.",
                      _obj({"decision_id": _STR, "summary": _SUMMARY})),
@@ -84,8 +84,11 @@ _TOOLS: dict[str, tuple[str, dict]] = {
 }
 READ_TOOLS = ("get_kitchen_state", "get_forecast", "explain_decision", "what_if", "get_bill", "get_context",
               "get_escalation")
-PROPOSE_TOOLS = ("propose_importance_change", "propose_peak_cap_change", "propose_escalation_choice", "propose_undo",
-                 "propose_customer_event")
+# Escalation resolution is not a normal Claude proposal path.  The owner chat
+# resolves an explicit "choose option N" directly; this isolated tuple remains
+# only for callers that deliberately implement an owner-only confirmation UI.
+OWNER_OVERRIDE_TOOLS = ("propose_escalation_choice",)
+PROPOSE_TOOLS = ("propose_importance_change", "propose_peak_cap_change", "propose_undo", "propose_customer_event")
 CHAT_TOOLS = (*READ_TOOLS, *PROPOSE_TOOLS, "set_crowd_effect")
 ESCALATION_TOOLS = (*READ_TOOLS, "choose_escalation_option")
 
@@ -130,12 +133,12 @@ class AgentTools:
         """Return exactly the option ids Claude may be offered.
 
         ``ask_owner`` is never an AI choice.  The engine supplies ``within_authority`` for every option; a missing or
-        disabled authority means Claude is not offered a choice at all.  ``_UNSET`` is only for callers that have an
-        escalation but not its KitchenConfig (for example a schema-only UI inspection).
+        disabled authority means Claude is not offered a choice at all.  Schema callers must supply the current
+        KitchenConfig authority (or embed it in the escalation); absence deliberately fails closed.
         """
-        if authority is _UNSET and "authority" in escalation:
-            authority = escalation["authority"]
-        if authority is not _UNSET and (not authority or not authority.get("enabled", False)):
+        if authority is _UNSET:
+            authority = escalation.get("authority")
+        if not authority or not authority.get("enabled", False):
             return []
         return [
             option["option_id"]

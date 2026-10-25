@@ -123,10 +123,9 @@ def test_owner_resolution_matches_the_rest_fixture(lanes):
     assert lanes["with"].resolve_escalation("e_0001", "accept_overrun", "owner", None) == expected
 
 
-def test_claude_outside_authority_is_awaiting_owner(lanes):
-    expected = _load("shapes/escalation_awaiting_owner.json")
-    got = lanes["with"].resolve_escalation("e_0001", "deep_reduce_hvac", "claude", expected["rationale"])
-    assert got == expected
+def test_claude_outside_authority_is_rejected(lanes):
+    with pytest.raises(RuleError, match="outside Claude authority"):
+        lanes["with"].resolve_escalation("e_0001", "deep_reduce_hvac", "claude", "Not offered")
 
 
 def test_resolution_with_an_unoffered_option_is_a_rule_error(lanes):
