@@ -1,37 +1,30 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes, useLocation } from "react-router";
-import { ChartColumn, ChefHat, LayoutDashboard, Leaf, Microscope, MonitorPlay, Network } from "lucide-react";
+import { ChefHat, LayoutDashboard, Leaf, Microscope, MonitorPlay } from "lucide-react";
 import { ChatDrawer } from "@/components/ChatDrawer";
 import { SectionTabs, type SectionTab } from "@/components/SectionTabs";
 import { StatusBar } from "@/components/StatusBar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { AgentNetworkPage } from "@/pages/AgentNetworkPage";
 import { BuilderPage } from "@/pages/BuilderPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { EvalLabPage } from "@/pages/EvalLabPage";
 import { LivePage } from "@/pages/LivePage";
-import { ProofPage } from "@/pages/ProofPage";
 import { SimHostPage } from "@/pages/SimHostPage";
 import { HtmlOverlays } from "@/components/live/floor/HtmlOverlay";
 import { startLive } from "@/data";
 import { useDashboardStore as useSim } from "@/data";
 import { transport } from "@/transport";
 
-// The four top tabs. Dashboard and Proof & Agents each hold two screens, switched by sub-tabs.
+// The three top tabs. Dashboard holds two screens, switched by sub-tabs.
 const NAV = [
   { to: "/live", label: "Live Simulation", icon: MonitorPlay },
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/eval", label: "Evaluation Lab", icon: Microscope },
-  { to: "/proof", label: "Proof & Agents", icon: ChartColumn },
 ];
 const DASHBOARD_TABS: SectionTab[] = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/dashboard/builder", label: "Kitchen Builder", icon: ChefHat },
-];
-const PROOF_TABS: SectionTab[] = [
-  { to: "/proof", label: "Proof", icon: ChartColumn },
-  { to: "/proof/agents", label: "Agent Network", icon: Network },
 ];
 
 export default function App() {
@@ -60,21 +53,18 @@ export default function App() {
             <Route path="builder" element={<BuilderPage />} />
           </Route>
           <Route path="/eval" element={<EvalLabPage />} />
-          <Route path="/proof" element={<SectionTabs tabs={PROOF_TABS} label="Proof sections" />}>
-            <Route index element={<ProofPage />} />
-            <Route path="agents" element={<AgentNetworkPage />} />
-          </Route>
           <Route path="/sim" element={<SimHostPage />} />
           {/* Old addresses still work. */}
           <Route path="/builder" element={<Navigate to="/dashboard/builder" replace />} />
-          <Route path="/agents" element={<Navigate to="/proof/agents" replace />} />
+          <Route path="/proof/*" element={<Navigate to="/live" replace />} />
+          <Route path="/agents" element={<Navigate to="/live" replace />} />
         </Route>
       </Routes>
     </BrowserRouter>
   );
 }
 
-/** The top bar with the four tabs above every screen. Claude resolves escalations itself, so no decision dialog. */
+/** The top bar with the three tabs above every screen. Claude resolves escalations itself, so no decision dialog. */
 function Shell() {
   const onLive = useLocation().pathname === "/live";
   // Keep the floor mounted and pause its render loop on other tabs so returning to Live is instant.
@@ -125,7 +115,7 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
     isActive && "border-[#22223B] bg-primary text-[#22223B] shadow-[0_3px_0_#22223B]",
   );
 
-/** Brand, the four tabs, kitchen and connection status, and the assistant, at every width. */
+/** Brand, the three tabs, kitchen and connection status, and the assistant, at every width. */
 function TopBar() {
   const kitchenName = useSim((s) => s.kitchen?.config.name);
   // Its height as `--topbar-h`, so a screen can fill exactly the rest of the window (Live Simulation).
