@@ -1821,12 +1821,13 @@ def scenario_pass(store):
             real = {c["type_id"]: c for c in json.load(f)}
         for c in store["shapes/equipment_catalog.json"]:
             r = real.get(c["type_id"])
-            same = r is not None and all(r[k] == c[k] for k in ("category", "power_model", "default_importance")) \
-                and set(r["params"]) == set(c["params"]) and set(r["default_limits"]) == set(c["default_limits"])
+            # default_importance is an owner default (every type flexible since 2026-10-25), not a shape
+            same = r is not None and all(r[k] == c[k] for k in ("category", "power_model")) \
+                and set(r["params"]) == set(c["params"])
             if not same:
                 fail("shapes/equipment_catalog.json",
-                     f"{c['type_id']}: not in backend/data/equipment_catalog.json with the same category, power_model, "
-                     "default_importance and params / default_limits keys")
+                     f"{c['type_id']}: not in backend/data/equipment_catalog.json with the same category, power_model "
+                     "and params keys")
     if catalog["hvac"]["rated_kw"] != 8.0:
         fail("catalog", "hvac rated_kw 8.0")
     roster = []
