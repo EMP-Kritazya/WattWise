@@ -26,7 +26,7 @@
  │ ┌────▼──────── ENGINE (no I/O) ─────────────────────────────────────────┐    │       │   [Kritazya]
  │ │ meter → forecaster(+context) → decider (replans every 5 sim min)      │    │       │
  │ │ → escalation (when no in-preference move holds the cap) → commands    │    │       │
- │ │ rules · ledger · compare_lanes · replay/backtest   (internals: TBD)   │    │       │
+ │ │ rules · ledger · compare_lanes · replay/backtest  (design/ENGINE.md)  │    │       │
  │ └───────────────────────────────────────────────────────────────────────┘    │       │
  │ LIVE client ── HTTP reducers ───────────────────────────────────────────────┼───────┴──▶ SpacetimeDB  [Kritazya]
  │ STORE + DEVICE BRIDGE ──────────────────────────────────────────────────────┼──────────▶ Convex       [Suyog]
@@ -102,17 +102,20 @@ multiplier) also go to the simulation inside `sim_tick.inputs`. Claude classifie
 Every agent message is logged → SpacetimeDB `live_agent_log`.
 
 **3. Escalation (judgment).** Engine finds a block over the cap with no move inside the owner's limits and preferences →
-Escalation with 2–3 evaluated alternatives + `ask_owner`, engine numbers for each, `within_authority`, a safe default →
-runtime asks Claude (context + preferences + options) → Claude returns an id → `resolve_escalation(...)` → engine validates:
-inside authority → its Commands go out with the next tick; outside → owner Proposal. No answer by the deadline → default.
-Demo mode pauses the clock while waiting.
+Escalation with 2–3 evaluated, harm-ranked alternatives + `ask_owner`, engine numbers for each, `within_authority` → the engine
+applies the safe fallback (best-ranked option within authority) **at once** → runtime asks Claude (context + preferences + ranked
+options) asynchronously → Claude returns an id → `resolve_escalation(...)` → engine revalidates on the latest state: within
+authority and in time → it switches with the next tick; outside → owner Proposal. No answer by the deadline → the fallback stays.
+The clock keeps running at its speed throughout.
 
 **4. Owner (control).** Dashboard REST or ASI:One chat → answers from engine tools → any change is a Proposal → owner confirms →
 code applies via the facade. Manual device clicks → `owner_command()` → Command in the next `sim_tick`.
 
 **5. Build.** `POST /api/kitchen` → runtime builds both engine lanes → sends `sim_build` (config, devices, seed, start time) to the
 sim host → the simulation creates both kitchens → `reset_all` + first publish to SpacetimeDB → play.
-Forecaster warm-up history: **TBD (Kritazya, engine decision)**.
+Before the first tick each engine lane gets `warm_up(history)`: 4 weeks of per-device 15-min blocks built from NREL ComStock
+(scaled to the kitchen, label `calibrated_model`), so the forecast, the `minimize` target and month-to-date start realistic
+(DATA_AND_PROOF.md, "Real data in the live product").
 
 ## Hub swap (simulated hub → real ESP32)
 The engine only sees HubReports and emits Commands. `HARDWARE=esp32`: the runtime forwards the `with` lane's Commands for mapped
@@ -122,16 +125,23 @@ through the same Convex functions, proving the drop-in without hardware. Every d
 
 ## Time
 The runtime owns the clock: `sim_tick` every `0.5 s × 120 / speed` (speeds 1×, 30×, 120× default, 600×). The engine and the
-simulation have no clock of their own. Paused while the hub is missing, and in demo mode while an escalation or approval waits.
+simulation have no clock of their own. Paused while the hub is missing, or manually (presenter / owner); never for an escalation or approval.
 Escalation deadlines are in sim time; Claude's timeout is in real time. Backtest runs in Python at full speed without the browser.
 
-**Claude at 120×.** At 120× one real second is two sim minutes, so an 8 s Claude call would cost 16 sim minutes. Three guards:
-1. **Escalate early.** The engine forecasts 2 h ahead and opens an escalation as soon as a block ≥ 30 sim min ahead looks
-   unfixable, so the decision is needed well before the block starts (deadline = block start − 5 sim min).
-2. **Slow the clock while Claude thinks.** Outside demo mode the runtime drops the clock to `ESCALATION_SPEED` (default 1×, real
-   time) while an escalation is open (`slowed_reason: escalation`), then restores the owner's speed. In demo mode it pauses, as before.
-3. **Never wait past the deadline.** Claude timeout 8 real s; the engine keeps making routine moves meanwhile; at the deadline the
-   safe default applies. In real deployment the clock is 1× anyway, so this only matters for the sped-up simulation.
+**Days.** Cold start = build both lanes and `warm_up` them with 4 weeks of history in one call (no ticks), then run
+`run_days` service days (KitchenConfig). Each day ticks at `speed` from open (day 1: `start_sim_ts`) to close; the closed hours are
+ticked too, back to back at max speed (`phase: overnight`, `sim_tick.fast_forward: true`, `inputs.is_open: false`), so always-on
+loads keep drawing and are billed. After the last day's close the clock stops (`paused_reason: run_complete`); the owner presses
+**Continue +1 day** (`next_day`). A year is never run live: the backtest covers it (DATA_AND_PROOF.md).
+
+**Claude at 120×.** At 120× one real second is two sim minutes, so an 8 s Claude call costs 16 sim minutes. The clock is never
+slowed for it; instead:
+1. **Escalate within 30 minutes of the risk.** The engine opens an escalation when a block starting in the next 30 sim min is
+   still over the target after every in-rules move (deadline = `max(ts + 5, min(ts + 15, block start − 5))` sim min).
+2. **Act first, ask second.** The engine applies the best safe option within the owner's authority the moment the escalation
+   opens; Claude's answer can only switch it, after the engine revalidates it on the latest state (safe, authorized, in time).
+3. **Never wait.** Claude timeout 8 real s; on timeout the fallback simply continues. Manual pause/resume exists for judges and
+   presenters; it is a runtime control the engine and the backtest never see.
 
 ## Deploy
 Azure Container Apps: `backend` (API + runtime + engine, min = max = 1 replica) and `agents` (uAgents, 1 replica, always on).

@@ -8,7 +8,7 @@ First inspect `ENGINE.md`, `CONTRACTS.md`, `KRITAZYA.md`, `DEMO.md`, equipment c
 
 ## 1. Document purpose and scope
 
-Start `EVAL.md` with a one-paragraph executive summary and a concise definition: an *eval* is a reproducible test protocol (scenarios + strategies + metrics + assertions + analysis), not merely a graph. Distinguish:
+Start `EVAL.md` with a one-paragraph executive summary and a concise definition: an _eval_ is a reproducible test protocol (scenarios + strategies + metrics + assertions + analysis), not merely a graph. Distinguish:
 
 1. **Deterministic engine correctness tests** (hand-computed unit/contract tests, safety invariants).
 2. **Closed-loop policy benchmarks** (baseline vs optimizer across the same exogenous scenario, with commands changing appliance states).
@@ -119,7 +119,7 @@ Design a compact **Evaluation Lab** view for a judge with ~2 minutes:
 3. Show a **cost-versus-comfort scatter plot** with failed policies visually distinguished.
 4. Show 15-minute demand line chart with cap and baseline vs optimized.
 5. Show cost breakdown (energy vs demand) and concise constraint pass/fail scorecard.
-6. Allow viewing one real trace/decision explanation, with clearly labeled *simulated* values and provenance.
+6. Allow viewing one real trace/decision explanation, with clearly labeled _simulated_ values and provenance.
 
 Define the JSON response shape and frontend data flow for precomputed eval artifacts vs on-demand evaluation, without creating new public APIs unless necessary; if proposing an endpoint, mark it `PROPOSED` and document it for contract review. Explain how to prevent judges from mistaking illustrative charts for real evaluation output. Provide a 20–30 second pitch script and a truthful sample caption.
 

@@ -16,7 +16,10 @@ SpacetimeDB is what ticks: every viewer and judge sees and plays in the same kit
 6. **Generated bindings only** (`spacetime generate`), never hand-edited.
 7. **Design for the screens' queries:** keys and indexes by lane and time, newest first.
 8. **Fallback exists.** `LIVE_TRANSPORT=ws` sends the same messages over FastAPI `/ws`; the UI hook switches automatically.
-9. **The UI's only live source.** Every screen in every tab (sim host included) draws from these tables: kitchen floor from
+9. **Month to date lives here too.** For now everything runs in simulation (no physical ESP32), and the `live_tick` row per lane
+   is the month-to-date store (month peaks, energy and cost so far). On a rebuild in the same month the runtime reads it back and
+   passes it to the engine as `WarmUpHistory.month_to_date`; otherwise month-to-date comes from the ComStock warm-up.
+10. **The UI's only live source.** Every screen in every tab (sim host included) draws from these tables: kitchen floor from
    `live_device` (state, power, physical gauges), energy and cost from `live_tick`, charts from `tick_history`. The browser
    simulation never writes here; it reports to FastAPI over `/ws/hub` and the runtime publishes.
 
@@ -27,7 +30,7 @@ CONTRACTS.md section 5 (`live_tick`, `tick_history`, `live_device`, `live_compar
 
 ## Python client (`backend/live/spacetime_client.py`)
 - Calls reducers over HTTP: `POST /v1/database/<db>/call/<reducer>` with a JSON array of arguments and the runtime identity's
-  bearer token. Verify against the installed SpacetimeDB version in Phase 1 (first task) and record it in DECISIONS.md.
+  bearer token. Verify against the installed SpacetimeDB version in Phase 1 (first task) and record the result here.
 - Reads new surge requests through the SQL endpoint each tick.
 - Never blocks the run loop: a bounded queue keeps the latest tick (drop older ticks), never drops feed, escalations or agent log.
 - `fakes/fake_live.py` + `spacetime/seed.ts` write plausible rows so the frontend can build before the runtime exists.

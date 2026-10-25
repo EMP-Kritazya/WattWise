@@ -43,13 +43,11 @@ SpacetimeDB, Convex, Microsoft Azure.
 
 | File                                                                                                                                                       | When                                                                                    |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `docs/team/<you>.md`                                                                                                                                       | Every session: your branch, scope, phase tasks, gates                                   |
+| `docs/team/<you>.md`                                                                                                                                       | Every session: your branch, scope, phase tasks, checks                                  |
 | `docs/PRINCIPLES.md`                                                                                                                                       | Once, then whenever in doubt                                                            |
 | `docs/ARCHITECTURE.md`                                                                                                                                     | Every session                                                                           |
 | `docs/CONTRACTS.md`                                                                                                                                        | Before touching any shared shape, endpoint, table, facade method, tool or agent message |
 | `docs/design/ENGINE.md` · `SIMULATION.md` · `API.md` · `AGENTS.md` · `SPACETIMEDB.md` · `CONVEX_AND_ESP32.md` · `UI.md` · `DATA_AND_PROOF.md` · `AZURE.md` | When working in that area                                                               |
-| `docs/TIMELINE.md`                                                                                                                                         | Phases, clock times, gates, merge order                                                 |
-| `docs/DECISIONS.md`                                                                                                                                        | Before reversing any design choice                                                      |
 | `Main_Gaps.md`                                                                                                                                             | Open design points: the demo decision in force and what's still to design (Kritazya)   |
 | `docs/DEMO.md`                                                                                                                                             | Demo mode, pitch, video                                                                 |
 
@@ -108,7 +106,7 @@ The engine imports nothing from api/, runtime/, agent/, store/, live/. In `front
 
 ## Branches
 
-Work on your own branch (`kritazya`, `suyog`, `ashirwad`). Merge to `main` only at gates (`docs/TIMELINE.md`) through a PR
+Work on your own branch (`kritazya`, `suyog`, `ashirwad`). Merge to `main` only at integration points, through a PR
 reviewed by `architecture-reviewer`. Never edit another person's folders on your branch; ask them.
 
 ## Stack
@@ -129,7 +127,7 @@ Azure Container Apps (exactly one replica per app) + Static Web Apps. Generated 
 
 ## Subagents (`.claude/agents/`) — at checkpoints; they share your usage limit
 
-`architecture-reviewer` (before every merge) · `contract-sync` (any shared shape change) · `engine-math-verifier` (engine or simulation change) ·
+`architecture-reviewer` (before every merge) · `contract-sync` (any shared shape change) · `engine-test-author` (before each engine module: hand-computed failing tests) · `engine-math-verifier` (engine or simulation change) ·
 `backtest-auditor` (before any savings number is shown) · `fetch-compliance` (before submission) · `demo-readiness` (from feature freeze) ·
 `fixture-builder` (Phase 1, and after every `contract-sync`: regenerates `contracts/fixtures/`).
 
