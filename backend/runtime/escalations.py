@@ -1,24 +1,14 @@
-"""Escalations: Claude resolves the engine's escalations, inside the owner's authority (API.md "Escalations",
-ARCHITECTURE.md flow 3 + "Claude at 120×").
+"""Asynchronous handling for engine-owned escalations.
 
-1. The run loop hands every new open escalation to `opened()`: it is published (`publish_escalation`, plus an
-   `escalation` message on `/ws` when the live transport is not `/ws` already) and queued for Claude.
-2. The council (agents/council.py): the Concierge asks Weather, Grid and Events about the escalation's window and posts
-   the replies to `POST /api/context`. Before calling Claude this task waits up to COUNCIL_WAIT_S real s for a context
-   post that arrived after the escalation opened (counted by post, not by `ts`: in demo mode the paused clock stamps the
-   same sim minute). Claude then gets the freshest context and the parts posted since (`council`). Only this task waits;
-   the tick never does, and the 8 s Claude timeout and the engine's default at the deadline still hold.
-3. One Claude call at a time (`ClaudeAgent.decide_escalation`: options with engine numbers, context, preferences and
-   authority; `choose_escalation_option` enum-constrained to the offered ids; 8 real s timeout). The tool calls
-   `resolve_escalation(..., "claude", rationale)`; outside the authority the engine answers `awaiting_owner` and the tool
-   makes the owner Proposal. No choice (Claude off, timeout, error) → nothing is done: the engine applies its default at
-   the deadline. More than MAX_WAITING queued → the oldest is left to that default.
-4. Every resolve (Claude's tool, the owner's `POST /api/escalations/{id}/resolve`, a confirmed proposal) reaches
-   `changed()` through the service, from any thread, and is published. The service stores final states.
-5. `after_tick()`: an escalation still open or awaiting the owner at its deadline has expired to the engine's default;
-   its final state is stored and published.
-6. `DEMO_MODE=1`: the clock pauses (`paused_reason: "escalation"`) while the council and Claude decide, and resumes after.
-The tick never waits on any of this. The clock slowdown (`ESCALATION_SPEED`) is not built: open question Q1.
+The engine applies an escalation fallback in the same ``step`` that opens it and
+emits the full escalation again whenever it changes. This module only mirrors
+that state to the live transport and, once per escalation id, asks Claude to
+choose one already-evaluated option. It never changes the clock, applies a
+fallback, or manufactures an expiry transition.
+
+Council context may wait for ``COUNCIL_WAIT_S`` real seconds, but that wait is
+contained in the escalation task. A simulation tick only calls :meth:`opened`
+and continues immediately.
 """
 
 from __future__ import annotations
@@ -29,204 +19,273 @@ import logging
 from collections import deque
 from typing import Any, Callable
 
-from agent.templates import explain_escalation
 from runtime.live_port import LivePublisher, WsLive
 
-MAX_WAITING = 3  # escalations queued for Claude; older ones keep the engine's default
-WAITING_STATUSES = ("open", "awaiting_owner")
-FINAL_STATUSES = ("resolved", "expired_default")
-COUNCIL_PARTS = ("weather", "prices", "events")  # Context parts the council agents answer with
-MAX_CONTEXT_POSTS = 50  # recent posts remembered to tell Claude which parts came after an escalation opened
+ACTIVE_STATUSES = ("open", "awaiting_owner")
+TERMINAL_STATUSES = ("resolved", "expired_default", "obsolete")
+COUNCIL_PARTS = ("weather", "prices", "events")
+MAX_CONTEXT_POSTS = 50
 
 log = logging.getLogger("runtime.escalations")
 
 
 class Escalations:
-    def __init__(self, *, service: Any, live: LivePublisher, clock: Callable[[], str],
-                 on_pause: Callable[[], None], publish_ws: Callable[[dict], None] | None = None,
-                 demo_mode: bool = False, council_wait_s: float = 0.0):
-        self._service = service  # api.service.KitchenService
-        self._live = live
-        self._clock = clock  # current sim time (RunLoop.sim_ts)
-        self._on_pause = on_pause  # the pause changed: publish the clock, wake the loop
-        self._publish_ws = publish_ws  # one /ws message (Broadcaster.send_soon)
-        self.demo_mode = demo_mode
-        self.council_wait_s = council_wait_s  # real s to wait for the council's context before calling Claude
-        self.agent: Any = None  # agent.claude_agent.ClaudeAgent; None or disabled = Claude off
-        self._tracked: dict[str, dict] = {}  # escalation_id → latest state, while open / awaiting_owner
-        self._waiting: deque[dict] = deque()
-        self._deciding: str | None = None
-        self._worker: asyncio.Task | None = None
-        self._loop: asyncio.AbstractEventLoop | None = None
-        self._context_seq = 0  # POST /api/context count
-        self._context_posts: deque[tuple[int, list[str]]] = deque(maxlen=MAX_CONTEXT_POSTS)  # (seq, parts posted)
-        self._context_changed: asyncio.Event | None = None
-        self._opened_seq: dict[str, int] = {}  # escalation_id → context posts seen when it opened
+    """Mirror engine escalations and run at most one Claude task per id."""
 
-    @property
-    def paused_reason(self) -> str | None:
-        return "escalation" if self.demo_mode and self._deciding is not None else None
+    def __init__(self, *, service: Any, live: LivePublisher, clock: Callable[[], str],
+                 publish_ws: Callable[[dict], None] | None = None, council_wait_s: float = 0.0):
+        self._service = service
+        self._live = live
+        # Kept in the constructor for the RunLoop seam. Escalation handling does
+        # not read sim time: the engine owns deadlines and terminal transitions.
+        del clock
+        self._publish_ws = publish_ws
+        self.council_wait_s = council_wait_s
+        self.agent: Any = None
+
+        self._tracked: dict[str, dict] = {}
+        self._seen_active: set[str] = set()
+        self._tasks: dict[str, asyncio.Task[None]] = {}
+        self._loop: asyncio.AbstractEventLoop | None = None
+
+        self._context_seq = 0
+        self._context_posts: deque[tuple[int, list[str]]] = deque(maxlen=MAX_CONTEXT_POSTS)
+        self._context_event: asyncio.Event | None = None
+        self._opened_seq: dict[str, int] = {}
 
     def tracked(self) -> list[dict]:
-        return [copy.deepcopy(e) for e in self._tracked.values()]
+        return [copy.deepcopy(escalation) for escalation in self._tracked.values()]
 
-    # ------------------------------------------------------------ engine → runtime
+    # ------------------------------------------------------------ engine -> runtime
 
     def opened(self, escalation: dict) -> None:
-        """A TickState's new escalation (event loop). Published at once; Claude decides in the background."""
+        """Accept one ``TickState.new_escalations`` item.
+
+        ``new_escalations`` contains an open state *and* later updates to that
+        same id. Every item is therefore an upsert/publish event; only its
+        first active appearance is eligible to start Claude work.
+        """
         self._bind_loop()
-        if escalation["status"] in WAITING_STATUSES:
-            self._tracked[escalation["escalation_id"]] = copy.deepcopy(escalation)
-        self._publish(escalation)
-        if escalation["status"] != "open":
-            return
-        self._opened_seq[escalation["escalation_id"]] = self._context_seq
-        if self.agent is None or not self.agent.enabled:
-            log.info("Claude is off; %s waits for the owner or the engine's default at %s",
-                     escalation["escalation_id"], escalation["deadline_sim_ts"])
-            return
-        self._waiting.append(copy.deepcopy(escalation))
-        while len(self._waiting) > MAX_WAITING:
-            dropped = self._waiting.popleft()
-            log.warning("escalation queue full; %s is left to the engine's default", dropped["escalation_id"])
-        if self._worker is None or self._worker.done():
-            self._worker = asyncio.get_running_loop().create_task(self._work(), name="escalations")
+        self._observe(copy.deepcopy(escalation), ask_if_first_active=True)
 
     def changed(self, escalation: dict) -> None:
-        """The service resolved an escalation (Claude, owner or a confirmed proposal). Any thread."""
+        """Accept an owner/Claude resolution from the service, from any thread."""
+        state = copy.deepcopy(escalation)
         try:
             asyncio.get_running_loop()
-        except RuntimeError:  # a worker thread (REST threadpool, agent tool)
+        except RuntimeError:
             if self._loop is None or self._loop.is_closed():
-                log.warning("no event loop; %s is not published", escalation["escalation_id"])
+                log.warning("no event loop; %s was not published", state.get("escalation_id"))
                 return
-            self._loop.call_soon_threadsafe(self._changed, copy.deepcopy(escalation))
+            self._loop.call_soon_threadsafe(self._observe, state, False)
             return
-        self._changed(copy.deepcopy(escalation))
-
-    def context_posted(self, parts: list[str]) -> None:
-        """`POST /api/context` was merged (event loop): wake an escalation waiting for its council."""
-        self._context_seq += 1
-        self._context_posts.append((self._context_seq, list(parts)))
-        if self._context_changed is not None:
-            self._context_changed.set()
+        self._observe(state, False)
 
     def after_tick(self) -> None:
-        """Past its deadline the engine has applied its default: store and publish the final state."""
-        now = self._clock()
-        for escalation in [e for e in self._tracked.values() if e["deadline_sim_ts"] <= now]:
-            try:
-                final = self._service.expire_escalation(escalation)
-            except Exception:
-                log.exception("expiring %s failed", escalation["escalation_id"])
-                continue
-            self._changed(final)
+        """Compatibility hook for ``RunLoop``.
+
+        The engine emits ``expired_default`` and ``obsolete`` in
+        ``new_escalations``. The runtime must not synthesize either state or
+        invoke a facade method to do so.
+        """
+
+    def context_posted(self, parts: list[str]) -> None:
+        """Wake council waits after ``POST /api/context`` merges a fresh part."""
+        self._context_seq += 1
+        self._context_posts.append((self._context_seq, list(parts)))
+        if self._context_event is not None:
+            self._context_event.set()
 
     # ------------------------------------------------------------ owner
 
     async def resolve_by_owner(self, escalation_id: str, option_id: str) -> dict:
-        """`POST /api/escalations/{id}/resolve`: the owner may pick any generated option."""
+        """Owner overrides remain available until the engine closes the block."""
         self._bind_loop()
-        return await asyncio.to_thread(self._service.resolve_escalation, escalation_id, {"option_id": option_id},
-                                       "owner", None)
+        return await asyncio.to_thread(
+            self._service.resolve_escalation, escalation_id, {"option_id": option_id}, "owner", None
+        )
 
     # ------------------------------------------------------------ Claude
 
-    async def _work(self) -> None:
-        while self._waiting:
-            escalation = self._waiting.popleft()
-            if self._still_open(escalation["escalation_id"]):
-                await self._decide(escalation)
-
-    def _still_open(self, escalation_id: str) -> bool:
-        current = self._tracked.get(escalation_id)
-        return current is not None and current["status"] == "open" and self._clock() < current["deadline_sim_ts"]
-
-    async def _await_council(self, escalation_id: str) -> list[str]:
-        """Wait up to `council_wait_s` for a context post after the escalation opened; the council parts posted since."""
-        since = self._opened_seq.pop(escalation_id, self._context_seq)
-        loop = asyncio.get_running_loop()
-        give_up = loop.time() + self.council_wait_s
-        while self._context_seq <= since and (remaining := give_up - loop.time()) > 0:
-            self._context_changed = asyncio.Event()
-            try:
-                await asyncio.wait_for(self._context_changed.wait(), remaining)
-            except asyncio.TimeoutError:
-                break
-            finally:
-                self._context_changed = None
-        posted = {part for seq, parts in self._context_posts if seq > since for part in parts}
-        if not posted:
-            log.info("no council context for %s; Claude decides on the last known", escalation_id)
-        return [part for part in COUNCIL_PARTS if part in posted]
-
-    async def _decide(self, escalation: dict) -> None:
+    def _observe(self, escalation: dict, ask_if_first_active: bool) -> None:
         escalation_id = escalation["escalation_id"]
-        self._set_deciding(escalation_id)
-        try:
-            council = await self._await_council(escalation_id)
-            if not self._still_open(escalation_id):  # the owner chose, or the deadline passed, while the council met
-                return
-            chosen = await self.agent.decide_escalation(escalation, council=council)
-        except Exception:
-            log.exception("Claude failed on %s", escalation["escalation_id"])
-            chosen = None
-        finally:
-            self._set_deciding(None)
-        if chosen is None:
-            log.info("no choice for %s; the engine's default applies at %s", escalation["escalation_id"],
-                     escalation["deadline_sim_ts"])
+        status = escalation["status"]
 
-    def _set_deciding(self, escalation_id: str | None) -> None:
-        before = self.paused_reason
-        self._deciding = escalation_id
-        if self.paused_reason != before:
-            self._on_pause()
-
-    async def idle(self) -> None:
-        """Wait until Claude has answered every queued escalation (tests)."""
-        while self._worker is not None and not self._worker.done():
-            await asyncio.shield(self._worker)
-        await asyncio.sleep(0)  # resolves reported from the tool's thread run next
-
-    # ------------------------------------------------------------ state + publish
-
-    def _changed(self, escalation: dict) -> None:
-        escalation_id, status = escalation["escalation_id"], escalation["status"]
-        if status in WAITING_STATUSES:
+        if status in ACTIVE_STATUSES:
             self._tracked[escalation_id] = escalation
         else:
             self._tracked.pop(escalation_id, None)
-        if status in FINAL_STATUSES or status == "awaiting_owner":
-            option = next((o for o in escalation["options"] if o["option_id"] == escalation["chosen_option_id"]), None)
-            log.info("%s %s: %s", escalation_id, status,
-                     escalation.get("rationale") or explain_escalation(escalation, option))
+
+        if status in TERMINAL_STATUSES:
+            self._cancel_task(escalation_id)
+            self._record_terminal(escalation)
+        elif status == "awaiting_owner":
+            # This should be impossible under the authority-filtered tool enum.
+            # Preserve the engine's active fallback and leave an explicit owner
+            # override route available, but never create an escalation Proposal.
+            log.warning("%s returned awaiting_owner; keeping the engine fallback and creating no Proposal", escalation_id)
+        elif status not in ACTIVE_STATUSES:
+            log.warning("%s has unknown escalation status %r", escalation_id, status)
+
         self._publish(escalation)
+
+        if not ask_if_first_active or status not in ACTIVE_STATUSES:
+            return
+        if escalation_id in self._seen_active:
+            return
+        self._seen_active.add(escalation_id)
+
+        if status != "open":
+            # An unexpected legacy state is not a new request to Claude.
+            return
+        if not self._can_ask_claude(escalation):
+            return
+        self._opened_seq[escalation_id] = self._context_seq
+        self._start_task(escalation_id)
+
+    def _can_ask_claude(self, escalation: dict) -> bool:
+        authority = self._authority()
+        if not authority or not authority.get("enabled", False):
+            log.info("Claude is not authorized for %s; the engine fallback remains active", escalation["escalation_id"])
+            return False
+        if not self._eligible_option_ids(escalation):
+            log.info("%s has no authority-eligible option for Claude; the engine fallback remains active",
+                     escalation["escalation_id"])
+            return False
+        if self.agent is None or not getattr(self.agent, "enabled", False):
+            log.info("Claude is off for %s; the engine fallback remains active", escalation["escalation_id"])
+            return False
+        return True
+
+    def _authority(self) -> dict | None:
+        """Read the owner authority from the current engine snapshot.
+
+        ``set_authority`` changes only the with-lane facade state.  The
+        build-time ``Lanes.config`` is intentionally retained for clock
+        configuration, but is not authoritative for a later escalation.
+        """
+        try:
+            get_kitchen = getattr(self._service, "get_kitchen", None)
+            if callable(get_kitchen):
+                config = get_kitchen()["config"]
+            else:  # Narrow test doubles expose only the lanes' initial config.
+                config = getattr(getattr(self._service, "lanes", None), "config", None)
+        except Exception:
+            log.exception("could not read Claude authority; leaving the engine fallback active")
+            return None
+        authority = config.get("authority") if isinstance(config, dict) else None
+        return authority if isinstance(authority, dict) else None
+
+    @staticmethod
+    def _eligible_option_ids(escalation: dict) -> tuple[str, ...]:
+        return tuple(
+            option["option_id"]
+            for option in escalation.get("options", ())
+            if option.get("option_id") != "ask_owner" and option.get("within_authority") is True
+        )
+
+    def _start_task(self, escalation_id: str) -> None:
+        task = asyncio.get_running_loop().create_task(self._decide(escalation_id), name=f"escalation:{escalation_id}")
+        self._tasks[escalation_id] = task
+
+        def forget(done: asyncio.Task[None], *, key: str = escalation_id) -> None:
+            if self._tasks.get(key) is done:
+                self._tasks.pop(key, None)
+            self._opened_seq.pop(key, None)
+
+        task.add_done_callback(forget)
+
+    def _cancel_task(self, escalation_id: str) -> None:
+        task = self._tasks.pop(escalation_id, None)
+        self._opened_seq.pop(escalation_id, None)
+        if task is not None and not task.done():
+            task.cancel()
+
+    async def _decide(self, escalation_id: str) -> None:
+        try:
+            council = await self._await_council(escalation_id)
+            current = self._tracked.get(escalation_id)
+            if current is None or current.get("status") != "open":
+                return
+            # A later engine update can change authority markings/options while
+            # the council waits. Do not let a stale invitation reach Claude.
+            if not self._can_ask_claude(current):
+                return
+            await self.agent.decide_escalation(copy.deepcopy(current), council=council)
+        except asyncio.CancelledError:
+            log.info("Claude task for %s cancelled after the engine closed it", escalation_id)
+            raise
+        except Exception:
+            log.exception("Claude failed on %s; the engine fallback remains active", escalation_id)
+
+    async def _await_council(self, escalation_id: str) -> list[str]:
+        """Wait only inside this background task for fresh council context."""
+        since = self._opened_seq.get(escalation_id, self._context_seq)
+        if self.council_wait_s > 0:
+            loop = asyncio.get_running_loop()
+            deadline = loop.time() + self.council_wait_s
+            while self._context_seq <= since:
+                remaining = deadline - loop.time()
+                if remaining <= 0:
+                    break
+                event = self._context_event
+                if event is None:  # ``opened`` creates it; retain this for defensive callers.
+                    event = self._context_event = asyncio.Event()
+                event.clear()
+                if self._context_seq > since:
+                    break
+                try:
+                    await asyncio.wait_for(event.wait(), remaining)
+                except asyncio.TimeoutError:
+                    break
+        posted = {part for seq, parts in self._context_posts if seq > since for part in parts}
+        if not posted:
+            log.info("no fresh council context for %s; Claude uses the latest known context", escalation_id)
+        return [part for part in COUNCIL_PARTS if part in posted]
+
+    async def idle(self) -> None:
+        """Wait for currently scheduled Claude work (tests and controlled shutdown)."""
+        while self._tasks:
+            tasks = list(self._tasks.values())
+            await asyncio.gather(*(asyncio.shield(task) for task in tasks), return_exceptions=True)
+            await asyncio.sleep(0)
+
+    # ------------------------------------------------------------ state + publish
+
+    def _record_terminal(self, escalation: dict) -> None:
+        """Persist engine-emitted final states; the store upserts by escalation id."""
+        try:
+            self._service.store.record_escalation(copy.deepcopy(escalation))
+        except Exception:
+            log.exception("could not persist terminal escalation %s", escalation["escalation_id"])
 
     def _publish(self, escalation: dict) -> None:
         self._live.send("publish_escalation", copy.deepcopy(escalation))
-        # Escalations are also /ws messages whatever the live transport (CONTRACTS.md §2); WsLive has sent it already.
+        # WsLive already broadcasts this call. A second broadcaster is needed
+        # only when the live transport is SpacetimeDB.
         if self._publish_ws is not None and not isinstance(self._live.port, WsLive):
             self._publish_ws({"type": "escalation", "data": copy.deepcopy(escalation)})
 
     def _bind_loop(self) -> None:
         self._loop = asyncio.get_running_loop()
+        if self._context_event is None:
+            self._context_event = asyncio.Event()
 
     def reset(self) -> None:
-        """New kitchen: forget every escalation; a Claude call in flight is cancelled."""
-        if self._worker is not None:
-            self._worker.cancel()
-            self._worker = None
-        self._waiting.clear()
-        self._tracked = {}
-        self._opened_seq = {}
-        self._set_deciding(None)
+        """Forget a previous kitchen and cancel all of its background work."""
+        for task in list(self._tasks.values()):
+            task.cancel()
+        self._tasks.clear()
+        self._tracked.clear()
+        self._seen_active.clear()
+        self._opened_seq.clear()
+        self._context_posts.clear()
+        self._context_seq = 0
 
     async def stop(self) -> None:
-        if self._worker is not None:
-            self._worker.cancel()
-            try:
-                await self._worker
-            except (asyncio.CancelledError, Exception):
-                pass
-            self._worker = None
+        tasks = list(self._tasks.values())
+        for task in tasks:
+            task.cancel()
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        self._tasks.clear()

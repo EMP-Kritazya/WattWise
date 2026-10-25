@@ -42,7 +42,7 @@ class Settings:
     anthropic_api_key: str | None = field(default=None, repr=False)  # None → Claude off (ASI:One, then templates)
     asi1_model: str | None = None  # None → agent/llm.py ASI1_DEFAULT_MODEL ("asi1")
     asi1_api_key: str | None = field(default=None, repr=False)  # None → no ASI:One fallback for chat / explanations
-    demo_mode: bool = False  # DEMO_MODE=1: the clock pauses while Claude decides an escalation
+    demo_mode: bool = False  # DEMO_MODE=1: recorded context, the identical run every time (never pauses the clock)
     council_wait_s: float = 0.0  # COUNCIL_WAIT_S (default 5 from the env, 0 in tests): wait for the council's context
     fixtures_dir: Path = field(default_factory=lambda: REPO_ROOT / "contracts" / "fixtures")
 

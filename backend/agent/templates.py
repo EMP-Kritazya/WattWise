@@ -13,6 +13,13 @@ CHAT_FAILED = "Sorry, I couldn't finish that answer. Please try again in a momen
 def explain_decision(decision: dict, device_name: str) -> str:
     effect = decision["effect"]
     peaks = f"({effect['peak_before_kw']:.1f} → {effect['peak_after_kw']:.1f} kW)"
+    if decision["reason_code"] == "escalation_fallback":
+        action = decision["action"]
+        if action == "delay":
+            return f"The engine applied its escalation fallback: delayed {device_name} {decision['value']:.0f} min {peaks}."
+        if action == "reduce":
+            return f"The engine applied its escalation fallback: reduced {device_name} to {decision['value']:.0f} % {peaks}."
+        return f"The engine applied its escalation fallback for {device_name} {peaks}."
     if decision["reason_code"] == "escalation_choice":
         return f"Delayed {device_name} {decision['value']:.0f} min (escalation option chosen) {peaks}."
     if decision["action"] == "delay":
@@ -23,15 +30,16 @@ def explain_decision(decision: dict, device_name: str) -> str:
 
 
 def explain_escalation(escalation: dict, option: dict | None) -> str:
-    """How an escalation ended, when there is no Claude rationale. Quotes the engine's option summary."""
+    """A factual escalation report when there is no generated explanation."""
     summary = option["summary"] if option else escalation["chosen_option_id"]
-    if escalation["status"] == "awaiting_owner":
-        return f"Claude suggests: {summary}. It is outside Claude's authority, so it waits for the owner."
     if escalation["resolved_by"] == "claude":
-        return f"Claude chose: {summary}."
+        rationale = escalation.get("rationale")
+        if rationale:
+            return f"Claude chose {summary} because {rationale.rstrip('.')} .".replace(" .", ".")
+        return f"Claude chose {summary}."
     if escalation["resolved_by"] == "owner":
         return f"The owner chose: {summary}."
-    return f"No choice before the deadline, so the engine's default applies: {summary}."
+    return f"The engine's escalation fallback is active: {summary}."
 
 
 def chat_reply(meter: dict | None) -> str:

@@ -10,9 +10,10 @@ goes to `on_status(paused_reason)`:
 - no report within `report_timeout_s` (2 real s) → "hub_waiting" (tick keeps waiting),
 - host socket closed → "sim_host_offline", plus a `/ws` `warning` message `{ last_tick_id }` to `on_warning`,
 - the report arrives, or a host is accepted → None.
-On every accepted hello the link re-sends `sim_build`, then replays every past `sim_tick` with `"replay": true` at full
-speed; the hub answers only the last one. If that tick is still pending, the answer completes it; otherwise it is a
-duplicate and is dropped, so the engine is never stepped twice for one tick. Ticks issued during the burst wait for it.
+On every accepted hello the link sends `hub_welcome.tick_id` = the last tick the server completed (its report arrived),
+re-sends `sim_build`, then replays every completed `sim_tick` with `"replay": true` at full speed; the hub answers only the
+replayed tick with that id. That answer is a duplicate and is dropped, so the engine is never stepped twice for one tick.
+A tick still pending (sent to the old host, never reported) and ticks issued during the burst are sent live after it.
 """
 
 from __future__ import annotations
@@ -88,6 +89,11 @@ class HubLink:
         """The last tick sent (or due) in this build; 0 before the first."""
         return self._history[-1]["tick_id"] if self._history else 0
 
+    @property
+    def completed_tick_id(self) -> int:
+        """The last tick the server completed in this build (its hub_report arrived); 0 before the first."""
+        return self.last_report_tick_id
+
     # ------------------------------------------------------------ runtime side
 
     async def send_build(
@@ -113,7 +119,8 @@ class HubLink:
             return await self._send(host, message)
 
     async def tick(
-        self, tick_id: int, sim_ts: str, surges: list[dict], inputs: dict, commands: list[dict], *, minutes: int = 1
+        self, tick_id: int, sim_ts: str, surges: list[dict], inputs: dict, commands: list[dict], *, minutes: int = 1,
+        fast_forward: bool = False,
     ) -> dict:
         """Send one `sim_tick` and return the matching `hub_report` message. Waits through hub_waiting and offline.
 
@@ -128,7 +135,7 @@ class HubLink:
                 raise ValueError(f"tick {tick_id} is not after tick {self.tick_id}")
             message = {
                 "type": "sim_tick", "tick_id": tick_id, "sim_ts": sim_ts, "minutes": minutes, "surges": list(surges),
-                "inputs": inputs, "commands": list(commands), "replay": False,
+                "inputs": inputs, "commands": list(commands), "replay": False, "fast_forward": fast_forward,
             }
             self._history.append(message)
             pending = self._pending = _Pending(tick_id, message, asyncio.get_running_loop().create_future())
@@ -170,7 +177,7 @@ class HubLink:
             host = await self._accept_host(websocket, hello)
             if host is None:
                 await websocket.send_text(json.dumps(
-                    {"type": "hub_welcome", "accepted": False, "reason": "host_taken", "tick_id": self.tick_id}
+                    {"type": "hub_welcome", "accepted": False, "reason": "host_taken", "tick_id": self.completed_tick_id}
                 ))
                 while True:  # stays a viewer: nothing it sends is used
                     await self._receive(websocket)
@@ -193,12 +200,17 @@ class HubLink:
             if self._host is not None:
                 return None
             host = self._host = _Host(websocket, hello.get("hub_id"))
-            await self._send(host, {"type": "hub_welcome", "accepted": True, "reason": None, "tick_id": self.tick_id})
+            completed = self.completed_tick_id
+            await self._send(host, {"type": "hub_welcome", "accepted": True, "reason": None, "tick_id": completed})
             if self._build is not None:
                 await self._send(host, self._build)
-                for message in self._history:
+                replayed = [m for m in self._history if m["tick_id"] <= completed]
+                for message in replayed:
                     await self._send_tick(host, {**message, "replay": True})
-                self._replay_until = self.tick_id if self._history else None
+                self._replay_until = completed if replayed else None
+                pending = self._pending
+                if self._replay_until is None and pending is not None and not pending.report.done():
+                    await self._send_tick(host, pending.message)  # nothing to replay: the pending tick goes out now
         log.info("sim host %s connected", host.hub_id)
         await self._emit(self._on_host, True)
         await self._set_status(None)

@@ -9,11 +9,11 @@ Interactive Card for the moments that matter; `cards.py`).
   `chat_delta` frames until its `chat_done`. A Proposal that turns up pending meanwhile gets a code-written
   "reply confirm" line and a proposal card.
 - Cards on a Claude reply (the text always carries the card's fallback): a Proposal pending from this chat → proposal
-  card; else a question about decisions / options while an escalation needs the owner → escalation card; else a forecast
+  card; else a question about decisions / options while an escalation is active → escalation report; else a forecast
   question → forecast card from the newest `with` tick's `forecast_kw` on `/ws` (no REST route to the forecast tool).
-- A card button press (selection JSON, or the planner's prose naming its ids) is matched here by code: an option →
-  `POST /api/escalations/{id}/resolve` (or, for the option Claude picked, confirming Claude's pending Proposal); a
-  proposal button → `POST /api/proposals/{id}/confirm`, as a typed "confirm" does. Unknown or stale → EXPIRED.
+- A card button press (selection JSON, or the planner's prose naming its ids) is matched here by code: an owner override
+  posts directly to `POST /api/escalations/{id}/resolve`; a proposal button posts to
+  `POST /api/proposals/{id}/confirm`, as a typed "confirm" does. Unknown or stale → EXPIRED.
 - `POST /api/chat` carries only `{message}`, so the last HISTORY_TURNS exchanges with this sender ride in the message
   text (STUB until the contract has a chat session id), letting "Undo that" or "Choose option 2" refer back.
 - Every hop is logged with `POST /api/agent-log`. Never raises: the API down, a timeout or an error status gives a short
@@ -27,6 +27,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from collections import deque
 from datetime import datetime, timezone
 from typing import Any
@@ -34,9 +35,8 @@ from typing import Any
 import httpx
 import websockets
 
-from cards import (APPROVE_PICK, ASK_LATER, CHOOSE_OPTION, CONFIRM_HINT, EXPIRED, PROPOSAL_CANCEL, PROPOSAL_CONFIRM,
-                   Card, Reply, Selection, escalation_card, forecast_card, numbered_options, parse_selection,
-                   proposal_card)
+from cards import (CHOOSE_OPTION, CONFIRM_HINT, EXPIRED, PROPOSAL_CANCEL, PROPOSAL_CONFIRM, Card, Reply, Selection,
+                   escalation_card, forecast_card, numbered_options, parse_selection, proposal_card)
 
 log = logging.getLogger("agents.owner_chat")
 
@@ -50,11 +50,16 @@ LOG_SUMMARY_CHARS = 80
 FORECAST_WAIT_S = 3.0  # after chat_done, how long to wait for a re-plan tick that carries forecast_kw
 ESCALATION_WORDS = ("decide", "decision", "escalat", "option", "choice")
 FORECAST_WORDS = ("forecast", "next 2 h", "next two hours", "next few hours", "coming hours")
+# The engine owns the final eligibility check.  A resolved/defaulted report can
+# still be overridden by the owner until its problem block ends, so the chat
+# must be able to find it rather than treating only ``open`` as selectable.
+OVERRIDE_STATUSES = ("open", "awaiting_owner", "resolved", "expired_default", "obsolete")
 
 API_DOWN = "I can't reach the kitchen right now. Please try again in a moment."
 TIMED_OUT = "Sorry, that took too long. Please ask again in a moment."
 NO_ANSWER = "Sorry, I couldn't get an answer just now. Please try again."
 NOTHING_PENDING = "Nothing is waiting for your confirmation right now."
+_CHOOSE_OPTION_RE = re.compile(r"\s*choose\s+option\s+([1-9]\d*)\s*[.!]?\s*", re.IGNORECASE)
 
 
 def match_confirmation(text: str) -> bool | None:
@@ -65,6 +70,12 @@ def match_confirmation(text: str) -> bool | None:
     if word in CANCEL_WORDS:
         return False
     return None
+
+
+def match_option_number(text: str) -> int | None:
+    """An explicit ASI:One owner override such as ``choose option 2`` (not a model instruction)."""
+    match = _CHOOSE_OPTION_RE.fullmatch(text)
+    return int(match.group(1)) if match else None
 
 
 def _mentions(text: str, words: tuple[str, ...]) -> bool:
@@ -121,11 +132,14 @@ class OwnerChat:
     async def answer_reply(self, sender: str, text: str) -> Reply:
         selection = parse_selection(text)
         confirm = match_confirmation(text) if selection is None else None
+        option_number = match_option_number(text) if selection is None and confirm is None else None
         try:
             if selection is not None:
                 reply = Reply(await self.on_selection(selection))
             elif confirm is not None:
                 reply = Reply(await self._confirm(confirm))
+            elif option_number is not None:
+                reply = Reply(await self._choose_number(option_number))
             else:
                 reply = await self._ask(sender, text)
         except Exception:
@@ -170,10 +184,8 @@ class OwnerChat:
 
     async def on_selection(self, selection: Selection) -> str:
         action = selection.action
-        if action in (CHOOSE_OPTION, APPROVE_PICK):
+        if action == CHOOSE_OPTION:
             return await self._choose(selection.get("escalation_id"), selection.get("option_id"))
-        if action == ASK_LATER:
-            return await self._later(selection.get("escalation_id"))
         if action in (PROPOSAL_CONFIRM, PROPOSAL_CANCEL):
             pending = await self._pending()
             if pending is None:
@@ -183,11 +195,15 @@ class OwnerChat:
             return await self._apply_proposal(selection.get("proposal_id"), action == PROPOSAL_CONFIRM)
         return EXPIRED  # unknown button (or an upgrade button with no checkout flow behind it)
 
-    async def _needing_owner(self) -> list[dict] | None:
-        """Escalations the owner can still decide (awaiting_owner first, then open); None when the API is down."""
+    async def _active_escalations(self) -> list[dict] | None:
+        """Escalations still eligible for an owner override; ``None`` when the API is down.
+
+        A Claude-resolved escalation remains overrideable until its problem block ends, so include the latest
+        ``resolved`` record as well as currently ``open`` records. The engine revalidates the final POST.
+        """
         found: list[dict] = []
         try:
-            for status in ("awaiting_owner", "open"):
+            for status in OVERRIDE_STATUSES:
                 r = await self._http.get("/api/escalations", params={"status": status}, timeout=API_TIMEOUT_S)
                 if r.status_code != 200:
                     return None
@@ -197,26 +213,28 @@ class OwnerChat:
         return found
 
     async def _choose(self, escalation_id: str, option_id: str) -> str:
-        """The owner picks an option on the escalation card. The option Claude proposed is confirmed through its pending
-        Proposal (the existing flow); any other is the owner's choice (`POST /api/escalations/{id}/resolve`). Either
-        way the escalation's other pending Proposals are cancelled, so a later "confirm" can't land on them."""
-        needing, pending = await self._needing_owner(), await self._pending()
-        if needing is None or pending is None:
+        """Apply a direct owner override; it is never a confirmation of a Claude Proposal."""
+        active = await self._active_escalations()
+        if active is None:
             return API_DOWN
-        escalation = next((e for e in needing if e["escalation_id"] == escalation_id), None)
+        escalation = next((e for e in active if e["escalation_id"] == escalation_id), None)
         option = escalation and next((o for _, o in numbered_options(escalation) if o["option_id"] == option_id), None)
         if option is None:
             return EXPIRED
-        stale = [p for p in pending if p["kind"] == "resolve_escalation" and p["payload"]["escalation_id"] == escalation_id]
-        same = [p for p in stale if p["payload"]["option_id"] == option_id]
-        if same:
-            reply = await self._apply_proposal(same[-1]["proposal_id"], True)
-            stale.remove(same[-1])
-        else:
-            reply = await self._resolve(escalation_id, option)
-        for proposal in stale:
-            await self._apply_proposal(proposal["proposal_id"], False)
-        return reply
+        return await self._resolve(escalation_id, option)
+
+    async def _choose_number(self, option_number: int) -> str:
+        """Resolve ``choose option N`` against the current report without asking a model."""
+        active = await self._active_escalations()
+        if active is None:
+            return API_DOWN
+        if not active:
+            return EXPIRED
+        escalation = active[0]
+        option = next((item for number, item in numbered_options(escalation) if number == option_number), None)
+        if option is None:
+            return EXPIRED
+        return await self._resolve(escalation["escalation_id"], option)
 
     async def _resolve(self, escalation_id: str, option: dict) -> str:
         try:
@@ -232,28 +250,11 @@ class OwnerChat:
         await self.log("concierge", "engine", "post", f"Owner chose {option['option_id']} for {escalation_id} in ASI:One")
         return f"Done: {_sentence(option['summary'])}"
 
-    async def _later(self, escalation_id: str) -> str:
-        needing = await self._needing_owner()
-        if needing is None:
-            return API_DOWN
-        escalation = next((e for e in needing if e["escalation_id"] == escalation_id), None)
-        if escalation is None:
-            return EXPIRED
-        default = next(o for o in escalation["options"] if o["option_id"] == escalation["default_option_id"])
-        await self.log("concierge", "engine", "post", f"Owner left {escalation_id} for later in ASI:One")
-        return ("OK, it stays with you. If nobody decides in time, the engine's default applies: "
-                f"{_sentence(default['summary'])}")
-
     async def _escalation_card(self) -> Card | None:
-        needing, pending = await self._needing_owner(), await self._pending()
-        if not needing:
+        active = await self._active_escalations()
+        if not active:
             return None
-        escalation = needing[0]  # awaiting_owner first: Claude's pick is waiting for the owner
-        newest = pending[-1] if pending else None
-        approves = (newest is not None and newest["kind"] == "resolve_escalation"
-                    and newest["payload"] == {"escalation_id": escalation["escalation_id"],
-                                              "option_id": escalation.get("chosen_option_id")})
-        return escalation_card(escalation, confirm_approves_pick=approves)
+        return escalation_card(active[0])
 
     # ------------------------------------------------------------ questions (the Claude agent through the API)
 

@@ -23,6 +23,7 @@ class NotRecordedError(LookupError):
 class EngineApi:
     impl: str
     Kitchen: Callable[..., Any]
+    build_lanes: Callable[[dict, dict, int], dict[str, Any]]
     run_backtest: Callable[..., list[dict]]
     compare_lanes: Callable[[dict, dict], dict]
     RuleError: type[Exception]
@@ -33,9 +34,9 @@ def load_engine(impl: str | None = None) -> EngineApi:
     if impl == "real":
         from engine import Kitchen, RuleError as EngineRuleError, compare_lanes, run_backtest
 
-        return EngineApi("real", Kitchen, run_backtest, compare_lanes, EngineRuleError)
+        return EngineApi("real", Kitchen, Kitchen.build_lanes, run_backtest, compare_lanes, EngineRuleError)
     if impl == "fake":
         from fakes.fake_kitchen import FakeKitchen, fake_compare_lanes, fake_run_backtest
 
-        return EngineApi("fake", FakeKitchen, fake_run_backtest, fake_compare_lanes, RuleError)
+        return EngineApi("fake", FakeKitchen, FakeKitchen.build_lanes, fake_run_backtest, fake_compare_lanes, RuleError)
     raise ValueError(f"KITCHEN_IMPL={impl!r}; expected 'fake' or 'real'")

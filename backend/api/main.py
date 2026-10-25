@@ -20,7 +20,7 @@ from runtime.device_bridge import DeviceBridge
 from runtime.hub_link import HubLink
 from runtime.kitchen_factory import load_engine
 from runtime.live_port import LivePublisher, WsLive, create_live
-from runtime.loop import RunLoop
+from runtime.loop import ClockConflict, RunLoop
 from store import create_store
 
 from . import models as m
@@ -116,7 +116,10 @@ def put_preferences(body: m.PreferencesUpdate, svc: Service):
 @router.post("/sim/control", response_model=m.ClockState, **_exclude_unset)
 async def post_sim_control(body: m.SimControlRequest, rt: Runtime):
     request = _body(body)
-    return await rt.control(request["action"], request.get("speed"))
+    try:
+        return await rt.control(request["action"], request.get("speed"))
+    except ClockConflict as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.post("/devices/{device_id}/command", response_model=m.Command, responses=R404, **_exclude_unset)
@@ -281,7 +284,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     bridge = DeviceBridge(settings.hardware, store, on_warning=broadcaster.send_soon)
     app.state.runtime = runtime = RunLoop(service=service, hub=hub, live=live, store=store,
                                           start_sim_ts=settings.sim_start_ts, publish_ws=broadcaster.send_soon,
-                                          demo_mode=settings.demo_mode, council_wait_s=settings.council_wait_s,
+                                          council_wait_s=settings.council_wait_s,
                                           bridge=bridge)
     service.on_escalation = runtime.escalations.changed
     # Proposals and chat use /ws whatever the live transport (CONTRACTS.md §2).
@@ -295,7 +298,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         publish=broadcaster.send_soon, timezone=service.tariff["timezone"], engine_rule_error=engine.RuleError,
         fallback=create_asi1_llm(settings.asi1_api_key, settings.asi1_model),
     )
-    runtime.escalations.agent = app.state.agent  # Claude off (no key) → escalations wait for the owner or the default
+    # Claude off (no key) leaves the engine-selected fallback in force; it never pauses or asks the owner.
+    runtime.escalations.agent = app.state.agent
     install_error_handlers(app, engine.RuleError)
     app.include_router(router)
 

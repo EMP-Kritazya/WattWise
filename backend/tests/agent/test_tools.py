@@ -29,10 +29,14 @@ def test_ai_tool_fixture(app, set_clock, fixture_file):
         _start_after_earlier_proposals(app, fx["output"]["proposal_id"])
         set_clock(fx["output"]["ts"])
 
-    # The offered schema carries the fixture's enums.
+    # The stale fixture still lists every engine option. Claude is now offered only authority-eligible ids and never
+    # ask_owner; the actual valid fixture call remains useful as a facade recording check.
     schema = next(t["input_schema"] for t in tools.schemas(allowed, escalation) if t["name"] == fx["tool"])
-    for key, values in fx.get("input_enum", {}).items():
-        assert schema["properties"][key]["enum"] == values
+    if fx["tool"] == "choose_escalation_option":
+        assert schema["properties"]["option_id"]["enum"] == ["accept_overrun", "extend_delay_dishwasher"]
+    else:
+        for key, values in fx.get("input_enum", {}).items():
+            assert schema["properties"][key]["enum"] == values
 
     assert tools.call(fx["tool"], fx["input"], allowed=allowed, escalation=escalation) == fx["output"]
 
@@ -62,14 +66,49 @@ def test_chat_cannot_choose_escalation_options(app):
         tools.call("choose_escalation_option", {"option_id": "accept_overrun", "rationale": "x"})
 
 
-def test_claude_pick_outside_authority_becomes_a_proposal(app, set_clock):
+def test_claude_enum_excludes_ask_owner_and_outside_authority(app):
     tools = app.state.agent_tools
     escalation = tools.get_escalation()[0]
-    set_clock(escalation["ts"])
-    result = tools.call("choose_escalation_option", {"option_id": "deep_reduce_hvac", "rationale": "Coolest choice."},
-                        allowed=ESCALATION_TOOLS, escalation=escalation)
-    assert result["status"] == "awaiting_owner" and result["chosen_option_id"] == "deep_reduce_hvac"
-    proposal = app.state.proposals.latest_pending()
-    assert proposal["kind"] == "resolve_escalation"
-    assert proposal["payload"] == {"escalation_id": "e_0001", "option_id": "deep_reduce_hvac"}
-    assert proposal["expires_at"] == escalation["deadline_sim_ts"]
+    tool = next(item for item in tools.schemas(ESCALATION_TOOLS, escalation) if item["name"] == "choose_escalation_option")
+    assert tool["input_schema"]["properties"]["option_id"]["enum"] == [
+        "accept_overrun", "extend_delay_dishwasher"
+    ]
+    assert "ask_owner" not in tool["input_schema"]["properties"]["option_id"]["enum"]
+    assert "deep_reduce_hvac" not in tool["input_schema"]["properties"]["option_id"]["enum"]
+
+
+def test_disabled_authority_does_not_offer_claude_a_choice(app):
+    tools = app.state.agent_tools
+    escalation = tools.get_escalation()[0]
+    offered = {item["name"] for item in tools.schemas(ESCALATION_TOOLS, escalation, {"enabled": False})}
+    assert "choose_escalation_option" not in offered
+
+
+def test_outside_authority_claude_pick_is_rejected_without_a_proposal(app):
+    tools = app.state.agent_tools
+    escalation = tools.get_escalation()[0]
+    before = list(app.state.store.proposals())
+    with pytest.raises(ToolInputError):
+        tools.call("choose_escalation_option", {"option_id": "deep_reduce_hvac", "rationale": "No."},
+                   allowed=ESCALATION_TOOLS, escalation=escalation)
+    assert app.state.store.proposals() == before
+
+
+def test_what_if_accepts_an_optional_lane_and_defaults_to_with(app, monkeypatch):
+    tools = app.state.agent_tools
+    calls = []
+    monkeypatch.setattr(app.state.service.lanes["without"], "what_if",
+                        lambda *args: calls.append(args) or {"lane": "without"})
+    result = tools.call("what_if", {"device_id": "walk_in_cooler_1", "action": "reduce", "value": 50,
+                                     "at": "2026-07-18T01:50:00Z", "lane": "without"})
+    assert result == {"lane": "without"}
+    assert calls == [("walk_in_cooler_1", "reduce", 50, "2026-07-18T01:50:00Z")]
+    schema = next(item["input_schema"] for item in tools.schemas() if item["name"] == "what_if")
+    assert schema["required"] == ["device_id", "action", "value", "at"]
+
+
+def test_forecast_tool_always_uses_the_contract_horizon(app, monkeypatch):
+    calls = []
+    monkeypatch.setattr(app.state.service.lanes["with"], "forecast", lambda horizon_min: calls.append(horizon_min) or [])
+    assert app.state.agent_tools.get_forecast() == []
+    assert calls == [120]

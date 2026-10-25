@@ -32,18 +32,16 @@ EXPIRED = "Sorry, that option expired."
 
 # Selection actions (prefixed so the planner's prose and any typed text can't collide with them).
 CHOOSE_OPTION = "wattwise_escalation_option"
-APPROVE_PICK = "wattwise_approve_pick"
-ASK_LATER = "wattwise_ask_later"
 PROPOSAL_CONFIRM = "wattwise_proposal_confirm"
 PROPOSAL_CANCEL = "wattwise_proposal_cancel"
 UPGRADE = "wattwise_upgrade"
 STAY_FREE = "wattwise_stay_free"
-ACTIONS = (CHOOSE_OPTION, APPROVE_PICK, ASK_LATER, PROPOSAL_CONFIRM, PROPOSAL_CANCEL, UPGRADE, STAY_FREE)
-_REQUIRED = {CHOOSE_OPTION: ("escalation_id", "option_id"), APPROVE_PICK: ("escalation_id", "option_id"),
-             ASK_LATER: ("escalation_id",), PROPOSAL_CONFIRM: ("proposal_id",), PROPOSAL_CANCEL: ("proposal_id",),
+ACTIONS = (CHOOSE_OPTION, PROPOSAL_CONFIRM, PROPOSAL_CANCEL, UPGRADE, STAY_FREE)
+_REQUIRED = {CHOOSE_OPTION: ("escalation_id", "option_id"),
+             PROPOSAL_CONFIRM: ("proposal_id",), PROPOSAL_CANCEL: ("proposal_id",),
              UPGRADE: (), STAY_FREE: ()}
 
-ASK_OWNER = "ask_owner"  # the "ask the owner" option: the card itself is that question, so it gets no button
+ASK_OWNER = "ask_owner"  # no action or owner-override button is ever rendered for this sentinel option
 RULE_BREAK_LABELS = {"cap_overrun": "cap overrun", "below_min_power": "below minimum power",
                      "past_deadline": "past deadline", "over_max_reduce": "over max reduce time",
                      "over_max_delay": "over max delay"}
@@ -193,72 +191,94 @@ def option_lines(option: dict) -> list[str]:
 
 
 def numbered_options(escalation: dict) -> list[tuple[int, dict]]:
-    """(N, option) as the card numbers them: the engine's order, `ask_owner` left out (the card is that question)."""
+    """(N, option) in engine order; ``ask_owner`` has no action and is never an owner override."""
     return [(n, o) for n, o in enumerate(escalation["options"], 1) if o["option_id"] != ASK_OWNER]
 
 
-def claude_pick(escalation: dict) -> dict | None:
-    """Claude's outside-authority pick, waiting for the owner (`awaiting_owner`); None otherwise."""
-    if escalation["status"] != "awaiting_owner" or not escalation.get("chosen_option_id"):
+def claude_choice(escalation: dict) -> dict | None:
+    """The option Claude resolved, if this report has one."""
+    if escalation.get("resolved_by") != "claude" or not escalation.get("chosen_option_id"):
         return None
     return next((o for o in escalation["options"] if o["option_id"] == escalation["chosen_option_id"]), None)
 
 
-def escalation_card(escalation: dict, *, confirm_approves_pick: bool = False) -> Card:
-    """`confirm_approves_pick`: Claude's pick is the newest pending Proposal, so a typed "confirm" approves it."""
+def _rank_harm_lines(option: dict) -> list[str]:
+    """Show engine-provided ranking fields without calculating or normalizing them."""
+    lines = []
+    if "rank" in option:
+        lines.append(f"Rank: {num(option['rank'])}")
+    if "harm_score" in option:
+        lines.append(f"Harm score: {num(option['harm_score'])}")
+    return lines
+
+
+def escalation_card(escalation: dict, *, allow_owner_override: bool = True) -> Card:
+    """An escalation *report*, not an approval request.
+
+    The engine fallback is already active. The only optional interaction is a direct owner override, which always goes
+    straight to the resolve endpoint; the card never requires a decision or confirmation from the owner.
+    """
     eid = escalation["escalation_id"]
-    pick = claude_pick(escalation)
+    pick = claude_choice(escalation)
     options = numbered_options(escalation)
     number = {o["option_id"]: n for n, o in options}
     default = next((o for o in escalation["options"] if o["option_id"] == escalation["default_option_id"]), None)
+    active = next((o for o in escalation["options"] if o["option_id"] == escalation.get("active_option_id")), None)
 
     children: list[dict] = [_text(problem_text(escalation["problem"]), "emphasis")]
+    if active is not None:
+        children.append({"type": "section", "title": f"Active option: option {number.get(active['option_id'], active['option_id'])}",
+                         "subtitle": active["summary"],
+                         "children": [_text(line, "muted") for line in _rank_harm_lines(active)]})
+    elif default is not None:
+        children.append(_text(f"Engine fallback: {default['summary']}", "muted"))
     if pick is not None:
-        children.append({"type": "section", "title": f"Claude's pick: option {number[pick['option_id']]}",
-                         "subtitle": pick["summary"],
-                         "children": [_text(escalation.get("rationale") or "", "muted")]})
+        rationale = escalation.get("rationale")
+        report = f"Claude chose {pick['summary']}" + (f" because {rationale}" if rationale else ".")
+        children.append({"type": "section", "title": "Claude's resolution", "subtitle": report,
+                         "children": [_text(line, "muted") for line in _rank_harm_lines(pick)]})
     children.append({"type": "divider"})
     for n, option in options:
         badges = []
+        if active is not None and option["option_id"] == active["option_id"]:
+            badges.append({"type": "badge", "label": "Active", "variant": "success"})
         if pick is not None and option["option_id"] == pick["option_id"]:
-            badges.append({"type": "badge", "label": "Claude's pick", "variant": "success"})
+            badges.append({"type": "badge", "label": "Claude chose", "variant": "info"})
         badges.append({"type": "badge", "label": "Within Claude's authority", "variant": "info"} if option[
-            "within_authority"] else {"type": "badge", "label": "Needs you", "variant": "warning"})
+            "within_authority"] else {"type": "badge", "label": "Outside Claude's authority", "variant": "warning"})
         if option["option_id"] == escalation["default_option_id"]:
-            badges.append({"type": "badge", "label": "Default", "variant": "info"})
-        children.append({"type": "section", "title": f"Option {n}", "subtitle": option["summary"], "children": [
+            badges.append({"type": "badge", "label": "Engine fallback", "variant": "info"})
+        option_children = [
             {"type": "group", "direction": "row", "gap": 8, "children": badges},
-            *(_text(line) for line in option_lines(option)),
-            _button(f"Option {n}", {"action": CHOOSE_OPTION, "escalation_id": eid, "option_id": option["option_id"]}),
-        ]})
-    children.append({"type": "divider"})
-    buttons = []
-    if pick is not None:
-        buttons.append(_button("Approve Claude's pick",
-                               {"action": APPROVE_PICK, "escalation_id": eid, "option_id": pick["option_id"]},
-                               primary=True))
-    buttons.append(_button("Ask me later", {"action": ASK_LATER, "escalation_id": eid}))
-    children.append({"type": "group", "direction": "row", "gap": 8, "children": buttons})
-    if default is not None:
-        children.append(_text(f"If nobody decides in time, the engine's default applies: {default['summary']}.",
-                              "muted"))
+            *(_text(line) for line in [*option_lines(option), *_rank_harm_lines(option)]),
+        ]
+        if allow_owner_override and (active is None or option["option_id"] != active["option_id"]):
+            option_children.append(_button(f"Override: option {n}",
+                                           {"action": CHOOSE_OPTION, "escalation_id": eid,
+                                            "option_id": option["option_id"]}))
+        children.append({"type": "section", "title": f"Option {n}", "subtitle": option["summary"],
+                         "children": option_children})
 
-    payload = {"root": {"type": "section", "title": "Peak cap at risk", "subtitle": escalation["problem"]["reason"],
+    payload = {"root": {"type": "section", "title": "Escalation report", "subtitle": escalation["problem"]["reason"],
                         "children": children}}
 
-    lines = [f"Peak cap at risk. {problem_text(escalation['problem'])}"]
+    lines = [f"Escalation report. {problem_text(escalation['problem'])}"]
+    if active is not None:
+        lines.append(f"Active option: {active['summary']}." +
+                     (f" Rank {num(active['rank'])}." if "rank" in active else "") +
+                     (f" Harm score {num(active['harm_score'])}." if "harm_score" in active else ""))
+    elif default is not None:
+        lines.append(f"Engine fallback: {default['summary']}.")
     if pick is not None:
-        lines.append(f"Claude's pick: option {number[pick['option_id']]}, {pick['summary']}. "
-                     f"Why: {_sentence(escalation.get('rationale') or '')}")
+        rationale = escalation.get("rationale")
+        lines.append(f"Claude chose {pick['summary']}" + (f" because {rationale}" if rationale else "."))
     for n, option in options:
-        authority = "within Claude's authority" if option["within_authority"] else "needs you"
-        lines.append(f"{n}. {option['summary']}: " + ", ".join(option_lines(option)) + f" ({authority}).")
-    how = 'Reply "choose option N" to pick one'
-    if pick is not None and confirm_approves_pick:
-        how += ', or "confirm" to approve Claude\'s pick'
-    lines.append(how + ".")
-    if default is not None:
-        lines.append(f"If nobody decides in time, the engine's default applies: {default['summary']}.")
+        authority = "within Claude's authority" if option["within_authority"] else "outside Claude's authority"
+        ranking = _rank_harm_lines(option)
+        lines.append(f"{n}. {option['summary']}: " + ", ".join([*option_lines(option), *ranking]) +
+                     f" ({authority}).")
+    if allow_owner_override and options:
+        lines.append('Owner override only: reply "choose option N" to switch the active option.')
     return Card("custom", payload, "\n".join(lines))
 
 
@@ -329,8 +349,8 @@ def move_text(decision: dict, device_names: dict[str, str]) -> str:
 def upgrade_card(*, paid_summary: str, amount: str, currency: str) -> Card:
     """Free vs paid. `paid_summary`: the authority the paid plan proposes (upgrade.authority_summary)."""
     price = f"{amount} {currency} (Stripe test mode)"
-    free = "Every escalation comes to you."
-    after = "You still confirm exactly what Claude may do."
+    free = "The engine fallback remains active for every escalation."
+    after = "Claude can choose only engine-approved options within its authority."
     payload = {
         "title": "Let Claude handle tonight's decisions",
         "summary_rows": [{"label": "Free plan", "value": free}, {"label": "Paid plan", "value": _sentence(paid_summary)},

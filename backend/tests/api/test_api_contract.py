@@ -1,9 +1,10 @@
 """Route table, agent token, error bodies and the viewer /ws, beyond the per-fixture replay in test_rest.py."""
 
 import json
+from copy import deepcopy
 
 import pytest
-from pydantic import TypeAdapter
+from pydantic import TypeAdapter, ValidationError
 
 from api import models as m
 from api.settings import REPO_ROOT
@@ -110,14 +111,64 @@ def test_queries_filter_recorded_lists(client):
     assert client.get("/api/escalations?status=resolved").json() == []
 
 
-def test_every_ws_fixture_matches_the_models():
-    adapter = TypeAdapter(m.WsMessage)
+def _ws_fixture_messages():
     lines = (FIXTURES / "ws" / "stream.jsonl").read_text(encoding="utf-8").splitlines()
     messages = [json.loads(line) for line in lines if line.strip()]
-    messages += [_load(f"ws/{p.name}") for p in sorted((FIXTURES / "ws").glob("*.json"))]
-    for msg in messages:
+    return messages + [_load(f"ws/{p.name}") for p in sorted((FIXTURES / "ws").glob("*.json"))]
+
+
+def _is_pre_10528e2_ws_message(message):
+    return (
+        message["type"] in {"clock", "tick", "escalation"}
+        or (message["type"] == "warning" and message["code"] == "cap_unreachable")
+    )
+
+
+def test_current_ws_fixtures_match_the_models():
+    """Fixture recordings that did not change remain executable contract examples."""
+    adapter = TypeAdapter(m.WsMessage)
+    for msg in _ws_fixture_messages():
+        if _is_pre_10528e2_ws_message(msg):
+            continue
         parsed = adapter.validate_python(msg)
         assert parsed.model_dump(mode="json", by_alias=True, exclude_unset=True) == msg
+
+
+def test_pre_10528e2_ws_fixtures_do_not_define_the_current_contract():
+    """The recorded tick/escalation/warning shapes are intentionally not accepted until fixture-builder regenerates them."""
+    adapter = TypeAdapter(m.WsMessage)
+    stale = [msg for msg in _ws_fixture_messages() if _is_pre_10528e2_ws_message(msg)]
+    assert stale
+    for msg in stale:
+        with pytest.raises(ValidationError):
+            adapter.validate_python(msg)
+
+
+def test_current_tick_models_include_escalation_and_meter_contract_fields():
+    state = deepcopy(_load("ws/tick.json")["data"])
+    state["meter"].update(on_peak_month_peak_kw=38.4, energy_kwh_month=7712.4)
+    state["warnings"] = [{
+        "code": "cap_unreachable", "message": "Engine target cannot be held.",
+        "data": {"unavoidable_kw": 44.0, "peak_cap_kw": None, "target_kw": 41.0},
+    }]
+    escalation = state["new_escalations"][0]
+    escalation.update(updated_ts=escalation["ts"], active_option_id="extend_delay_dishwasher")
+    for index, option in enumerate(escalation["options"], start=1):
+        option.update(harm_score=None if option["option_id"] == "ask_owner" else float(index),
+                      rank=None if option["option_id"] == "ask_owner" else index)
+
+    parsed = m.TickState.model_validate(state)
+    assert parsed.meter.energy_kwh_month == 7712.4
+    assert parsed.new_escalations[0].updated_ts == escalation["ts"]
+    assert parsed.warnings[0].data["peak_cap_kw"] is None
+
+
+def test_snapshot_model_has_every_facade_field():
+    assert set(m.KitchenSnapshot.model_fields) == {
+        "tick_id", "sim_ts", "lane", "control", "peak_mode", "config", "meter", "forecast_kw", "forecast_ts",
+        "devices", "active_commands", "owed_kwh", "open_escalations", "warnings", "recent_decisions", "context",
+        "id_counters",
+    }
 
 
 def test_ws_replays_fixture_stream_to_every_viewer(app, client):

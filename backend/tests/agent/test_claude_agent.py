@@ -1,6 +1,7 @@
 """The Claude agent with no key (templates) and with a scripted model (the tool loop, enums, timeouts)."""
 
 import asyncio
+import copy
 import json
 
 from agent import templates
@@ -115,15 +116,28 @@ async def test_failed_model_call_falls_back_to_template(app):
 
 async def test_escalation_choice_goes_through_the_enum_tool(app):
     fx = load("ai_tools/choose_escalation_option.json")
-    escalation = app.state.agent_tools.get_escalation()[0]
+    escalation = copy.deepcopy(app.state.agent_tools.get_escalation()[0])
+    escalation["active_option_id"] = "accept_overrun"
+    for rank, option in enumerate(escalation["options"], 1):
+        option["rank"] = rank if option["option_id"] != "ask_owner" else None
+        option["harm_score"] = float(rank) if option["option_id"] != "ask_owner" else None
     llm = ScriptedLLM(tool_turn(("t1", "choose_escalation_option", fx["input"])), text_turn("Done."))
     agent, _ = _agent(app, llm)
 
     assert await agent.decide_escalation(escalation) == fx["output"]
     tool = next(t for t in llm.requests[0]["tools"] if t["name"] == "choose_escalation_option")
-    assert tool["input_schema"]["properties"]["option_id"]["enum"] == fx["input_enum"]["option_id"]
+    assert tool["input_schema"]["properties"]["option_id"]["enum"] == [
+        "accept_overrun", "extend_delay_dishwasher"
+    ]
     facts = json.loads(llm.requests[0]["messages"][0]["content"])
     assert facts["escalation"] == escalation and facts["authority"]["max_cap_overrun_kw"] == 3.0
+    assert facts["active_option_id"] == "accept_overrun"
+    assert facts["ranked_options"][0] == {
+        "option_id": "accept_overrun", "rank": 1, "harm_score": 1.0,
+        "projected": escalation["options"][0]["projected"],
+    }
+    assert "ask_owner" not in tool["input_schema"]["properties"]["option_id"]["enum"]
+    assert "never claim weather drives" in llm.requests[0]["system"].lower()
 
 
 async def test_escalation_with_an_unoffered_option_makes_no_choice(app):
@@ -132,6 +146,38 @@ async def test_escalation_with_an_unoffered_option_makes_no_choice(app):
                       text_turn("Could not."))
     agent, _ = _agent(app, llm)
     assert await agent.decide_escalation(escalation) is None
+
+
+async def test_disabled_authority_does_not_call_claude_for_an_escalation(app, monkeypatch):
+    escalation = app.state.agent_tools.get_escalation()[0]
+    snapshot = copy.deepcopy(app.state.agent_tools.get_kitchen_state())
+    snapshot["config"]["authority"] = {"enabled": False}
+    monkeypatch.setattr(app.state.agent_tools, "get_kitchen_state", lambda: snapshot)
+    llm = ScriptedLLM(text_turn("This must not run."))
+    agent, _ = _agent(app, llm)
+
+    assert await agent.decide_escalation(escalation) is None
+    assert llm.requests == []
+
+
+async def test_no_eligible_option_does_not_call_claude(app):
+    escalation = copy.deepcopy(app.state.agent_tools.get_escalation()[0])
+    for option in escalation["options"]:
+        option["within_authority"] = False
+    llm = ScriptedLLM(text_turn("This must not run."))
+    agent, _ = _agent(app, llm)
+
+    assert await agent.decide_escalation(escalation) is None
+    assert llm.requests == []
+
+
+def test_escalation_fallback_template_is_explicit():
+    decision = {
+        "reason_code": "escalation_fallback", "action": "reduce", "value": 60,
+        "effect": {"peak_before_kw": 44.0, "peak_after_kw": 40.0},
+    }
+    text = templates.explain_decision(decision, "HVAC 1")
+    assert "engine applied its escalation fallback" in text
 
 
 async def test_slow_explanation_keeps_the_template(app, monkeypatch):

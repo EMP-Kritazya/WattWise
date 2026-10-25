@@ -7,10 +7,10 @@ default). The kitchen runs identically with every model off. Both models' text i
 
 - `start_chat(message)` → `{chat_id}`; the reply streams on `/ws` as `chat_delta` messages, then one `chat_done`.
 - `explain_decision(decision, device_name)` → (text, "ai" | "template"), 3 s timeout per model.
-- `decide_escalation(escalation, council=[...])` → the engine's resolved Escalation, or None (8 s timeout, no choice):
-  the engine's default then applies at the deadline. `council` names the Context parts the context agents posted for this
-  escalation's window; the rationale cites them by source with numbers copied from the context. Used by
-  `runtime/escalations.py`.
+- `decide_escalation(escalation, council=[...])` → the engine's resolved Escalation, or ``None`` (8 s timeout, no
+  choice). The engine fallback is already active before this task starts. `council` names the Context parts the context
+  agents posted for this escalation's window; the rationale cites them by source with numbers copied from context. Used
+  by `runtime/escalations.py`.
 """
 
 from __future__ import annotations
@@ -54,10 +54,17 @@ SYSTEM_PROMPT = """You are WattWise's assistant for a restaurant owner. Be brief
 - Times in tools are UTC. The restaurant's local time zone is {timezone}; speak in local time."""
 
 ESCALATION_PROMPT = """
-An escalation is open: the engine found no move inside the owner's rules that holds the peak target. Choose exactly
-one of its offered options by calling choose_escalation_option once, with its option_id and a short rationale (one or
-two sentences). Choose what best fits the context and the owner's preferences. Prefer options with within_authority
-true; choose ask_owner when the trade-off is the owner's to make.
+An escalation is open: the engine found no move inside the owner's rules that holds the peak target. The engine has
+already applied its fallback, shown as active_option_id, and the kitchen continues safely if you do not answer. Choose
+exactly one option by calling choose_escalation_option once, with its option_id and a short rationale (one or two
+sentences). The tool enum is the complete set you are allowed to choose: every id is within authority and ask_owner is
+never an option. Do not ask the owner to decide.
+
+The supplied ranked_options are engine facts. Compare each option's rank, harm_score and projected values exactly as
+provided; do not calculate or alter them. Prefer the option that best fits the owner preferences and structured context,
+not merely the rank. Weather is context only in this build: never claim weather drives, changes, or causes the load
+forecast. Events/crowd and prices may be cited when the supplied context supports it.
+
 `council` lists the agents just asked about this block. In the rationale, quote the chosen option's numbers, then cite
 one piece of evidence from each council agent by name, shaped like "Weather agent: <temp_c> °C at <time>", "Grid agent:
 stress <stress>, <usd_per_kwh> $/kWh at <time>", "Events agent: <name>, <expected_attendance> expected at <time>". Copy those numbers exactly from
@@ -172,30 +179,51 @@ class ClaudeAgent:
     # ------------------------------------------------------------ escalations
 
     async def decide_escalation(self, escalation: dict, council: list[str] | None = None) -> dict | None:
-        """Claude picks one offered option (enum-constrained); the engine validates it. None = no choice."""
+        """Claude picks one authority-eligible option; the engine validates it. ``None`` means no choice.
+
+        The run loop calls this once per new escalation id. This defensive gate also makes direct callers harmless when
+        authority is disabled, missing, or has no eligible option.
+        """
         if self._llm is None:
             return None
         chosen: dict = {}
         try:
             snapshot = await asyncio.to_thread(self._tools.get_kitchen_state)
             config = snapshot["config"]
+            authority = config.get("authority")
+            eligible = AgentTools.eligible_option_ids(escalation, authority)
+            if escalation.get("status") != "open" or not eligible:
+                return None
+            ranked_options = [
+                {
+                    "option_id": option.get("option_id"),
+                    "rank": option.get("rank"),
+                    "harm_score": option.get("harm_score"),
+                    "projected": option.get("projected"),
+                }
+                for option in escalation.get("options", [])
+            ]
             facts = {"escalation": escalation, "context": snapshot["context"],
-                     "owner_preferences": config.get("owner_preferences"), "authority": config.get("authority"),
+                     "owner_preferences": config.get("owner_preferences"), "authority": authority,
+                     "active_option_id": escalation.get("active_option_id"), "ranked_options": ranked_options,
+                     "offered_option_ids": eligible,
                      "council": [COUNCIL_AGENTS[p] for p in council or () if p in COUNCIL_AGENTS]}
             await asyncio.wait_for(
                 self._run(self._llm, self._system + ESCALATION_PROMPT, [{"role": "user", "content": json.dumps(facts)}],
-                          ESCALATION_TOOLS, effort="medium", escalation=escalation, chosen=chosen),
+                          ESCALATION_TOOLS, effort="medium", escalation=escalation, authority=authority,
+                          chosen=chosen),
                 ESCALATION_TIMEOUT_S)
         except Exception:
-            log.warning("Claude made no choice for %s; the engine's default applies at the deadline",
+            log.warning("Claude made no choice for %s; the engine fallback remains active",
                         escalation["escalation_id"], exc_info=True)
         return chosen.get("escalation")
 
     # ------------------------------------------------------------ the tool loop
 
     async def _run(self, llm: LLM, system: str, messages: list[dict], allowed: tuple[str, ...], *, effort: str,
-                   on_text: OnText | None = None, escalation: dict | None = None, chosen: dict | None = None) -> str:
-        tools = AgentTools.schemas(allowed, escalation)
+                   on_text: OnText | None = None, escalation: dict | None = None,
+                   authority: dict | None = None, chosen: dict | None = None) -> str:
+        tools = AgentTools.schemas(allowed, escalation, authority)
         text = []
         for _ in range(MAX_TURNS):
             turn = await llm.turn(system=system, messages=messages, tools=tools, effort=effort, on_text=on_text)
@@ -205,7 +233,7 @@ class ClaudeAgent:
                 continue
             if not turn.tool_uses or turn.stop_reason in ("refusal", "max_tokens"):
                 break  # an answer, a refusal, or a truncated (unsafe to run) tool input
-            results = await asyncio.gather(*(self._tool_result(use, allowed, escalation, chosen)
+            results = await asyncio.gather(*(self._tool_result(use, allowed, escalation, authority, chosen)
                                              for use in turn.tool_uses))
             messages.append({"role": "user", "content": list(results)})
         else:
@@ -213,14 +241,15 @@ class ClaudeAgent:
         return "".join(text)
 
     async def _tool_result(self, use: tuple[str, str, dict], allowed: tuple[str, ...], escalation: dict | None,
-                           chosen: dict | None) -> dict:
+                           authority: dict | None, chosen: dict | None) -> dict:
         tool_use_id, name, tool_input = use
         try:
             if name in LOOP_TOOLS:
-                output = self._tools.call(name, tool_input, allowed=allowed, escalation=escalation)
+                output = self._tools.call(name, tool_input, allowed=allowed, escalation=escalation,
+                                          authority=authority)
             else:
                 output = await asyncio.to_thread(self._tools.call, name, tool_input, allowed=allowed,
-                                                 escalation=escalation)
+                                                  escalation=escalation, authority=authority)
         except self._tool_errors as exc:
             return {"type": "tool_result", "tool_use_id": tool_use_id, "is_error": True, "content": str(exc)}
         except Exception:
