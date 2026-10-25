@@ -19,6 +19,8 @@ import json
 import logging
 from typing import Any, Awaitable, Callable, Protocol
 
+from live.rows import backtest_month_row, backtest_point_row
+
 log = logging.getLogger("runtime.live_port")
 
 LANES = ("without", "with")
@@ -54,6 +56,13 @@ class LivePort(Protocol):
 
     async def read_surges(self) -> list[dict]:
         """Unconsumed `surge_request` rows."""
+
+    async def reset_backtest(self, run_id: str) -> None:
+        """A new Proof run starts: clear the previous run's `backtest_point` / `backtest_month` rows."""
+
+    async def publish_backtest_point(self, run_id: str, point: dict) -> None: ...
+
+    async def publish_backtest_month(self, run_id: str, result: dict) -> None: ...
 
 
 # ---------------------------------------------------------------- §5 rows
@@ -140,6 +149,18 @@ class RecordingLive:
         self._record("reset_all")
         await self._forward("reset_all")
 
+    async def reset_backtest(self, run_id: str) -> None:
+        self._record("reset_backtest", run_id)
+        await self._forward("reset_backtest", run_id)
+
+    async def publish_backtest_point(self, run_id: str, point: dict) -> None:
+        self._record("publish_backtest_point", compact_json(backtest_point_row(run_id, point)))
+        await self._forward("publish_backtest_point", run_id, point)
+
+    async def publish_backtest_month(self, run_id: str, result: dict) -> None:
+        self._record("publish_backtest_month", compact_json(backtest_month_row(run_id, result)))
+        await self._forward("publish_backtest_month", run_id, result)
+
     async def consume_surge(self, request_id: int) -> None:
         self._record("consume_surge", request_id)
         for row in self.surge_requests:
@@ -189,6 +210,15 @@ class WsLive:
 
     async def reset_all(self) -> None:
         self._last_clock = None
+
+    async def reset_backtest(self, run_id: str) -> None:
+        return None  # viewers keep only the newest run_id's rows (the first point of a new run replaces the old ones)
+
+    async def publish_backtest_point(self, run_id: str, point: dict) -> None:
+        await self._broadcast({"type": "backtest_point", "run_id": run_id, "data": point})
+
+    async def publish_backtest_month(self, run_id: str, result: dict) -> None:
+        await self._broadcast({"type": "backtest_month", "run_id": run_id, "data": result})
 
     async def consume_surge(self, request_id: int) -> None:
         return None
@@ -243,6 +273,18 @@ class SpacetimeLive:
     async def consume_surge(self, request_id):
         # consume_surges queues its own acknowledgement exactly once.
         pass
+
+    async def reset_backtest(self, run_id):
+        self._check()
+        self.client.reset_backtest(run_id)
+
+    async def publish_backtest_point(self, run_id, point):
+        self._check()
+        self.client.publish_backtest_point(run_id, point)
+
+    async def publish_backtest_month(self, run_id, result):
+        self._check()
+        self.client.publish_backtest_month(run_id, result)
 
     async def read_surges(self):
         self._check()

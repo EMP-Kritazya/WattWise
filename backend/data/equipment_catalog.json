@@ -4,55 +4,55 @@
     "name": "HVAC",
     "category": "cooling",
     "default_importance": "flexible",
-    "rated_kw": 8.0,
+    "rated_kw": 5.0,
     "power_model": "thermal",
     "params": { "setpoint_c": 22.5 },
     "default_limits": { "min_power_pct": 40, "max_reduce_min": 30 },
-    "source_note": "One 5-ton packaged RTU (PSZ-AC, gas furnace), per unit: DX compressor ~5.45 kW (60 kBtu/h / EER 11) + share of the constant ventilation fans. Sized on NREL ComStock bldg 5847 upgrade 45 (2018): HVAC = cooling + fans + heating (ComStock's electric HVAC group, 74,322 kWh/yr); fans are a constant 5.739 kW (night_fanon_vent); worst 15-min block 15.714 kW (2018-06-23 18:45) = 7.857 kW per unit for 2 units, so 8.0 kW covers the whole year without clipping. 40 % min = 3.2 kW >= the 2.87 kW ventilation fan share per unit. derived"
+    "source_note": "5-ton RTU, compressor+condenser fan only (EnergyPlus DX def.). ComStock 5847 cooling max 9.97 kW / 2 units. Goodman GPC1460 4.87 kW total @AHRI 95F. Fans -> kitchen_exhaust. derived"
   },
   {
     "type_id": "walk_in_cooler",
     "name": "Walk-in cooler",
     "category": "refrigeration",
     "default_importance": "flexible",
-    "rated_kw": 3.5,
+    "rated_kw": 2.0,
     "power_model": "cycling",
     "params": { "duty_idle_pct": 33, "duty_busy_pct": 67 },
     "default_limits": { "min_power_pct": 50, "max_reduce_min": 30 },
-    "source_note": "Modeled walk-in condensing load; ENERGY STAR V5 explicitly excludes walk-ins, so this is a transparent demo assumption rather than an ENERGY STAR rating."
+    "source_note": "8x10 box ~9.6 kBtu/h (Heatcraft Quick Calc) / DOE AWEF 5.61 (10 CFR 431.306) + fans = 2.0 kW. Duty: Heatcraft 16-18 h design run; SMUD measured 56%. Not ENERGY STAR V5."
   },
   {
     "type_id": "reach_in_fridge",
     "name": "Reach-in fridge",
     "category": "refrigeration",
     "default_importance": "always_on",
-    "rated_kw": 0.8,
+    "rated_kw": 0.6,
     "power_model": "cycling",
-    "params": { "duty_idle_pct": 23, "duty_busy_pct": 57 },
+    "params": { "duty_idle_pct": 20, "duty_busy_pct": 45 },
     "default_limits": {},
-    "source_note": "Modeled two-door reach-in input; duty behavior is calibrated to ENERGY STAR commercial refrigerator daily-energy criteria, not a claimed product rating."
+    "source_note": "True T-49-HC spec sheet: 1/2 hp, 5.4 A @115 V (rated). ENERGY STAR certified 2.57 kWh/day = 17% test duty; busy 45% ASSUMPTION."
   },
   {
     "type_id": "freezer",
     "name": "Freezer",
     "category": "refrigeration",
     "default_importance": "always_on",
-    "rated_kw": 1.4,
+    "rated_kw": 0.7,
     "power_model": "cycling",
-    "params": { "duty_idle_pct": 24, "duty_busy_pct": 48 },
+    "params": { "duty_idle_pct": 40, "duty_busy_pct": 65 },
     "default_limits": {},
-    "source_note": "Modeled reach-in freezer input; duty behavior is calibrated to ENERGY STAR commercial freezer daily-energy criteria, not a claimed product rating."
+    "source_note": "True T-49F-HC spec sheet: 3/4 hp, 6.0 A @115 V (rated). ENERGY STAR certified 8.57 kWh/day = 52% test duty; 40/65% brackets it (ASSUMPTION)."
   },
   {
     "type_id": "ice_machine",
     "name": "Ice machine",
     "category": "refrigeration",
     "default_importance": "deferrable",
-    "rated_kw": 1.6,
+    "rated_kw": 1.2,
     "power_model": "job",
     "params": { "cycle_min": 20 },
     "default_limits": { "max_delay_min": 60, "must_finish_by": "22:00" },
-    "source_note": "Modeled batch ice-machine input; cycle length and draw are explicit demo assumptions informed by ENERGY STAR commercial ice-machine test criteria."
+    "source_note": "500 lb/day air-cooled batch IMH. ENERGY STAR V3 <= 6.49-0.0023H = 5.34 kWh/100 lb -> 1.1 kW running (spec_limit). cycle_min 20 = ASSUMPTION."
   },
   {
     "type_id": "fryer",
@@ -61,63 +61,85 @@
     "default_importance": "always_on",
     "rated_kw": 14.0,
     "power_model": "demand_driven",
-    "params": { "idle_kw": 1.5, "kw_per_order": 0.26 },
+    "params": { "idle_kw": 1.2, "kw_per_order": 0.26 },
     "default_limits": {},
-    "source_note": "Modeled standard electric fryer; ENERGY STAR defines electric idle rate <=0.8 kW, while the intentionally conservative 1.5 kW demo idle represents a non-certified baseline."
+    "source_note": "Frymaster RE14 14 kW. ENERGY STAR CFS calc (FSTC 2011) conv. idle 1.2 kW, 75%, 65 lb/h, 167 Wh/lb; SDG&E idle 1.05. kw_per_order derived (0.25 lb, 12 min ASSUMPTION)."
   },
   {
     "type_id": "oven",
     "name": "Oven",
     "category": "cooking",
     "default_importance": "always_on",
-    "rated_kw": 10.0,
+    "rated_kw": 11.0,
     "power_model": "demand_driven",
     "params": { "idle_kw": 2.0, "kw_per_order": 0.12 },
     "default_limits": {},
-    "source_note": "Modeled full-size electric convection oven input; values are explicit demo assumptions informed by FSTC ASTM-standard appliance testing."
+    "source_note": "Blodgett Mark V-100 11 kW. ENERGY STAR CFS calc conv. full-size: idle 2.0 kW, 65%, 90 lb/h, 73.2 Wh/lb; SDG&E 70 lb/h. kw_per_order derived 0.11 (0.25 lb, 12 min ASSUMPTION)."
   },
   {
     "type_id": "grill",
     "name": "Grill",
     "category": "cooking",
     "default_importance": "always_on",
-    "rated_kw": 8.0,
+    "rated_kw": 12.0,
     "power_model": "demand_driven",
-    "params": { "idle_kw": 1.5, "kw_per_order": 0.12 },
+    "params": { "idle_kw": 2.4, "kw_per_order": 0.25 },
     "default_limits": {},
-    "source_note": "Modeled electric griddle input; rated draw is aligned with published FSTC-tested electric griddle cooking rates near 8.9 kW."
+    "source_note": "36x24in electric griddle (Garland E24-36G 12 kW). ENERGY STAR calc conv. 400 W/ft2 = 2.4 kW idle, 65%, 35 lb/h; ES Tier 2 <=320 W/ft2. kw_per_order derived (0.35 lb ASSUMPTION)."
   },
   {
     "type_id": "dishwasher",
     "name": "Dishwasher",
     "category": "water_heating",
     "default_importance": "deferrable",
-    "rated_kw": 6.0,
+    "rated_kw": 8.0,
     "power_model": "job",
     "params": { "cycle_min": 30 },
     "default_limits": { "max_delay_min": 60, "must_finish_by": "15:30" },
-    "source_note": "Modeled high-temperature door-type dishwasher including booster demand; draw and batch length are explicit demo assumptions informed by ENERGY STAR commercial dishwasher criteria."
+    "source_note": "Hobart AM16 door-type high-temp: 5.4 kW tank + 7.1 kW booster, 52 racks/h. Avg wash draw 8 kW derived (booster load + ASSUMPTION). ENERGY STAR V2 idle <=0.55 kW."
   },
   {
     "type_id": "water_heater",
     "name": "Water heater",
     "category": "water_heating",
     "default_importance": "flexible",
-    "rated_kw": 4.5,
+    "rated_kw": 12.0,
     "power_model": "cycling",
-    "params": { "duty_idle_pct": 25, "duty_busy_pct": 67 },
+    "params": { "duty_idle_pct": 10, "duty_busy_pct": 70 },
     "default_limits": { "min_power_pct": 40, "max_reduce_min": 30 },
-    "source_note": "Modeled single-element electric water-heater input; rated draw and duty cycle are explicit demo assumptions informed by DOE commercial water-heater test procedures."
+    "source_note": "80 gal commercial electric storage, 12 kW (A.O. Smith DRE range 6-54 kW). FSTC field: FSR 2,100 gal/d, QSR 500. Standby per 10 CFR 431.110. Duty ASSUMPTION."
   },
   {
     "type_id": "lights",
     "name": "Lights",
     "category": "lighting",
     "default_importance": "always_on",
-    "rated_kw": 2.4,
+    "rated_kw": 1.6,
     "power_model": "fixed",
     "params": {},
     "default_limits": {},
-    "source_note": "Modeled 2,500 ft² restaurant at 0.96 W/ft²; explicit demo assumption within ASHRAE 90.1 restaurant lighting-power-density ranges."
+    "source_note": "ComStock 5847 interior+exterior lighting max 1.58 kW. ASHRAE 90.1-2019 Table 9.5.1 Dining: Family 0.71 W/ft2 -> 1.42 kW interior allowance (spec_limit)."
+  },
+  {
+    "type_id": "kitchen_exhaust",
+    "name": "Kitchen exhaust & ventilation fans",
+    "category": "other",
+    "default_importance": "always_on",
+    "rated_kw": 5.74,
+    "power_model": "fixed",
+    "params": {},
+    "default_limits": {},
+    "source_note": "ComStock 5847 fans: constant 5.739 kW 24/7 (night_fanon_vent; hood exhaust+MUA+RTU supply fans). Bottom-up 2.9-3.9 kW (Title 24 280 cfm/ft, Greenheck CUBE-180 1.74 bhp). derived"
+  },
+  {
+    "type_id": "other_equipment",
+    "name": "Other kitchen equipment",
+    "category": "other",
+    "default_importance": "always_on",
+    "rated_kw": 16.4,
+    "power_model": "demand_driven",
+    "params": { "idle_kw": 5.0, "kw_per_order": 0.6 },
+    "default_limits": {},
+    "source_note": "Plug/process residual of ComStock 5847 IE; rated = the two-part recipe's residual peak 16.30 kW, rounded up (derived). Bottom-up: HFHC 0.45-0.8, steamer idle 1.0-1.2 (ES calc, SDG&E), steam table 2.25, warmers 2x0.8, microwaves 2x1.55. ASSUMPTION counts"
   }
 ]

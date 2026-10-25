@@ -205,6 +205,8 @@ const TYPE_ZONE: Record<string, ZoneId | "lights"> = {
   water_heater: "dishRoom",
   ice_machine: "dishRoom",
   hvac: "roof",
+  kitchen_exhaust: "roof",
+  other_equipment: "misc",
   lights: "lights",
 };
 
@@ -228,6 +230,8 @@ const TYPE_HEIGHT: Record<string, number> = {
   water_heater: 1.9,
   ice_machine: 1.5,
   hvac: 1.2,
+  kitchen_exhaust: 0.9,
+  other_equipment: 1.0,
 };
 
 export interface PlacedDevice {

@@ -24,7 +24,7 @@ from api.errors import NoKitchenError, NotFoundError, NotRecordedError, RuleErro
 
 from . import templates
 from .llm import LLM, OnText, Turn, create_asi1_llm, create_llm  # noqa: F401 (re-exported for callers and tests)
-from .tools import CHAT_TOOLS, ESCALATION_TOOLS, AgentTools, ToolInputError
+from .tools import CHAT_TOOLS, ESCALATION_TOOLS, AgentTools, ToolInputError, for_claude
 
 log = logging.getLogger("agent.claude")
 
@@ -279,4 +279,4 @@ class ClaudeAgent:
                     "content": "The tool failed; tell the owner you couldn't get that right now."}
         if name == "choose_escalation_option" and chosen is not None:
             chosen["escalation"] = output
-        return {"type": "tool_result", "tool_use_id": tool_use_id, "content": json.dumps(output)}
+        return {"type": "tool_result", "tool_use_id": tool_use_id, "content": json.dumps(for_claude(output))}

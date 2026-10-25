@@ -61,9 +61,20 @@ tariff is illustrative and must not be presented as a real utility saving.
 To show real billed amounts, install the PG&E URDB data described in
 `docs/design/DATA_AND_PROOF.md` and set frontend
 `VITE_TARIFF_ID=pge_b19_secondary_voluntary` before starting Vite.
-Calibrated warm-up requires the optional ComStock dataset. When the current
-recipe exceeds catalog ratings, the runtime logs the problem and uses explicitly
-labelled synthetic fixture history; it never clips those readings.
+Calibrated warm-up requires the optional ComStock dataset (`dataset/`, see
+`docs/design/DATA_AND_PROOF.md`). Without it the runtime uses explicitly labelled
+synthetic fixture history; it never clips readings.
+
+### Proof (year replay)
+
+The Proof screen's **Replay the year** button calls `POST /api/backtest/run`. The
+real engine replays the ComStock year under without / timer / WattWise in a
+separate process and the rows stream to the chart (SpacetimeDB, or `/ws`), one
+month every `REPLAY_MONTH_S` real seconds (default 5). The finished run is cached
+in `data/backtest_cache/`; `BACKTEST_PRECOMPUTE=1` (default) fills the cache at
+startup, so the first press plays at once. Computing the year takes about
+3–4 minutes; a press during that time follows the computation as it goes.
+No number from it is a cleared saving until `backtest-auditor` returns CLEARED.
 
 ### Fetch context and ASI:One
 
@@ -96,17 +107,29 @@ Ticketmaster does not publish the contract's required attendance field. A
 `TICKETMASTER_API_KEY` enables live event listings in public agent chat only.
 An unavailable source does not stop the kitchen.
 
-Set `ANTHROPIC_API_KEY` and an available `ANTHROPIC_MODEL` for Claude escalation
-choices and crowd classification. Without a key, routine engine decisions and
+Set `ANTHROPIC_API_KEY` (exactly this name: environment variables are
+case-sensitive) and optionally `ANTHROPIC_MODEL` for Claude escalation choices and
+crowd classification. When the Fetch agents are not running, set
+`COUNCIL_WAIT_S=0`: Claude otherwise waits 5 real seconds for their context, and
+at 120× an escalation's deadline is only 2.5–5 real seconds. Without a key, routine engine decisions and
 safe escalation fallbacks still run; chat uses its available fallback. Set
 `ASI1_API_KEY` / `ASI1_MODEL` for the optional ASI:One model fallback. Open ASI:One
 to chat with the registered Concierge after registration.
 
 ### SpacetimeDB and optional services
 
-For shared live tables, deploy the module in `spacetime/` and set backend
-`LIVE_TRANSPORT=spacetime`, `SPACETIMEDB_URL`, `SPACETIMEDB_DB`, and the runtime
-identity `SPACETIMEDB_TOKEN`. Set frontend `VITE_LIVE_TRANSPORT=spacetime`,
+For shared live tables, run SpacetimeDB and publish the module in `spacetime/`:
+
+```sh
+curl -sSf https://install.spacetimedb.com | sh   # CLI 2.13 into ~/.local/bin
+spacetime start                                  # local server on :3000 (own terminal)
+cd spacetime && spacetime publish --server local wattwise && npm run generate
+spacetime login show --token                     # the runtime identity's token
+```
+
+Then set backend `LIVE_TRANSPORT=spacetime`, `SPACETIMEDB_URL` (or `SPACETIME_URI`),
+`SPACETIMEDB_DB` (or `SPACETIME_DB`), and the runtime identity `SPACETIMEDB_TOKEN`
+(or `SPACETIME_TOKEN`); a local server needs no account or API key. Set frontend `VITE_LIVE_TRANSPORT=spacetime`,
 `VITE_SPACETIME_URI` (the WebSocket URI), and `VITE_SPACETIME_DB` in
 `frontend/.env.local`, then restart Vite. Use only a viewer identity for the
 optional browser token; never expose the runtime token. `/ws` still carries chat

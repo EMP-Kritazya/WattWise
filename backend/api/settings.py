@@ -45,6 +45,8 @@ class Settings:
     demo_mode: bool = False  # DEMO_MODE=1: recorded context, the identical run every time (never pauses the clock)
     council_wait_s: float = 0.0  # COUNCIL_WAIT_S (default 5 from the env, 0 in tests): wait for the council's context
     fixtures_dir: Path = field(default_factory=lambda: REPO_ROOT / "contracts" / "fixtures")
+    replay_month_s: float = 0.0  # REPLAY_MONTH_S (default 5 from the env, 0 in tests): Proof display pace per month
+    backtest_precompute: bool = False  # BACKTEST_PRECOMPUTE (default 1 from the env): fill the year cache at startup
 
     @classmethod
     def from_env(cls) -> "Settings":
@@ -65,4 +67,6 @@ class Settings:
             demo_mode=os.environ.get("DEMO_MODE") == "1",
             council_wait_s=float(os.environ.get("COUNCIL_WAIT_S", "5")),
             fixtures_dir=Path(os.environ.get("FIXTURES_DIR", REPO_ROOT / "contracts" / "fixtures")),
+            replay_month_s=float(os.environ.get("REPLAY_MONTH_S", "5")),
+            backtest_precompute=os.environ.get("BACKTEST_PRECOMPUTE", "1") == "1",
         )

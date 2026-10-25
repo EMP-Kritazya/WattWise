@@ -39,12 +39,42 @@ def test_deferrable_moves_three_kwh_into_first_valley():
 
 def test_flexible_reduces_only_four_kw_to_sixty_percent():
     now=local_ts(2026,7,10,12)
+    # 44 kW in blocks 0-1 -> 4 kW excess -> cap ceil((10-4)/10*100) = 60 % = 6 kW until 12:30; owed (4+4)*.25 = 2 kWh.
+    # Catch-up from 12:30 at the rated room 10-6 = 4 kW: 1 kWh in block 2, 1 kWh in block 3 (hvac back at 10 kW).
+    fc=forecast(now,{"must":[34,34,20,20,20,20,20,20],"hvac":[10,10,6,6,6,6,6,6]})
+    out=run(now,fc,[device("hvac","flexible",10,{"min_power_pct":40,"max_reduce_min":30})])
+    assert [(a["action"], a["value"]) for a in out["actions"]] == [("reduce", 60)]
+    assert out["forecast"]["total_kw"] == pytest.approx([40,40,30,30,26,26,26,26])
+    assert out["forecast"].get("unplaced_kwh", 0.0) == pytest.approx(0.0)
+
+
+# Repay-room check (decided 2026-10-25): a reduce is only made when its owed energy fits back under rated_kw before close
+# and the move, catch-up included, lowers the projected bill (energy is moved, never deleted, and never just shifts a peak).
+
+def test_reduce_rejected_when_the_device_has_no_room_to_repay():
+    now=local_ts(2026,7,10,12)
+    # hvac already at its rated 10 kW in every block: the 2 kWh a cap would owe can never come back -> no reduce.
     fc=forecast(now,{"must":[34]*8,"hvac":[10]*8})
     out=run(now,fc,[device("hvac","flexible",10,{"min_power_pct":40,"max_reduce_min":30})])
-    assert out["actions"][0]["value"] == 60
-    assert out["forecast"]["total_kw"][0] == 40
-    # With no spare capacity before the horizon ends, the 2 kWh remains explicitly owed.
-    assert sum(out["forecast"]["device_kw"]["hvac"])*.25 + out["forecast"]["unplaced_kwh"] == pytest.approx(20)
+    assert out["actions"] == []
+    assert out["forecast"]["total_kw"] == [44]*8
+
+
+def test_reduce_rejected_when_catch_up_only_moves_the_peak():
+    now=local_ts(2026,7,10,12)
+    # Blocks 0-1 at 44 kW; the 2 kWh catch-up would lift block 2 from 40 to 44 kW: the horizon peak stays 44 kW and the
+    # energy is the same at the same 12:00-14:00 price, so the move saves $0 -> no reduce.
+    fc=forecast(now,{"must":[34]*8,"hvac":[10,10,6,6,6,6,6,6]})
+    out=run(now,fc,[device("hvac","flexible",10,{"min_power_pct":40,"max_reduce_min":30})])
+    assert out["actions"] == []
+
+
+def test_reduce_rejected_when_repayment_would_fall_after_close():
+    now=local_ts(2026,7,10,21,15)
+    # Cap 21:15-21:45 owes 2 kWh; only the 21:45 block (1 kWh at 4 kW room) ends by the 22:00 close -> 1 kWh unpaid.
+    fc=forecast(now,{"must":[34,34,20,20,20,20,20,20],"hvac":[10,10,6,6,6,6,6,6]})
+    out=run(now,fc,[device("hvac","flexible",10,{"min_power_pct":40,"max_reduce_min":30})])
+    assert out["actions"] == []
 
 
 def test_protected_rejected_always_on_and_closed_never_reduced():
@@ -59,7 +89,9 @@ def test_protected_rejected_always_on_and_closed_never_reduced():
 
 def test_effects_are_marginal_and_add_up():
     now=local_ts(2026,7,10,12)
-    fc=forecast(now,{"must":[30,30,30,30,0,0,0,0],"a":[10]*8,"b":[10]*8})
+    # Both devices drop to 4 kW after 12:30, so each reduction's catch-up has room (repay-room check):
+    # a -> 40 % owes 3 kWh, b -> 60 % owes 2 kWh; totals become [40, 40, 18, 18, 8, 8, 8, 8].
+    fc=forecast(now,{"must":[30,30,0,0,0,0,0,0],"a":[10,10,4,4,4,4,4,4],"b":[10,10,4,4,4,4,4,4]})
     devices=[device(d,"flexible",10,{"min_power_pct":40,"max_reduce_min":30}) for d in ("a","b")]
     out=run(now,fc,devices)
     actions=out["actions"]

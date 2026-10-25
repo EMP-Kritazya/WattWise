@@ -18,6 +18,7 @@ import pytest
 import uvicorn
 
 from agent.claude_agent import ClaudeAgent
+from agent.tools import for_claude
 from api.settings import REPO_ROOT
 
 from .conftest import ScriptedLLM, load, text_turn, tool_turn
@@ -61,7 +62,7 @@ async def concierge(api_url):
 
 
 def tool_results(llm, request_index):
-    """The tool results the model got back in request `request_index`, by tool_use_id."""
+    """The tool results the model got back in request `request_index`, by tool_use_id (rounded to their units)."""
     return {r["tool_use_id"]: json.loads(r["content"]) for r in llm.requests[request_index]["messages"][-1]["content"]}
 
 
@@ -97,7 +98,7 @@ async def test_what_will_lunch_cost_me(app, concierge):
     assert await concierge.answer(OWNER, "What will lunch cost me?") == answer
     assert owner_message(llm) == "What will lunch cost me?"
     results = tool_results(llm, 1)
-    assert results["t1"] == forecast and results["t2"]["meter"] == meter
+    assert results["t1"] == for_claude(forecast) and results["t2"]["meter"] == for_claude(meter)
 
 
 async def test_explain_then_undo_a_named_decision_and_confirm(app, set_clock, facade_calls, concierge):
@@ -111,7 +112,7 @@ async def test_explain_then_undo_a_named_decision_and_confirm(app, set_clock, fa
         tool_turn(("t2", "propose_undo", undo)), text_turn("I've proposed undoing the HVAC reduction.")))
 
     assert await concierge.answer(OWNER, "Why did you delay the ice machine?") == why
-    assert tool_results(llm, 1)["t1"] == decision
+    assert tool_results(llm, 1)["t1"] == for_claude(decision)
 
     reply = await concierge.answer(OWNER, "Undo the HVAC reduction")
     assert reply == "I've proposed undoing the HVAC reduction." + hint(undo["summary"])
@@ -154,7 +155,7 @@ async def test_how_much_did_we_save_this_month(app, concierge):
     llm = use_llm(app, ScriptedLLM(tool_turn(("t1", "get_bill", bill["input"])), text_turn(answer)))
 
     assert await concierge.answer(OWNER, "How much did we save this month?") == answer
-    assert tool_results(llm, 1)["t1"] == bill["output"]
+    assert tool_results(llm, 1)["t1"] == for_claude(bill["output"])
 
 
 async def test_escalation_report_has_no_override_and_typed_choice_explains_control(app, set_clock, facade_calls,

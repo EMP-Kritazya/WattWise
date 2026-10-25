@@ -48,6 +48,8 @@ and record the source in `source_note`. Only electric equipment (gas appliances 
 | dishwasher | water_heating | deferrable | job | Cycle starts when enough dirty racks pile up |
 | water_heater | water_heating | flexible | cycling | Can run at reduced power and recover later |
 | lights | lighting | always_on | fixed | On during opening hours |
+| kitchen_exhaust | other | always_on | fixed | Hood exhaust, make-up air and RTU supply fans; runs 24/7 (ComStock `fans`, 5.74 kW) |
+| other_equipment | other | always_on | demand_driven | Plug and process load (holding cabinets, steamer, steam table, warmers, microwaves) |
 
 `params` keys per power model are fixed by CONTRACTS.md (EquipmentType). Owner can change importance per device (with limits) in the Kitchen Builder, and the count per type (0 = not present).
 Each type also carries `default_limits` (CONTRACTS.md) that must pass the engine's rules check: e.g. `walk_in_cooler` starts
@@ -83,8 +85,9 @@ The simulation reads only `sim_tick.inputs.is_open` and keeps every appliance's 
 | `is_open: false` | Behaviour |
 |---|---|
 | Customers | none arrive; orders in progress finish |
-| Cooking (`demand_driven`: fryer, oven, grill) | off (0 kW) 15 min after close; preheat from 30 min before open (`idle_kw`) |
-| Lights (`fixed`) | 10 % of `rated_kw` (night/security lighting) |
+| Cooking and other equipment (`demand_driven`: fryer, oven, grill, other_equipment) | off (0 kW) |
+| Lights (`fixed`) | off |
+| Kitchen exhaust (`fixed`, category `other`) | keeps running at `rated_kw` (ventilation runs around the clock) |
 | Refrigeration (`cycling`: walk-in, reach-in, freezer) | keeps cycling at `duty_idle_pct` (no door openings) |
 | Ice machine, dishwasher (`job`) | jobs still trigger and run (ice refills overnight; last dishwasher cycle after close) |
 | Water heater (`cycling`) | standby duty |

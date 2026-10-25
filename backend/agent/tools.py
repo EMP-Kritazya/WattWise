@@ -30,6 +30,26 @@ class ToolInputError(ValueError):
     """The model's tool input does not match the tool's schema."""
 
 
+def for_claude(value: Any, key: str = "") -> Any:
+    """A tool result as Claude reads it: every float rounded to the unit in its key (UI.md: kW 1 decimal, $ 2), so the
+    model quotes "39.6 kW", never "39.599999999999994 kW". Display rounding only: no number is computed here, and the
+    engine, proposals and stores keep full precision. A list takes its parent key's unit."""
+    if isinstance(value, dict):
+        return {k: for_claude(v, k) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [for_claude(v, key) for v in value]
+    if isinstance(value, float):
+        k = key.lower()
+        if "_per_" in k:
+            return round(value, 4)  # unit prices: usd_per_kwh, usd_per_kw
+        if k.endswith("_usd") or "_usd_" in k:
+            return round(value, 2)
+        if k.endswith(("_kw", "_kwh")) or "_kw_" in k or "_kwh_" in k:
+            return round(value, 1)
+        return round(value, 3)
+    return value
+
+
 def _obj(properties: dict, required: list[str] | None = None) -> dict:
     return {"type": "object", "properties": properties, "required": required or list(properties),
             "additionalProperties": False}

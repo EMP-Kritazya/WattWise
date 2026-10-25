@@ -6,9 +6,8 @@ import copy
 import pytest
 
 from backtest import checks
-from backtest.run import main, parse_months
+from backtest.run import parse_months
 from data.backtest_inputs import load_backtest_inputs, replay_months
-from data.recipe import RatedKwExceeded
 from engine.replay import run_backtest_with_diagnostics
 from tests.backtest.test_run_backtest import make_inputs
 from tests.data.helpers import needs_comstock
@@ -53,22 +52,21 @@ def test_parse_months():
 
 
 @needs_comstock
-def test_base_assumptions_are_refused_on_the_real_year_while_devices_exceed_rated():
-    """Current state (2026-10-24): base shares x the repo catalog put freezer, ice machine and water heater above rated_kw.
-    The loader refuses (never clips); the CLI exits 2. Remove this test once the catalog or the shares are reconciled."""
-    with pytest.raises(RatedKwExceeded):
-        load_backtest_inputs(["2026-07"], "base")
-    assert main(["--months", "2026-07", "--assumptions", "base", "--skip-slow-checks", "--out", "/dev/null"]) == 2
+def test_base_assumptions_load_on_the_real_year():
+    """Since the two-part recipe and the re-cited catalog (2026-10-25) no device of the real year exceeds its rated_kw, so
+    the base set loads (the loader would raise RatedKwExceeded otherwise, never clip)."""
+    inp = load_backtest_inputs(["2026-07"], "base")
+    assert inp["series"]["label"] == "calibrated_model" and inp["assumptions"]["assumptions_id"] == "base"
 
 
 @needs_comstock
 @pytest.mark.slow
-def test_real_year_pipeline_on_the_redistribute_proposal(tmp_path):
+def test_real_year_pipeline_on_base(tmp_path):
     """The whole 2026 replay calendar on PG&E B-19: 12 marks, January and December partial, every check passes."""
     months = replay_months()
-    inp = load_backtest_inputs(months, "base_redistribute_proposal")
+    inp = load_backtest_inputs(months, "base")
     events = []
-    results, diag = run_backtest_with_diagnostics(inp, months, "base_redistribute_proposal", events.append)
+    results, diag = run_backtest_with_diagnostics(inp, months, "base", events.append)
     assert [r["month"] for r in results] == months
     assert [r["partial"] for r in results] == [True] + [False] * 10 + [True]
     assert diag.scored_days["2026-01"] == 6 and diag.scored_days["2026-12"] == 28

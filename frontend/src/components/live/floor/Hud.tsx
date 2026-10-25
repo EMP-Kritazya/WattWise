@@ -48,7 +48,7 @@ function MeterRow({ label, value, cap, scale, color }: { label: string; value: n
         <span className="text-white/75">{label}</span>
         <span className={cn("font-semibold tabular-nums", over ? "text-red-300" : "text-white")}>
           {fmtKw(value)}
-          {over && <span className="ml-1 animate-pulse text-[10px] font-bold tracking-wide text-red-400">OVER CAP</span>}
+          {over && <span className="ml-1 text-[10px] font-bold tracking-wide text-red-400">OVER CAP</span>}
         </span>
       </div>
       <div className="relative mt-1.5 h-2.5 rounded-full bg-white/10">

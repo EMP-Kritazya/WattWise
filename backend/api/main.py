@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from agent.claude_agent import ClaudeAgent, create_asi1_llm, create_llm
 from agent.proposals import ProposalBook
 from agent.tools import AgentTools
+from runtime.backtest_runner import BacktestRunner, BacktestUnavailable
 from runtime.device_bridge import DeviceBridge
 from runtime.hub_link import HubLink
 from runtime.kitchen_factory import load_engine
@@ -170,8 +171,14 @@ async def post_proposal_confirm(proposal_id: str, body: m.ProposalConfirmRequest
 # ---------------------------------------------------------------- backtest, chat
 
 @router.post("/backtest/run", response_model=m.BacktestRunStarted, **_exclude_unset)
-def post_backtest_run(body: m.BacktestRunRequest, svc: Service):
-    return svc.run_backtest(_body(body))
+async def post_backtest_run(body: m.BacktestRunRequest, request: Request, svc: Service):
+    runner: BacktestRunner | None = request.app.state.backtests
+    if runner is None:  # fake engine: the recorded fixture run
+        return await asyncio.to_thread(svc.run_backtest, _body(body))
+    try:
+        return await runner.start(list(body.months), body.assumptions_id)
+    except BacktestUnavailable as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
 
 @router.get("/backtest/{run_id}", response_model=list[m.BacktestResult], responses=R404, **_exclude_unset)
@@ -233,7 +240,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         start_live = getattr(app.state.live_port, "start", None)
         if start_live is not None:
             start_live()
+        runner = app.state.backtests
+        if runner is not None and settings.backtest_precompute:
+            from data.backtest_inputs import replay_months
+
+            # Fill the Proof cache in a background process, so "Replay the year" plays at once.
+            app.state.backtest_warm = asyncio.create_task(runner.warm(replay_months(), "base"), name="backtest-warm")
         yield
+        if runner is not None:
+            await runner.stop()
         await app.state.agent.wait_chats()
         await app.state.runtime.stop()
         close_live = getattr(app.state.live_port, "close", None)
@@ -276,6 +291,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     fallback = None if isinstance(port, WsLive) else WsLive(broadcaster.broadcast)
     live = LivePublisher(port, fallback=fallback, on_warning=broadcaster.broadcast)
     bridge = DeviceBridge(settings.hardware, store, on_warning=broadcaster.send_soon)
+    # Proof (Mode A): the real engine's year replay, paced onto the live port; the fake engine serves its fixture run.
+    app.state.backtests = None if fake else BacktestRunner(
+        store=store, live=live, publish_ws=broadcaster.broadcast, month_s=settings.replay_month_s)
     app.state.runtime = runtime = RunLoop(service=service, hub=hub, live=live, store=store,
                                           start_sim_ts=settings.sim_start_ts, publish_ws=broadcaster.send_soon,
                                           council_wait_s=settings.council_wait_s,

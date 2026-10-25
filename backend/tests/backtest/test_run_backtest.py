@@ -1,7 +1,7 @@
 """engine.run_backtest (CONTRACTS.md section 3): event order, month marks, checks, knobs, determinism.
 
 Synthetic ComStock-shaped rows (tests/data/helpers.py) go through the real loader path (`build_backtest_inputs`) and the real
-Kitchen. The decider is still a stub, so `with` equals `without` here; no test fakes a saving.
+Kitchen (with the real decider). No test fakes a saving.
 """
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ from data.recipe import distribute
 from data.tariffs import load_tariff
 from engine import run_backtest
 from engine.replay import run_backtest_with_diagnostics
-from tests.data.helpers import catalog, doc_and_base, synthetic_rows
+from tests.data.helpers import catalog, doc_and_base, open_of, synthetic_rows
 
 REPO = Path(__file__).resolve().parents[3]
 B19_FIXTURE = json.loads((REPO / "contracts" / "fixtures" / "shapes" / "tariff_pge_b19.json").read_text())
@@ -30,7 +30,7 @@ def make_inputs(months, *, start=datetime(2018, 5, 6, 7, 0, tzinfo=timezone.utc)
     doc, _ = doc_and_base()
     base = dict(resolve(assumptions_id, doc), **knobs)
     rows = synthetic_rows(start, days)
-    dev = distribute(rows, doc["kitchen"]["equipment"], catalog(), doc["step1"], base)
+    dev = distribute(rows, doc["kitchen"]["equipment"], catalog(), doc["step1"], base, open_of(rows, doc))
     return build_backtest_inputs(rows, dev, months, base, doc, tariff or load_tariff("demo"), catalog())
 
 
@@ -80,13 +80,16 @@ def test_checks_and_labels(june_run):
     assert diag.peek_errors == 0 and diag.commands_issued["without"] == 0
 
 
-def test_with_equals_without_while_the_decider_is_a_stub(june_run):
-    """STUB dependency (ENGINE.md section 5): no Commands, so the `with` bill is the `without` bill and saved_usd is 0.00."""
+def test_with_lane_moves_energy_and_never_deletes_it(june_run):
+    """Golden rule 5: every policy uses the same month energy; saved_usd is the bill difference, computed in backend code."""
     _, _, results, diag = june_run
     res = results[0]
-    if diag.commands_issued["with"] == 0:
-        assert res["saved_usd"] == 0.0
-        assert res["policies"]["with"] == res["policies"]["without"]
+    pol = res["policies"]
+    assert pol["with"]["energy_kwh"] == pytest.approx(pol["without"]["energy_kwh"], abs=1e-6)
+    assert pol["timer"]["energy_kwh"] == pytest.approx(pol["without"]["energy_kwh"], abs=1e-6)
+    assert res["saved_usd"] == round(pol["without"]["total_usd"] - pol["with"]["total_usd"], 2)
+    assert res["checks"] == {"baseline_matches_raw": True, "energy_conserved": True, "rule_violations": 0}
+    assert diag.over_rated_blocks["with"] == 0  # repay-room check: no close-time dump above a device's rating
 
 
 def test_month_to_date_grows_and_costs_are_month_to_date(june_run):

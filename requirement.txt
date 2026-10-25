@@ -1,0 +1,35 @@
+# WattWise: every Python package for the whole project (Python 3.11).
+#   python -m venv .venv
+#   .venv\Scripts\activate          (Windows)   |   source .venv/bin/activate   (macOS / Linux)
+#   pip install -r requirements.txt
+#
+# Covers backend/ (API, runtime, Claude agent, store), the engine (engine, backtest, data, live) and agents/ (Fetch.ai uAgents).
+# Not Python, installed separately:
+#   frontend/   npm install            (React, Vite, Three.js, SpacetimeDB client)
+#   spacetime/  npm install + the SpacetimeDB CLI (spacetime build / publish)
+#   repo root   npm install            (Convex: npx convex dev)
+#   firmware/   PlatformIO (ESP32: convex-esp32, ArduinoJson 7)
+
+# API and runtime
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2.7
+httpx>=0.28
+websockets>=12
+tzdata>=2024.1            # time zone data on Windows (tariff and opening hours in local time)
+
+# Engine, backtest and data
+numpy>=1.26
+pandas>=2.2
+pyarrow>=15               # pandas.read_parquet for the NREL ComStock file (backend/data/comstock.py)
+
+# AI and integrations
+anthropic>=2.3            # Claude: agent/claude_agent.py, agents/crowd.py
+convex>=0.7               # Convex store (backend/store/convex_store.py)
+uagents>=0.26.1           # Fetch.ai agents
+uagents-core>=0.4.12      # Agent Chat Protocol + Payment Protocol models
+stripe>=10                # Payment Protocol checkout, Stripe TEST mode only
+
+# Tests
+pytest>=8.2
+pytest-asyncio>=0.23

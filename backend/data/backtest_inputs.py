@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import Mapping, Optional, Sequence
 from zoneinfo import ZoneInfo
 
+import numpy as np
+
 from backtest import assumptions as assumptions_mod
 
 from .comstock import COMSTOCK_FILE, DATASET_ID, ComStockRows, load_comstock
@@ -36,6 +38,18 @@ def _month_bounds_utc(month: str, tz: ZoneInfo) -> tuple[datetime, datetime]:
     a = datetime(y, m, 1, tzinfo=tz)
     b = datetime(y + m // 12, m % 12 + 1, 1, tzinfo=tz)
     return a.astimezone(timezone.utc), b.astimezone(timezone.utc)
+
+
+def open_mask(rows: ComStockRows, operating_hours: Mapping, tz: ZoneInfo) -> np.ndarray:
+    """One bool per row: the block starts inside `[open, close)` local time. The day_offset keeps weekday and DST, so a
+    dataset row's local time is also its replay-calendar local time."""
+    def minute(hm: str) -> int:
+        h, m = hm.split(":")
+        return int(h) * 60 + int(m)
+
+    a, b = minute(operating_hours["open"]), minute(operating_hours["close"])
+    local = np.array([(lambda t: t.hour * 60 + t.minute)(s.astimezone(tz)) for s in rows.start_utc])
+    return (local >= a) & (local < b)
 
 
 def kitchen_config(doc: Mapping, tariff_id: str) -> dict:
@@ -115,7 +129,8 @@ def load_backtest_inputs(months: Sequence[str], assumptions_id: str, *, tariff: 
     catalog = load_catalog()
     path = comstock_path or assumptions_mod.repo_path(doc["dataset"]["file"]) or COMSTOCK_FILE
     rows = load_comstock(path, DATASET_ID)
-    devices = distribute(rows, doc["kitchen"]["equipment"], catalog, doc["step1"], resolved)
+    is_open = open_mask(rows, doc["kitchen"]["operating_hours"], ZoneInfo(tariff_obj["timezone"]))
+    devices = distribute(rows, doc["kitchen"]["equipment"], catalog, doc["step1"], resolved, is_open)
     return build_backtest_inputs(rows, devices, months, resolved, doc, tariff_obj, catalog)
 
 

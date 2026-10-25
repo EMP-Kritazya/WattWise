@@ -31,7 +31,7 @@ Record dataset id, county and convention in the table below.
 | Electricity column names used | `out.electricity.{cooling,fans,heating,pumps,heat_rejection,heat_recovery,interior_equipment,interior_lighting,exterior_lighting,refrigeration,water_systems,pv,total}.energy_consumption` (kWh per 15 min, `kW = kWh × 4`); refrigeration, water_systems and pv are 0 for bldg 5847 (the loader raises otherwise) |
 | Calendar (`day_offset`) | **2919 days** (417 weeks): 2018-01-01 (Mon) → 2025-12-29 (Mon). It also maps the 2018 DST switches onto the 2026 ones (11 Mar → 8 Mar, 4 Nov → 1 Nov), so the wall-clock schedule is kept exactly. Replay calendar 2025-12-29 … 2026-12-28: January 2026 is partial (warm-up = first 28 days, scored 26–31 Jan) and **December 2026 is partial too** (1–28 Dec, the data ends) |
 | Tariff | PG&E B-19 Secondary Voluntary, URDB `69de8cdb02f684104e01267d` (`label: "urdb"`), converted by `backend/data/tariff_urdb.py` (equals `contracts/fixtures/shapes/tariff_pge_b19.json`, tested) |
-| Recipe values | `backend/backtest/assumptions.yaml` (step 1 mapping, step-2 `interior_equipment` shares from appliance-split §3, Demo Café roster, sensitivity ids) |
+| Recipe values | `backend/backtest/assumptions.yaml` (step 1 mapping, two-part step 2: `base_duty` + `variable_shares` from appliance-split §3, Demo Café roster and hours, sensitivity ids) |
 
 ## Real data in the live product (not only on the Proof screen)
 The same ComStock restaurant and the same URDB tariff feed the live demo, so the live kitchen is "today" in a real, calibrated
@@ -64,31 +64,32 @@ Rules for the live use:
 ## Distributing historical load onto devices (engine code, never AI)
 A fixed recipe. Same input → same output. Devices always sum to the original value exactly.
 
-**Step 1 — total → categories**
-- ComStock: already split (end-use columns). Mapping (2026-10-24): **cooling = `cooling` + `fans` + `heating` + `pumps` +
-  `heat_rejection` + `heat_recovery`** (ComStock's own electric HVAC group; for bldg 5847 heating, pumps, heat rejection and
-  recovery are 0, `fans` is a constant 5.739 kW all year because the RTU runs `night_fanon_vent`, and cooling + fans = 74,322 kWh
-  = `calc.enduse_group.electricity.hvac`) → split equally over the `hvac` units. Worst 15-min block 15.714 kW
-  (2018-06-23 18:45 local) = 7.857 kW per unit for two units, under the catalog's 8.0 kW (a validation test replays the whole
-  year's HVAC series and fails if any block would exceed `rated_kw`; the loader raises, it never clips). The other end uses
-  (`interior_equipment`, lighting) → categories by the shares in `backtest/assumptions.yaml` (from appliance-split §3).
+**Step 1 — total → groups** (revised 2026-10-25, appliance-recheck.md)
+- ComStock: already split (end-use columns). **hvac = `cooling` + `heating` + `pumps` + `heat_rejection` + `heat_recovery`**
+  → split equally over the `hvac` units (bldg 5847: only cooling is non-zero; worst block 9.974 kW at 2018-06-23 18:30 PST =
+  4.987 kW per unit, under the catalog's 5.0 kW). **exhaust = `fans`** (a constant 5.739 kW all year, `night_fanon_vent`) →
+  `kitchen_exhaust` (rated 5.74). **lights = `interior_lighting` + `exterior_lighting`** → `lights` (max 1.58 kW, rated 1.6).
+  `interior_equipment` (+ the file's float32 residual) → step 2. refrigeration, water_systems and pv must be 0 (the loader raises).
   Every device row sums exactly to the dataset's `total` for that row; the baseline is never altered.
 - Real meter (total only): apply ComStock's category shares for that hour of day as a template, scaled to the real total.
 
-**Step 2 — category → devices** using fixed shares per device (from rated power × typical duty cycle).
+**Step 2 — interior_equipment → devices, two-part** (decided 2026-10-25; `backend/data/recipe.py`)
+1. **Base:** refrigeration draws its duty average, `rated_kw × duty`: the catalog's busy/idle midpoint while the kitchen is open
+   and its idle duty while closed (walk-in 2.0 kW × 50 / 33 %, reach-in 0.6 × 32.5 / 20 %, freezer 0.7 × 52.5 / 40 %), and the
+   ice machine 1.2 kW × 60 % (ASSUMPTION). In a row where interior_equipment is smaller (overnight it is 0.7 kW), all base
+   devices are scaled down together; the data never gets more energy.
+2. **Variable rest** (interior_equipment − base) by energy shares from appliance-split §3's daily kWh model: fryer 6.6,
+   oven 8.2, grill 13.8, dishwasher 5.5, water heater 17.1 %, and **other_equipment 48.8 %** (always_on plug and process load:
+   holding cabinets, steamer, steam table, warmers, microwaves; the 205.7 kWh/day no catalog device explains). Its rated_kw 16.4
+   is this recipe's residual peak (16.30 kW) rounded up.
 
-Example, one 15-min interval, total 50 kW:
-| Category | Share | kW | Devices |
-|---|---|---|---|
-| Refrigeration | 30% | 15.0 | walk-in 7.5 · reach-in 4.5 · ice machine 3.0 |
-| Cooling | 25% | 12.5 | HVAC 12.5 |
-| Cooking | 25% | 12.5 | oven 5.0 · fryer 5.0 · grill 2.5 |
-| Water heating | 10% | 5.0 | water heater 3.0 · dishwasher 2.0 |
-| Lighting | 10% | 5.0 | lights 5.0 |
-| **Total** | | **50.0** | sums exactly |
+No device exceeds its catalog `rated_kw` anywhere in the year (a test replays the whole year; the loader raises, never clips).
+The backtest kitchen keeps **09:00–24:00** hours (the live Demo Café keeps 10:00–22:00): ComStock 5847 is busy from 09:00 to
+02:00, and a 22:00 close would put the close-time rules inside the data's dinner service. A close after midnight is not in the
+contract, so 24:00 is the closest.
 
-Shares and windows are **assumptions**: keep them in `backtest/assumptions.yaml` with ids
-(`base`, `low_flex`, `heavy_equipment`, `bad_forecast`).
+Shares, duties and hours are **assumptions**: they live in `backtest/assumptions.yaml` with ids
+(`base`, `low_flex`, `heavy_equipment`, `bad_forecast`, and `zero_flex` for the zero-flexibility check).
 
 ## Replay and backtest
 - The replay feeds the kitchen one 15-min row at a time → no peeking by construction.
@@ -108,6 +109,15 @@ Shares and windows are **assumptions**: keep them in `backtest/assumptions.yaml`
 
 Context in replay: historical weather (Open-Meteo archive) and prices (CAISO history) for the same dates, labeled
 `recorded` (historical archives); crowd effect `none`. Optional, cut item: one replayed week with Claude resolving escalations, shown separately.
+
+**Serving the replay** (`backend/runtime/backtest_runner.py`, 2026-10-25): `POST /api/backtest/run` answers with a `run_id`
+at once and plays the run's `on_progress` events in order: `backtest_point` / `backtest_month` through the live port (SpacetimeDB
+rows, or /ws messages), `backtest_progress` over /ws. A month takes `REPLAY_MONTH_S` real seconds (default 5, so the year plays in
+about a minute); the pace is display only. The replay itself runs in a separate process (CPU-bound; a thread would starve the live
+clock) at about 18 s per month, and the finished events are cached in `data/backtest_cache/proof_<fingerprint>.json`, keyed by the
+catalog, assumptions, tariff and engine/data code. `BACKTEST_PRECOMPUTE=1` (default) fills that cache at startup, so the Proof
+button plays at once; a press during the warm-up follows the computation as it goes. Without the dataset and without a cache the
+request answers 422 with the reason.
 
 ## Checks (all must pass before a number is shown)
 | Check | Expected |

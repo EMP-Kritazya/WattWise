@@ -139,3 +139,15 @@ def test_forecast_tool_always_uses_the_contract_horizon(app, monkeypatch):
     monkeypatch.setattr(app.state.service.lanes["with"], "forecast", lambda horizon_min: calls.append(horizon_min) or [])
     assert app.state.agent_tools.get_forecast() == []
     assert calls == [120]
+
+
+def test_tool_results_reach_claude_rounded_to_their_units():
+    from agent.tools import for_claude
+
+    out = for_claude({"total_kw": 39.599999999999994, "energy_kwh_today": 319.19383333333394, "cost_usd_today": 89.28525666,
+                      "price_usd_per_kwh_now": 0.22345, "harm_score": 0.026323812643499405, "tick_id": 120,
+                      "forecast": {"total_kw": [40.23669042856598, 35.18738627919204]},
+                      "demand_peaks": [{"peak_kw": 42.53699999999999, "cost_usd": 850.8000001}], "name": "HVAC 1"})
+    assert out == {"total_kw": 39.6, "energy_kwh_today": 319.2, "cost_usd_today": 89.29, "price_usd_per_kwh_now": 0.2235,
+                   "harm_score": 0.026, "tick_id": 120, "forecast": {"total_kw": [40.2, 35.2]},
+                   "demand_peaks": [{"peak_kw": 42.5, "cost_usd": 850.8}], "name": "HVAC 1"}

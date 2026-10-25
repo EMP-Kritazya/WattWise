@@ -8,7 +8,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "seed": "node --experimental-strip-types seed.ts",
     "build": "spacetime build",
-    "generate": "spacetime generate --lang typescript --out-dir ../frontend/src/module_bindings --project-path .",
+    "generate": "spacetime generate --lang typescript --out-dir ../frontend/src/module_bindings --module-path .",
     "test": "vitest run"
   },
   "dependencies": {

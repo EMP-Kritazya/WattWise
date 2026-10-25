@@ -43,6 +43,8 @@ export const APPLIANCE: Record<string, string> = {
   water_heater: "#FFC8DD",
   ice_machine: "#CDEAC0",
   hvac: "#E9EDC9",
+  kitchen_exhaust: "#D8E2DC",
+  other_equipment: "#E2C2FF",
 };
 /** Fallback per category for types the catalog adds later. */
 export const APPLIANCE_BY_CATEGORY: Record<Category, string> = {

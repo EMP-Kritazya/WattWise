@@ -1812,11 +1812,21 @@ def scenario_pass(store):
     if tariff_obj["fixed_charges"] != [] or [(c["name"], c["usd_per_kw"], c["windows"]) for c in tariff_obj["demand"]] != \
             [("max_demand", 20.0, None), ("peak_demand", 8.0, [{"start": "16:00", "end": "21:00"}])]:
         fail("shapes/tariff.json", "demo_tariff_v1 keeps $20/kW max, $8/kW 16:00-21:00, no fixed charges")
+    # The fixture catalog is the frozen 2026-10-24 toy catalog the scripted scenario is tuned to; the real catalog
+    # (re-cited 2026-10-25) has other numbers and two more types. Every fixture type must still exist there with the same
+    # shape, so the fakes and the real app speak the same contract.
     src_cat = os.path.join(REPO, "backend", "data", "equipment_catalog.json")
     if os.path.exists(src_cat):
         with open(src_cat, encoding="utf-8") as f:
-            if json.load(f) != store["shapes/equipment_catalog.json"]:
-                fail("shapes/equipment_catalog.json", "must equal backend/data/equipment_catalog.json verbatim")
+            real = {c["type_id"]: c for c in json.load(f)}
+        for c in store["shapes/equipment_catalog.json"]:
+            r = real.get(c["type_id"])
+            same = r is not None and all(r[k] == c[k] for k in ("category", "power_model", "default_importance")) \
+                and set(r["params"]) == set(c["params"]) and set(r["default_limits"]) == set(c["default_limits"])
+            if not same:
+                fail("shapes/equipment_catalog.json",
+                     f"{c['type_id']}: not in backend/data/equipment_catalog.json with the same category, power_model, "
+                     "default_importance and params / default_limits keys")
     if catalog["hvac"]["rated_kw"] != 8.0:
         fail("catalog", "hvac rated_kw 8.0")
     roster = []

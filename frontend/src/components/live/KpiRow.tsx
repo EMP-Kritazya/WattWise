@@ -100,7 +100,7 @@ function Kpi({
           {label}
           {live && (
             <span className="flex items-center gap-1 text-lane-with">
-              <span className="size-1.5 animate-pulse rounded-full bg-lane-with" /> Live
+              <span className="size-1.5 rounded-full bg-lane-with" /> Live
             </span>
           )}
         </div>

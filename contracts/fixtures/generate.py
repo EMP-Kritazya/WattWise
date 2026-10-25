@@ -142,8 +142,8 @@ def duty(type_id):
     return {"duty_idle_pct": half_up(100 * p["a"] / p["rate"]), "duty_busy_pct": half_up(100 * (p["a"] + p["b"]) / p["rate"])}
 
 
-# Catalog source notes, copied verbatim from backend/data/equipment_catalog.json (branch ashirwad, the frontend's catalog
-# is the truth). type_id, power numbers, params and default_limits below already equal that file.
+# Catalog source notes of the frozen 2026-10-24 toy catalog this scenario is tuned to. The real catalog
+# (backend/data/equipment_catalog.json) was re-cited on 2026-10-25; check.py keeps the two in the same shape.
 SOURCE_NOTES = {
     "hvac":
         "One 5-ton packaged RTU (PSZ-AC, gas furnace), per unit: DX compressor ~5.45 kW (60 kBtu/h / EER 11) + share of the constant ventilation fans. Sized on NREL ComStock bldg 5847 upgrade 45 (2018): HVAC = cooling + fans + heating (ComStock's electric HVAC group, 74,322 kWh/yr); fans are a constant 5.739 kW (night_fanon_vent); worst 15-min block 15.714 kW (2018-06-23 18:45) = 7.857 kW per unit for 2 units, so 8.0 kW covers the whole year without clipping. 40 % min = 3.2 kW >= the 2.87 kW ventilation fan share per unit. derived",

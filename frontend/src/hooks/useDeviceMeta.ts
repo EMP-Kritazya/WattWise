@@ -9,6 +9,7 @@ import {
   Refrigerator,
   Snowflake,
   WashingMachine,
+  Wind,
   type LucideIcon,
 } from "lucide-react";
 import { deviceColor } from "@/lib/theme";
@@ -37,6 +38,8 @@ const TYPE_ICON: Record<string, LucideIcon> = {
   dishwasher: WashingMachine,
   water_heater: Droplets,
   lights: Lightbulb,
+  kitchen_exhaust: Wind,
+  other_equipment: Plug,
 };
 
 const CATEGORY_ICON: Record<Category, LucideIcon> = {
@@ -61,6 +64,8 @@ const FALLBACK_CATEGORY: Record<string, Category> = {
   dishwasher: "water_heating",
   water_heater: "water_heating",
   lights: "lighting",
+  kitchen_exhaust: "other",
+  other_equipment: "other",
 };
 
 /** Per-device display info: category (from the catalog), stable color, icon. In kitchen order. */

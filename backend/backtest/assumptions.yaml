@@ -7,17 +7,25 @@
 # - dataset: NREL ComStock comstock_amy2018_release_3, upgrade 45 (electric kitchen), bldg_id 5847, San Francisco County
 #   (G0600750), 2,000 ft2 full-service restaurant, 52.0 kW peak, 251 MWh/yr (DATASET_AND_TARIFF_SELECTION.md).
 # - tariff: PG&E B-19 Secondary Voluntary, URDB 69de8cdb02f684104e01267d (converted by data/tariff_urdb.py).
-# - step 1: hvac = cooling + fans + heating + pumps + heat_rejection + heat_recovery, split equally over the hvac units;
-#   lights = interior_lighting + exterior_lighting; interior_equipment -> the nine kitchen devices (DATA_AND_PROOF.md Step 1).
+# - step 1: hvac = cooling + heating + pumps + heat_rejection + heat_recovery, split equally over the hvac units; exhaust =
+#   fans (constant 5.74 kW) -> kitchen_exhaust; lights = interior_lighting + exterior_lighting; interior_equipment -> step 2
+#   (DATA_AND_PROOF.md Step 1). Fans moved out of hvac on 2026-10-25 (appliance-recheck.md section 7).
 #   refrigeration, water_systems and pv are 0 for bldg 5847; the loader raises if they are not (they have no mapping).
 #   The float32 residual of the file (total - sum of end uses, at most 3.0e-6 kWh per row) is added to interior_equipment
 #   before step 2, so every row's devices sum exactly to `out.electricity.total` (the baseline is never altered).
-# - step 2 shares: appliance-split.md section 3 "interior_equipment" (energy-weighted rated_kw x duty, sum 100.0).
+# - step 2 is two-part (decided 2026-10-25). base_duty: refrigeration draws rated_kw x duty, the catalog's busy/idle midpoint
+#   while open and its idle duty while closed; the ice machine 60 % (ASSUMPTION, appliance-split.md section 3). The base is
+#   scaled down in rows where interior_equipment is smaller (overnight it is 0.7 kW). variable_shares: the rest, by the daily
+#   kWh of appliance-split.md section 3 (fryer 27.9, oven 34.6, grill 58.0, dishwasher 23.1, water heater 72.0 kWh/day) with
+#   other_equipment taking the unexplained remainder (421.3 - 215.6 = 205.7 kWh/day); sum 100.0.
+# - kitchen hours 09:00-24:00 here (the live Demo Cafe keeps 10:00-22:00): ComStock 5847's restaurant schedule is busy from
+#   09:00 to 02:00 (interior_equipment ~15 kW at 09h and 00h), and a close at 22:00 would put the engine's close-time rules in
+#   the middle of the data's dinner service. A close after midnight is not in the contract, so 24:00 is the closest.
 # - day_offset 2919 days = 417 weeks: 2018-01-01 (Mon) -> 2025-12-29 (Mon). It also lines up DST: 2018-03-11 -> 2026-03-08 and
 #   2018-11-04 -> 2026-11-01, both the real 2026 DST dates, so the kitchen's wall-clock schedule is kept exactly.
 #   Consequence: the replay calendar is 2025-12-29 .. 2026-12-28; January 2026 is partial (warm-up = first 28 days, scored
 #   from 26 Jan) and December 2026 is partial too (1-28 Dec; the dataset ends there).
-# - overflow "raise": a device block above its catalog rated_kw stops the loader (never clipped).
+# - a device block above its catalog rated_kw stops the loader with RatedKwExceeded (never clipped).
 #
 # Sensitivity ids (DATA_AND_PROOF.md): low_flex (half the flexibility), heavy_equipment (+20 % draw), bad_forecast (+/-20 %
 # forecast noise). zero_flex is the "zero-flexibility run saves 0" check, not a sensitivity case.
@@ -43,11 +51,13 @@
       { "type_id": "grill", "count": 1, "importance": "always_on", "limits": {} },
       { "type_id": "dishwasher", "count": 1, "importance": "deferrable", "limits": { "max_delay_min": 60, "must_finish_by": "19:30" } },
       { "type_id": "water_heater", "count": 1, "importance": "flexible", "limits": { "min_power_pct": 40, "max_reduce_min": 30 } },
-      { "type_id": "lights", "count": 1, "importance": "always_on", "limits": {} }
+      { "type_id": "lights", "count": 1, "importance": "always_on", "limits": {} },
+      { "type_id": "kitchen_exhaust", "count": 1, "importance": "always_on", "limits": {} },
+      { "type_id": "other_equipment", "count": 1, "importance": "always_on", "limits": {} }
     ],
     "peak_mode": "cap",
     "peak_cap_kw": 40.0,
-    "operating_hours": { "open": "10:00", "close": "22:00" },
+    "operating_hours": { "open": "09:00", "close": "24:00" },
     "location": { "lat": 37.8, "lon": -122.44, "label": "Marina, San Francisco" },
     "owner_preferences": "Keep the dining room comfortable during dinner service.",
     "authority": { "enabled": true, "max_cap_overrun_kw": 3.0, "max_extra_delay_min": 20, "max_extra_reduce_min": 15, "may_go_below_min_power": false },
@@ -55,7 +65,8 @@
     "seed": 42
   },
   "step1": {
-    "hvac": ["cooling", "fans", "heating", "pumps", "heat_rejection", "heat_recovery"],
+    "hvac": ["cooling", "heating", "pumps", "heat_rejection", "heat_recovery"],
+    "exhaust": ["fans"],
     "lights": ["interior_lighting", "exterior_lighting"],
     "interior_equipment": ["interior_equipment"],
     "must_be_zero": ["refrigeration", "water_systems", "pv"]
@@ -65,27 +76,24 @@
       "flex_scale": 1.0,
       "draw_scale": 1.0,
       "forecast_noise_pct": 0.0,
-      "overflow": "raise",
-      "interior_equipment": {
-        "walk_in_cooler": 7.4,
-        "reach_in_fridge": 1.4,
-        "freezer": 4.1,
-        "ice_machine": 6.5,
-        "fryer": 10.4,
-        "oven": 12.9,
-        "grill": 21.7,
-        "dishwasher": 8.6,
-        "water_heater": 27.0
+      "base_duty": {
+        "walk_in_cooler": { "open_pct": 50.0, "closed_pct": 33.0 },
+        "reach_in_fridge": { "open_pct": 32.5, "closed_pct": 20.0 },
+        "freezer": { "open_pct": 52.5, "closed_pct": 40.0 },
+        "ice_machine": { "open_pct": 60.0, "closed_pct": 60.0 }
+      },
+      "variable_shares": {
+        "fryer": 6.6,
+        "oven": 8.2,
+        "grill": 13.8,
+        "dishwasher": 5.5,
+        "water_heater": 17.1,
+        "other_equipment": 48.8
       }
     },
     "low_flex": { "inherits": "base", "flex_scale": 0.5 },
     "heavy_equipment": { "inherits": "base", "draw_scale": 1.2 },
     "bad_forecast": { "inherits": "base", "forecast_noise_pct": 20.0 },
-    "zero_flex": { "inherits": "base", "flex_scale": 0.0 },
-    "base_redistribute_proposal": {
-      "inherits": "base",
-      "overflow": "redistribute",
-      "status": "PROPOSAL, not approved: a device block above rated_kw is capped at rated_kw and the excess is spread over the other interior_equipment devices in proportion to their shares (the row total is unchanged). Exists only so the pipeline can be exercised on the full year while `base` raises."
-    }
+    "zero_flex": { "inherits": "base", "flex_scale": 0.0 }
   }
 }

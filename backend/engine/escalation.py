@@ -357,7 +357,10 @@ def resolve(k, escalation_id, option_id, resolved_by, rationale=None):
             e['problem'].update(forecast_peak_kw=fresh['total_kw'][index],target_kw=target,
                                 excess_kw=max(0.,fresh['total_kw'][index]-target))
             if replacement is None:
-                reason = 'outside_authority'
+                # The engine's own fallback, already in force, drops out of a fresh replan (its effect is in the
+                # forecast). Claude confirming it is still a valid pick; any other vanished option is not.
+                if option_id != e['active_option_id'] or not authorized(option, k.authority):
+                    reason = 'outside_authority'
             else:
                 option = replacement
                 e['options'] = [replacement if o['option_id']==option_id else o for o in e['options']]
@@ -385,9 +388,10 @@ def resolve(k, escalation_id, option_id, resolved_by, rationale=None):
     if reason=='after_deadline':
         e.update(status='expired_default',resolved_by='default')
     elif reason is None:
-        previous=next(o for o in e['options'] if o['option_id']==e['active_option_id'])
-        _apply(k,now,option,'escalation_choice',previous,until=_time(e['block_start'])+BLOCK,
-               baseline=getattr(k,'_escalation_baselines',{}).get(escalation_id,{}),escalation_id=escalation_id)
+        if option_id != e['active_option_id']:  # the active option is already applied: nothing to re-issue
+            previous=next(o for o in e['options'] if o['option_id']==e['active_option_id'])
+            _apply(k,now,option,'escalation_choice',previous,until=_time(e['block_start'])+BLOCK,
+                   baseline=getattr(k,'_escalation_baselines',{}).get(escalation_id,{}),escalation_id=escalation_id)
         e.update(status='resolved',resolved_by='claude',chosen_option_id=option_id,
                  active_option_id=option_id,rationale=rationale)
     return Escalation.model_validate(e).model_dump(mode='json')

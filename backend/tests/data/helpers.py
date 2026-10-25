@@ -37,6 +37,15 @@ def doc_and_base():
     return doc, resolve("base", doc)
 
 
+def open_of(rows: ComStockRows, doc) -> np.ndarray:
+    """The recipe's `is_open` for these rows: the assumptions kitchen's hours in the tariff timezone (loader rule)."""
+    from zoneinfo import ZoneInfo
+
+    from data.backtest_inputs import open_mask
+
+    return open_mask(rows, doc["kitchen"]["operating_hours"], ZoneInfo("America/Los_Angeles"))
+
+
 def catalog():
     return load_catalog()
 

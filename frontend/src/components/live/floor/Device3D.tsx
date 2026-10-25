@@ -1,7 +1,8 @@
 import { Html } from "./HtmlOverlay";
-import { forwardRef, useState } from "react";
+import { forwardRef, useRef, useState } from "react";
 import { Billboard, Edges, Line, RoundedBox } from "@react-three/drei";
-import { Color, DoubleSide, type Group } from "three";
+import { useFrame } from "@react-three/fiber";
+import { Color, DoubleSide, type Group, type MeshBasicMaterial, type Side } from "three";
 import { ArrowDownToLine, Clock } from "lucide-react";
 import type { DeviceMeta } from "@/hooks/useDeviceMeta";
 import { fmtKw } from "@/lib/format";
@@ -46,6 +47,33 @@ export interface DeviceProps {
 /** Bright colors for things that should bloom (meshBasicMaterial with toneMapped off). */
 const glow = (hex: string, k: number) => new Color(hex).multiplyScalar(Math.min(k, 2.5));
 const OFF_GREY = OFF_TINT;
+/** Seconds for a glow to settle on a new load: long enough to average compressor/heater on-off cycling. */
+const GLOW_EASE_S = 2.5;
+
+/**
+ * A glow whose brightness follows the unit's share of rated power, eased every frame. Cycling equipment switches
+ * between 0 and full power tick to tick; easing turns that into one steady level instead of a flicker.
+ */
+function LoadGlow({ hex, base, gain, load, transparent, opacity, side }: {
+  hex: string;
+  base: number;
+  gain: number;
+  load: number;
+  transparent?: boolean;
+  opacity?: number;
+  side?: Side;
+}) {
+  const material = useRef<MeshBasicMaterial>(null);
+  const shown = useRef(load);
+  const [initial] = useState(() => glow(hex, base + load * gain));
+  useFrame((_, dt) => {
+    shown.current += (load - shown.current) * (1 - Math.exp(-dt / GLOW_EASE_S));
+    material.current?.color.set(hex).multiplyScalar(Math.min(base + shown.current * gain, 2.5));
+  });
+  return (
+    <meshBasicMaterial ref={material} color={initial} toneMapped={false} transparent={transparent} opacity={opacity} side={side} />
+  );
+}
 
 /** One piece of equipment: body, type details, status light, and glow that follows its live load. */
 export const Device3D = forwardRef<Group, DeviceProps>(function Device3D(
@@ -57,13 +85,13 @@ export const Device3D = forwardRef<Group, DeviceProps>(function Device3D(
   const type = meta.device.type_id;
   const state = reading?.state;
   const power = reading?.power_kw ?? 0;
-  const running = state !== "off" && state !== "waiting" && power > 0;
-  // Visual intensity only (never shown as a number): how hard the unit is working right now.
-  const load = running && meta.device.rated_kw > 0 ? Math.min(1, power / meta.device.rated_kw) : 0;
+  // In use follows the state, not this tick's power: a fridge between compressor runs is still on.
+  const inUse = state === "on" || state === "running_job" || state === "reduced";
+  // Visual intensity only (never shown as a number): share of rated power, eased by LoadGlow.
+  const load = inUse && meta.device.rated_kw > 0 ? Math.min(1, power / meta.device.rated_kw) : 0;
   const accent = state === "reduced" ? REDUCED_TEAL : ACCENT[meta.category];
   const pastel = APPLIANCE[type] ?? APPLIANCE_BY_CATEGORY[meta.category];
   const [hovered, setHovered] = useState(false);
-  const isRunning = state === "on" || state === "running_job";
   const isReduced = state === "reduced";
   const isWaiting = state === "waiting";
   // The body tells the operating state; intervention colours are reserved for reduced and held equipment.
@@ -113,7 +141,7 @@ export const Device3D = forwardRef<Group, DeviceProps>(function Device3D(
 
       <Details type={type} w={w} d={d} h={h} load={load} accent={accent} state={state ?? "unknown"} category={meta.category} />
 
-      {!dimmed && (isRunning || isReduced) && <StatusLed position={[w / 2 - 0.13, h + 0.07, d / 2 - 0.13]} color={ledColor} />}
+      {!dimmed && inUse && <StatusLed position={[w / 2 - 0.13, h + 0.07, d / 2 - 0.13]} color={ledColor} load={load} />}
       {!dimmed && (isReduced || isWaiting) && (
         <StateRing radius={Math.max(w, d) * 0.72 + 0.25} color={statusColor} dashed={isWaiting} />
       )}
@@ -183,7 +211,7 @@ function Details({
             <group key={x} position={[x, h + 0.035, -d * 0.03]}>
               <mesh rotation-x={-Math.PI / 2}>
                 <planeGeometry args={[w * 0.32, d * 0.54]} />
-                <meshBasicMaterial color={glow("#FF9F1C", 0.2 + load * 2.8)} toneMapped={false} />
+                <LoadGlow hex="#FF9F1C" base={0.2} gain={2.8} load={load} />
               </mesh>
               <mesh position={[0, 0.055, 0]}>
                 <boxGeometry args={[w * 0.34, 0.08, d * 0.56]} />
@@ -209,7 +237,7 @@ function Details({
           ].map(([x, z], i) => (
             <mesh key={i} position={[x * w, h + 0.024, z * d]} rotation-x={-Math.PI / 2}>
               <ringGeometry args={[Math.min(w, d) * 0.09, Math.min(w, d) * 0.145, 24]} />
-              <meshBasicMaterial color={glow("#FF6B35", 0.15 + load * 3)} toneMapped={false} />
+              <LoadGlow hex="#FF6B35" base={0.15} gain={3} load={load} />
             </mesh>
           ))}
         </>
@@ -223,7 +251,7 @@ function Details({
           </mesh>
           <mesh position={[0, h * 0.47, front]}>
             <planeGeometry args={[w * 0.7, h * 0.4]} />
-            <meshBasicMaterial color={glow("#FF9F1C", 0.08 + load * 2.7)} toneMapped={false} />
+            <LoadGlow hex="#FF9F1C" base={0.08} gain={2.7} load={load} />
           </mesh>
           <mesh position={[0, h * 0.72, front + 0.015]}>
             <boxGeometry args={[w * 0.58, 0.055, 0.055]} />
@@ -262,7 +290,7 @@ function Details({
           </mesh>
           <mesh position={[-w * 0.3, h * 0.78, front]}>
             <planeGeometry args={[0.32, 0.16]} />
-            <meshBasicMaterial color={glow(accent, 0.6 + load * 2.4)} toneMapped={false} />
+            <LoadGlow hex={accent} base={0.6} gain={2.4} load={load} />
           </mesh>
         </>
       );
@@ -271,7 +299,7 @@ function Details({
         <>
           <mesh position={[0, h * 0.5, front]}>
             <planeGeometry args={[w * 0.84, h * 0.84]} />
-            <meshBasicMaterial color={glow("#8ECAE6", 0.12 + load * 1.2)} transparent opacity={0.72} toneMapped={false} />
+            <LoadGlow hex="#8ECAE6" base={0.12} gain={1.2} load={load} transparent opacity={0.72} />
           </mesh>
           <mesh position={[0, h * 0.5, front + 0.012]}>
             <boxGeometry args={[0.035, h * 0.8, 0.025]} />
@@ -307,7 +335,7 @@ function Details({
       return (
         <mesh position={[0, h * 0.35, 0]}>
           <cylinderGeometry args={[r + 0.012, r + 0.012, 0.08, 32, 1, true]} />
-          <meshBasicMaterial color={glow(accent, 0.2 + load * 3)} toneMapped={false} side={DoubleSide} />
+          <LoadGlow hex={accent} base={0.2} gain={3} load={load} side={DoubleSide} />
         </mesh>
       );
     }
@@ -336,11 +364,12 @@ function Fan({ w, d, h }: { w: number; d: number; h: number }) {
   );
 }
 
-function StatusLed({ position, color }: { position: [number, number, number]; color: string }) {
+/** Lit while the unit is in use; brightness shows its share of rated power (dim floor so "on" always reads). */
+function StatusLed({ position, color, load }: { position: [number, number, number]; color: string; load: number }) {
   return (
     <mesh position={position}>
       <sphereGeometry args={[0.075, 16, 12]} />
-      <meshBasicMaterial color={glow(color, 2.2)} toneMapped={false} />
+      <LoadGlow hex={color} base={0.5} gain={1.9} load={load} />
     </mesh>
   );
 }

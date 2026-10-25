@@ -754,8 +754,10 @@ def test_emitted_commands_respect_rules(engine_api):
     kitchen, hub = _new_kitchen(engine_api)
     emitted = _run(kitchen, hub, 1, 30)
     limits, importance = _limits_and_importance(_config())
-    # 51.6 kW against a 40 kW cap with 12.85 kW in-rules room -> at least one engine reduce must be issued
-    assert any(c["issued_by"] == "engine" and c["action"] == "reduce" for c, _ in emitted)
+    # 51.6 kW in every block against a 40 kW cap, with no history: the forecast is flat, so every block after a reduce is
+    # already over the cap and its catch-up would raise one. The repay-room check (decided 2026-10-25) refuses such a move:
+    # it would only shift the peak. Accepted reduces are covered in test_decider.py and by the backtest's rule_violations.
+    assert not any(c["issued_by"] == "engine" and c["action"] == "reduce" and r in ROUTINE_REASONS for c, r in emitted)
     _assert_rules_on_commands(emitted, limits, importance)
 
 

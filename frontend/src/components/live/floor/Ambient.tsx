@@ -297,7 +297,7 @@ export function CapOutline({ meter, showLabel }: { meter?: Meter; showLabel: boo
           <div
             className={
               over
-                ? "animate-pulse rounded-full border border-red-400/60 bg-red-500/20 px-3 py-1 text-xs font-semibold whitespace-nowrap text-red-200 shadow-lg"
+                ? "rounded-full border border-red-400/60 bg-red-500/20 px-3 py-1 text-xs font-semibold whitespace-nowrap text-red-200 shadow-lg"
                 : "rounded-full border border-emerald-400/40 bg-emerald-500/10 px-3 py-1 text-xs font-medium whitespace-nowrap text-emerald-200 shadow-lg"
             }
           >

@@ -39,10 +39,12 @@ Unit tests run the module on SpacetimeDB's in-process test datastore (`cd spacet
 ## Python client (`backend/live/spacetime_client.py`)
 - Calls reducers over HTTP: `POST /v1/database/<db>/call/<reducer>` with a JSON array of arguments and the runtime identity's
   bearer token. Verify against the installed SpacetimeDB version in Phase 1 (first task) and record the result here.
-  **Status 2026-10-24: NOT yet verified** (the `spacetime` CLI is not installed on the build machine). To verify:
-  `curl -sSf https://install.spacetimedb.com | sh`, `spacetime start`, `cd spacetime && spacetime build && spacetime publish
-  wattwise`, then `SPACETIME_TOKEN=$(spacetime login show --token) npm run seed` (exercises every reducer over HTTP, including
-  the Option encoding) and record the version and result here.
+  **Status 2026-10-25: verified** on SpacetimeDB CLI/server 2.13.0 (local `spacetime start`, module published as `wattwise`):
+  `SPACETIME_TOKEN=$(spacetime login show --token) npm run seed` exercised every reducer over HTTP, including the Option
+  encoding; the runtime then published a live run (`live_clock`, `tick_history`, `live_device`, `live_feed`, `live_escalation`
+  filled) and the browser client (generated bindings, `connectSpacetime`) subscribed and received every table.
+  Local setup: `curl -sSf https://install.spacetimedb.com | sh`, `spacetime start`, `cd spacetime && spacetime publish --server
+  local wattwise && npm run generate` (CLI 2.13 renamed `--project-path` to `--module-path`).
 - Reads new surge requests through the SQL endpoint each tick.
 - Never blocks the run loop: a bounded queue keeps the latest tick (drop older ticks), never drops feed, escalations or agent log.
 - `fakes/fake_live.py` + `spacetime/seed.ts` write plausible rows so the frontend can build before the runtime exists.

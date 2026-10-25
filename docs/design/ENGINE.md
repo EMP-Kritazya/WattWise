@@ -160,6 +160,13 @@ Delaying goes first (no comfort impact). Ties are broken by tariff price, then c
   time keeps counting from the first reduce.
 - Cooldown: after a restore the device is not reduced again for `max_reduce_min`. No new reduce starts in the last
   `max_reduce_min` before close or while closed, so catch-up happens while open.
+- **Repay-room check** (decided 2026-10-25): a reduce is made only if, in the horizon forecast with it applied (catch-up at the
+  device's rated room right after `restore_at`, as the hub and the replay plant do), (1) all its owed energy is repaid in blocks
+  that end by today's close, (2) no block is lifted over `max(target_kw, unavoidable_kw)`, nor a block already over it any higher,
+  and (3) it lowers the horizon cost (`saving_usd > 0`). Otherwise it only moves the peak, and a forecast miss turns the catch-up
+  into a new one. Without the check, a July replay dumped a day's owed energy at close: a 147 kW block against 50 kW without
+  control. With it, the engine never does worse than `without` on the year; a flat dinner plateau longer than `max_reduce_min`
+  leaves reductions no room, so savings then come only from deferrable jobs.
 
 **Effect of a decision** (`Decision.effect`), computed marginally in plan order so one replan's savings add up without double counting:
 
@@ -231,7 +238,9 @@ Open at deadline → `expired_default`, resolved_by default; fallback remains ac
 Unknown option → RuleError; resolved/obsolete returns unchanged. Before deadline: at most two attempts (one retry).
 Append `{ts, option_id, accepted, reason, rationale}` to claude_attempts. Accepted reason is null; rejected reason
 is outside_authority or after_deadline. A late attempt expires an open escalation and records rejection.
-Accepted choice resolves and queues commands to switch from the active option on the next step. Rejected choice
+Accepted choice resolves and queues commands to switch from the active option on the next step. Choosing the active option
+itself (Claude agrees with the fallback already in force) is accepted as is and re-issues nothing; a fresh replan no longer
+offers it because its effect is in the forecast, so it is not re-checked against the fresh options. Rejected choice
 keeps fallback in force. No owner resolve route, proposal, option or awaiting-owner state.
 TickState.new_escalations carries every opened or changed escalation; ws/live carry explanation and source.
 

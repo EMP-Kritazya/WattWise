@@ -11,7 +11,7 @@ from data.backtest_inputs import build_backtest_inputs, load_backtest_inputs, re
 from data.recipe import distribute
 from data.tariffs import load_tariff
 from data.warmup import warmup_from_series
-from tests.data.helpers import catalog, doc_and_base, needs_comstock, synthetic_rows
+from tests.data.helpers import catalog, doc_and_base, needs_comstock, open_of, synthetic_rows
 
 LA = ZoneInfo("America/Los_Angeles")
 
@@ -19,7 +19,7 @@ LA = ZoneInfo("America/Los_Angeles")
 def _inputs(months, start=datetime(2018, 5, 1, 8, 0, tzinfo=timezone.utc), days=120):
     doc, base = doc_and_base()
     rows = synthetic_rows(start, days)
-    dev = distribute(rows, doc["kitchen"]["equipment"], catalog(), doc["step1"], base)
+    dev = distribute(rows, doc["kitchen"]["equipment"], catalog(), doc["step1"], base, open_of(rows, doc))
     return build_backtest_inputs(rows, dev, months, base, doc, load_tariff("demo"), catalog())
 
 
@@ -64,14 +64,14 @@ def test_warmup_cut_ends_at_the_start():
     w = warmup_from_series(inp["series"], end)
     WarmUpHistory.model_validate(w)
     assert w["end"] == "2026-07-01T07:00:00Z" and w["blocks"][-1]["block_start"] == "2026-07-01T06:45:00Z"
-    assert len(w["blocks"]) == 28 * 96 * 12
+    assert len(w["blocks"]) == 28 * 96 * 14  # 14 devices since kitchen_exhaust + other_equipment
 
 
 @needs_comstock
-def test_full_year_inputs_redistribute_proposal():
-    inp = load_backtest_inputs(replay_months(), "base_redistribute_proposal")
+def test_full_year_inputs_base():
+    inp = load_backtest_inputs(replay_months(), "base")
     BacktestInputs.model_validate(inp)
     s = inp["series"]
     assert s["start"] == "2025-12-29T08:00:00Z" and s["end"] == "2026-12-29T08:00:00Z"
-    assert len(s["blocks"]) == 35040 * 12
+    assert len(s["blocks"]) == 35040 * 14
     assert inp["tariff"]["tariff_id"] == "pge_b19_secondary_voluntary"

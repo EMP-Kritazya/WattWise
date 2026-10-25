@@ -293,3 +293,24 @@ def test_stronger_cap_ends_into_remaining_weaker_cap():
     escalation.update(k,NOW+timedelta(minutes=15),None,replan=False)
     assert k.issued[0][1:3]==('reduce',60)
     assert k.issued[0][4]['restore_at']==NOW+timedelta(minutes=30)
+
+
+def test_claude_confirming_the_active_fallback_is_accepted_without_reapplying():
+    """Claude agrees with the engine's own fallback, already in force: the fresh replan no longer offers it (the reduction
+    is in the forecast), but the pick is the active, authorized option, so it is accepted as is; nothing is re-issued."""
+    d={'device_id':'hvac_1','type_id':'hvac','importance':'flexible','category':'hvac','state':'on',
+       'rated_kw':10.,'power_kw':8.,'limits':{'min_power_pct':80,'max_reduce_min':30},'params':{}}
+    k=kitchen(3,[d]); k.authority['may_go_below_min_power']=True
+    e=opened(k,forecast(42,device_kw={'fixed':[22.,34.,22.,22.,22.,22.,22.,22.], 'hvac_1':[8.]*8}))
+    assert e['default_option_id']==e['active_option_id']=='deep_reduce_hvac'
+    issued=len(k.issued)
+    # The fallback now holds the block: hvac at its reduced 4 kW -> 38 kW, no deep reduction is offered any more.
+    fresh=forecast(38,device_kw={'fixed':[22.,34.,22.,22.,22.,22.,22.,22.], 'hvac_1':[8.,4.,8.,8.,8.,8.,8.,8.]})
+    k._escalation_forecast=lambda: fresh
+    assert all(o['option_id']!='deep_reduce_hvac' for o in escalation.options(k,NOW,fresh,1,40))
+    result=escalation.resolve(k,e['escalation_id'],'deep_reduce_hvac','claude','agree with the fallback')
+    assert result['status']=='resolved' and result['resolved_by']=='claude'
+    assert result['chosen_option_id']==result['active_option_id']=='deep_reduce_hvac'
+    assert result['claude_attempts'][-1]=={'ts':'2026-07-17T19:00:00Z','option_id':'deep_reduce_hvac','accepted':True,'reason':None,
+                                            'rationale':'agree with the fallback'}
+    assert len(k.issued)==issued

@@ -68,8 +68,9 @@ def effect(before: dict, after: dict, tariff: TariffView, peaks: Optional[dict] 
 
 
 def reduce_forecast(forecast: dict, did: str, rated: float, value: int, until: datetime,
-                    now: datetime) -> dict:
-    """Cap future energy only; meter history in block zero cannot be undone. Repay within rated room."""
+                    now: datetime, close_at: Optional[datetime] = None) -> dict:
+    """Cap future energy only; meter history in block zero cannot be undone. Repay within rated room, in blocks that end
+    by `close_at` when given (energy owed past close stays in `unplaced_kwh`)."""
     out = copy.deepcopy(forecast)
     owed = 0.0
     rates = out["device_kw"][did]
@@ -88,7 +89,7 @@ def reduce_forecast(forecast: dict, did: str, rated: float, value: int, until: d
         owed += (rates[i] - new) * .25
         rates[i] = new
     for i, start in enumerate(out["block_starts"]):
-        if start < until:
+        if start < until or (close_at is not None and start + BLOCK > close_at):
             continue
         catch_up = min(max(0.0, rated - rates[i]) * .25, owed)
         rates[i] += catch_up * 4
@@ -117,6 +118,7 @@ def plan(*, now: datetime, forecast: dict, devices: list[dict], target: float, t
     minute = tariff.minute_of_day(now)
     opened, close = hhmm_to_min(operating_hours["open"]), hhmm_to_min(operating_hours["close"])
     is_open = in_span(minute, opened, close)
+    close_at = tariff.local_midnight_utc(tariff.local_date(now)) + close * MINUTE
     by_id = {d["device_id"]: d for d in devices}
     changed: set[str] = set()
 
@@ -256,8 +258,19 @@ def plan(*, now: datetime, forecast: dict, devices: list[dict], target: float, t
             command = active.get(did, {})
             if command.get("action") == "reduce" and command.get("value") == value:
                 continue
-            projected = reduce_forecast(current, did, d["rated_kw"], value, until, now)
+            projected = reduce_forecast(current, did, d["rated_kw"], value, until, now, close_at)
             if projected["total_kw"][block] >= current["total_kw"][block] - 1e-9:
+                continue
+            # Repay-room check: the owed energy must come back before close, its catch-up may not lift any block over the
+            # target (or a block already over it any higher), and the move must lower the projected bill over the horizon.
+            # Otherwise it only shifts the peak, and a forecast miss turns the catch-up into a new one.
+            if projected.get("unplaced_kwh", 0.0) > current.get("unplaced_kwh", 0.0) + 1e-9:
+                continue
+            unavoidable = current.get("unavoidable_kw", [0.0] * n)
+            if any(p > max(target, unavoidable[i], c) + 1e-9
+                   for i, (p, c) in enumerate(zip(projected["total_kw"], current["total_kw"]))):
+                continue
+            if horizon_cost(current, tariff, peaks) - horizon_cost(projected, tariff, peaks) <= 1e-9:
                 continue
             add(did, "reduce", value, projected, reason_code, restore_at=until)
             if current["total_kw"][block] <= block_target + 1e-9:

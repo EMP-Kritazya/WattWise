@@ -51,6 +51,9 @@ def test_authenticated_context_real_engine_commands_and_viewer_updates(monkeypat
     config = fixture("shapes/kitchen_config.json")
     config["equipment"] = [config["equipment"][0], config["equipment"][-1]]
     config["peak_cap_kw"] = 4
+    # Every unit at rated_kw against a 4 kW cap: no in-rules move can hold it (a routine reduce has no room to repay), so
+    # the engine escalates; this authority lets its fallback take HVAC below min_power_pct (never refrigeration below 50 %).
+    config["authority"] = dict(config["authority"], may_go_below_min_power=True)
     with TestClient(app) as client, client.websocket_connect("/ws/hub") as hub, client.websocket_connect("/ws") as viewer:
         hub.send_json({"type": "hub_hello", "protocol": 1, "hub_id": "sim_hub", "role": "sim_host", "client": "integration/1"})
         assert hub.receive_json()["accepted"] is True
@@ -121,7 +124,7 @@ def test_authenticated_context_real_engine_commands_and_viewer_updates(monkeypat
         assert command_id in {c["command_id"] for c in sent[2]["commands"]}
         assert all(c["issued_by"] == "owner" for tick in sent[:5] for c in tick["commands"])
         automatic = [c for c in sent[5]["commands"] if c["issued_by"] == "engine"]
-        assert automatic, "the real engine should control the overloaded kitchen on decision tick 5"
+        assert automatic, "the real engine's escalation fallback should control the overloaded kitchen on decision tick 5"
         decisions = client.get("/api/decisions").json()
         assert {c["decision_id"] for c in automatic} <= {d["decision_id"] for d in decisions}
 
