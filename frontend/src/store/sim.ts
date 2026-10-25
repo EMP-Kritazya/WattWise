@@ -202,14 +202,17 @@ export const useSim = create<SimState>()((set) => ({
             else if (last && start === last.start) blocks[t.lane] = [...list.slice(0, -1), point];
             else blocks[t.lane] = [...list, point].slice(-MAX_BLOCKS);
             // Escalations in the tick are also sent as `escalation` messages; take whichever arrives.
-            for (const e of t.new_escalations ?? []) escalations[e.escalation_id] = e;
+            for (const e of t.new_escalations ?? []) {
+              const previous = escalations[e.escalation_id];
+              escalations[e.escalation_id] = { ...previous, ...e };
+            }
             break;
           }
           case "decision":
             feed[m.data.decision_id] = { decision: m.data, explanation: m.explanation, explanation_source: m.explanation_source };
             break;
           case "escalation":
-            escalations[m.data.escalation_id] = m.data;
+            escalations[m.data.escalation_id] = { ...m.data, explanation: m.explanation, explanation_source: m.explanation_source };
             break;
           case "proposal":
             proposals[m.data.proposal_id] = m.data;
@@ -230,7 +233,9 @@ export const useSim = create<SimState>()((set) => ({
               sim_ts: m.sim_ts,
               tick_id: m.tick_id,
               paused_reason: m.paused_reason,
-              slowed_reason: m.slowed_reason,
+              day_index: m.day_index,
+              run_days: m.run_days,
+              phase: m.phase,
             };
             break;
           case "warning":

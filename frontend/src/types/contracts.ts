@@ -177,11 +177,20 @@ export interface EscalationOption {
   option_id: string;
   summary: string;
   actions: Command[];
-  projected: { peak_kw: number; cost_delta_usd: number; max_indoor_temp_change_c: number } | null;
+  projected: { peak_kw: number; cost_delta_usd: number; max_indoor_temp_change_c: number | null };
   rule_breaks: RuleBreak[];
   within_authority: boolean;
+  harm_score: number;
+  rank: number;
 }
-export type EscalationStatus = "open" | "resolved" | "awaiting_owner" | "expired_default";
+export type EscalationStatus = "open" | "resolved" | "expired_default" | "obsolete";
+export interface ClaudeAttempt {
+  ts: string;
+  option_id: string;
+  accepted: boolean;
+  reason: "outside_authority" | "after_deadline" | null;
+  rationale: string | null;
+}
 export interface Escalation {
   escalation_id: string;
   lane: Lane;
@@ -190,13 +199,17 @@ export interface Escalation {
   problem: { forecast_peak_kw: number; target_kw: number; excess_kw: number; reason: string };
   options: EscalationOption[];
   default_option_id: string;
-  active_option_id?: string | null;
-  updated_ts?: string;
+  active_option_id: string | null;
+  updated_ts: string;
   deadline_sim_ts: string;
   status: EscalationStatus;
-  resolved_by: "claude" | "owner" | "default" | null;
+  resolved_by: "claude" | "default" | null;
   chosen_option_id: string | null;
   rationale: string | null;
+  claude_attempts: ClaudeAttempt[];
+  /** Notification text supplied by /ws or live_escalation, not computed by the screen. */
+  explanation?: string;
+  explanation_source?: "ai" | "template";
 }
 export interface Meter {
   ts: string;
@@ -242,7 +255,7 @@ export interface LaneComparison {
   month_peak_without_kw: number;
   month_peak_with_kw: number;
 }
-export type ProposalKind = "importance" | "peak_cap" | "authority" | "undo_decision" | "customer_event" | "resolve_escalation";
+export type ProposalKind = "importance" | "peak_cap" | "authority" | "undo_decision" | "customer_event";
 export interface Proposal {
   proposal_id: string;
   ts: string;
@@ -321,7 +334,8 @@ export interface PeakCapUpdate {
   peak_cap_kw: number | null;
 }
 export interface SimControlRequest {
-  action: "play" | "pause" | "reset";
+  /** `next_day` only while `paused_reason` is `run_complete` (CONTRACTS.md §2 POST /api/sim/control). */
+  action: "play" | "pause" | "reset" | "next_day";
   speed?: number;
 }
 export interface ClockState {
@@ -329,9 +343,7 @@ export interface ClockState {
   speed: number;
   sim_ts: string;
   tick_id: number;
-  // "escalation" | "approval" are pre-2026-10-24 values some screens still test for; the clock never pauses for them now.
-  paused_reason: "manual" | "hub_waiting" | "sim_host_offline" | "run_complete" | "escalation" | "approval" | null;
-  slowed_reason?: "escalation" | null;
+  paused_reason: "manual" | "hub_waiting" | "sim_host_offline" | "run_complete" | null;
   day_index?: number;
   run_days?: number;
   phase?: "service" | "overnight" | "closed";
@@ -371,7 +383,7 @@ export type WsMessage =
   | { type: "backtest_month"; run_id: string; data: BacktestResult }
   | { type: "comparison"; data: LaneComparison }
   | { type: "proposal"; data: Proposal }
-  | { type: "escalation"; data: Escalation }
+  | { type: "escalation"; data: Escalation; explanation: string; explanation_source: "ai" | "template" }
   | { type: "context"; data: Context }
   | { type: "agent_log"; data: AgentLog };
 export type WsMessageType = WsMessage["type"];
@@ -460,6 +472,9 @@ export interface LiveEscalationRow {
   chosen_option_id: string | null;
   resolved_by: Escalation["resolved_by"];
   rationale: string | null;
+  claude_attempts_json: string;
+  explanation: string;
+  explanation_source: "ai" | "template";
 }
 export interface LiveAgentLogRow extends AgentLog { id: number }
 export interface SurgeRequestRow {

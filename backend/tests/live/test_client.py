@@ -177,3 +177,17 @@ def test_every_reducer_fixture_through_fake_live():
     want_tick = json.loads((SP / "tables" / "live_tick.json").read_text())
     assert client.transport.rows("live_tick") == sorted(want_tick, key=lambda r: r["lane"])
     client.close()
+
+
+def test_g73_escalation_notification_is_published_with_attempt_verdict():
+    esc = next(m["data"] for m in ws_stream() if m["type"] == "escalation")
+    client = FakeLive(surge_poll_s=0)
+    try:
+        row = client.publish_escalation(esc, "Claude explained the engine verdict.", "ai")
+        assert row["explanation"] == "Claude explained the engine verdict."
+        assert row["explanation_source"] == "ai"
+        assert json.loads(row["claude_attempts_json"]) == esc["claude_attempts"]
+        assert client.flush(5)
+        assert client.transport.rows("live_escalation")[0]["explanation_source"] == "ai"
+    finally:
+        client.close()

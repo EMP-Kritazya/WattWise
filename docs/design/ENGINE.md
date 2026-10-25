@@ -32,7 +32,7 @@ All local times (days, months, tariff windows, `must_finish_by`, opening hours) 
 - **Ids:** one monotonically increasing counter per id type, shared by both lanes: `d_0001` (Decision), `c_0001` (Command),
   `e_0001` (Escalation); zero-padded to 4 digits, wider when needed (`d_10000`). Never reset during a run; a new kitchen starts at 1.
   Determinism comes from a fixed order: every tick the runtime steps `without`, then `with`, and calls any id-creating facade
-  method (`owner_command`, `undo`, `resolve_escalation`) on `without` before `with`. Counters are in `snapshot()["id_counters"]`.
+  method (`owner_command`) on `without` before `with`; undo and escalation resolution use `with` only. Counters are in `snapshot()["id_counters"]`.
 - **Warm-up:** `warm_up(history)` is called once per lane after construction and before the first `step`. `history` is a
   `WarmUpHistory` (CONTRACTS.md section 1): 15-min per-device blocks for the 4 weeks before the start, built by
   `backend/data/warmup.py` from NREL ComStock (scaled to the kitchen, label `calibrated_model`; see DATA_AND_PROOF.md), plus
@@ -179,7 +179,7 @@ cost_delta_usd = optimized_cost_usd − baseline_cost_usd ;  saving_usd = −cos
 ## 6. Escalation (`engine/escalation.py`)
 
 **Open** on a decision tick when a block starting within the next 30 sim minutes (the block in progress included) is still over
-`target_kw` after every in-rules move (`problem.forecast_peak_kw` = that forecast, `excess_kw` = it − target). At most one **active** escalation (`open` or `awaiting_owner`) per lane per `block_start`.
+`target_kw` after every in-rules move (`problem.forecast_peak_kw` = that forecast, `excess_kw` = it − target). At most one **active** escalation (`open`) per lane per `block_start`.
 
 **Options** (on the residual problem):
 
@@ -188,7 +188,7 @@ cost_delta_usd = optimized_cost_usd − baseline_cost_usd ;  saving_usd = −cos
   that holds the target (or to their floor). Never below 50 % for refrigeration; food-safety breaks are never generated.
 - `extend_delay_<type_id>`: that type's jobs past `max_delay_min` and/or `must_finish_by`, by the least amount that holds the target.
 - One best (lowest-harm) `deep_reduce_*` and one best `extend_delay_*` are kept → 1–3 alternatives (2–3 whenever the kitchen
-  has a flexible or deferrable device left to move), plus `ask_owner`.
+  has a flexible or deferrable device left to move).
 
 **Projection** of each alternative, re-forecasting with it applied:
 `peak_kw` · `cost_delta_usd = optimized_cost_usd − baseline_cost_usd`, where baseline = the in-rules plan with the problem block
@@ -197,7 +197,7 @@ held exactly at the target (hypothetical, no rule broken), so it is the extra co
 
 **`within_authority`** (ClaudeAuthority): `cap_overrun ≤ max_cap_overrun_kw`; `past_deadline`, `over_max_delay ≤
 max_extra_delay_min`; `over_max_reduce ≤ max_extra_reduce_min`; `below_min_power` only if `may_go_below_min_power`;
-`enabled: false` → only `ask_owner`.
+`enabled: false` → no Claude option is authorized.
 
 **Harm ranking (G15).** Each alternative gets an engine-computed `harm_score`: the share of the owner's tolerance it uses,
 
@@ -209,13 +209,12 @@ tolerance: cap_overrun → max_cap_overrun_kw · past_deadline, over_max_delay �
 ```
 
 `rank`: `within_authority` first, then `harm_score` ascending, then `cost_delta_usd`, then fewer devices, then `option_id`.
-`ask_owner` has `harm_score: null`, `rank: null`. Claude gets the ranked list with context and owner preferences, and may pick
+Claude gets the ranked list with context and owner preferences, and may pick
 any option: the ranking is the engine's recommendation, not a filter.
 
-**Fallback = `default_option_id`** = rank 1 if it is within authority, else `ask_owner` (nothing extra is applied, which is
-physically the overrun). The fallback's Commands are issued **in the same step** the escalation opens (Decisions
-`escalation_fallback`), and `active_option_id` = the fallback (`null` for `ask_owner`). The clock keeps its speed; the runtime asks
-Claude once, asynchronously, when the escalation opens (later updates are published, not re-asked).
+**Fallback = `default_option_id`** = rank 1 if within authority, else `accept_overrun`.
+Apply immediately in the opening step (`escalation_fallback`); active_option_id always identifies that option.
+Claude sees every ranked option and Fetch.ai context asynchronously; the kitchen never waits.
 
 **Update in place.** On each decision tick an active escalation is re-evaluated: `problem` (forecast, excess), options,
 projections, ranks and `updated_ts` change; `escalation_id`, `deadline_sim_ts`, `default_option_id` and `active_option_id` do not. The engine never
@@ -225,22 +224,16 @@ switches the active option on its own and never reverses executed commands.
   → status `obsolete` (terminal). Already executed commands stay and end at their own planned time.
 - Risk returns after an escalation closed → a new escalation for that block.
 
-**Deadline** = `max(ts + 5 min, min(ts + 15 min, block_start − 5 min))`. Still `open` or `awaiting_owner` at the deadline →
-`expired_default` (`resolved_by: "default"`; `chosen_option_id` keeps Claude's pick, if any), the fallback stays in force. Decision
-ticks fall on 5-minute marks, so the deadline is never after the problem block ends. `obsolete` keeps `resolved_by: null`.
+**Deadline** = `max(ts + 5 min, min(ts + 15 min, block_start − 5 min))`.
+Open at deadline → `expired_default`, resolved_by default; fallback remains active.
 
-**Resolve** `resolve_escalation(id, option_id, resolved_by, rationale)` (revalidated against the latest state):
-
-- `option_id` not in the current options → `RuleError`. Escalation already closed (`resolved`, `expired_default`, `obsolete`) →
-  returned unchanged (the runtime tells Claude what the engine did).
-- `claude`: `ask_owner` → `awaiting_owner`, fallback stays. Outside authority (now) → `awaiting_owner` with Claude's pick and
-  rationale. Within authority and before the deadline → `resolved`; if it differs from the active option, the next step issues the
-  Commands that move devices from the active option to the chosen one (Decisions `escalation_choice`). Whether an option is
-  _preferable_ is Claude's judgment (owner preferences, context); the engine only checks what code can check: safe, authorized, timely.
-- `owner`: any current option before the deadline → `resolved`, `resolved_by: "owner"` (a Proposal for it expires at the deadline).
-- Replay/backtest: nobody answers; the fallback runs and the escalation ends `expired_default`.
-
-`TickState.new_escalations` carries every escalation opened **or changed** in that step (the full object, keyed by id).
+**Resolve** `resolve_escalation(id, option_id, "claude", rationale)` revalidates current authority and safety.
+Unknown option → RuleError; resolved/obsolete returns unchanged. Before deadline: at most two attempts (one retry).
+Append `{ts, option_id, accepted, reason, rationale}` to claude_attempts. Accepted reason is null; rejected reason
+is outside_authority or after_deadline. A late attempt expires an open escalation and records rejection.
+Accepted choice resolves and queues commands to switch from the active option on the next step. Rejected choice
+keeps fallback in force. No owner resolve route, proposal, option or awaiting-owner state.
+TickState.new_escalations carries every opened or changed escalation; ws/live carry explanation and source.
 
 ## 7. Executor, acks, owner and undo (`engine/kitchen.py`)
 
@@ -303,7 +296,7 @@ with_.meter.cost_usd_today`, `peak_avoided_kw = without.meter.month_peak_kw − 
 ```
 { tick_id, sim_ts, lane, control, peak_mode, config, meter, forecast_kw, forecast_ts,
   devices (latest HubReport state), active_commands, owed_kwh {device_id: kWh},
-  open_escalations (open + awaiting_owner), warnings (latest step), recent_decisions (last 20, newest first),
+  open_escalations (open only), warnings (latest step), recent_decisions (last 20, newest first),
   context, id_counters { d, c, e } }
 ```
 
@@ -345,14 +338,14 @@ Dishwasher 6 kW × 30 min scheduled at block 2 (max delay 60 min).
   **Acks:** clamped ack → active at `applied_value`; `job_running` → hold cleared, not re-sent this block.
   **Escalation:** must-run 44 kW in one block starting in 15 min, cap 40, no in-rules room → escalation opens.
   Authority `max_cap_overrun_kw` = 5 → `accept_overrun` (peak 44) `within_authority`, rank 1, fallback, active at once.
-  Authority 3 → it is outside; default = `ask_owner`, nothing applied; nobody resolves by the deadline → `expired_default`.
-  Claude choosing `accept_overrun` with authority 3 → `awaiting_owner`. Block starting in 45 min → no escalation yet.
+  Authority 3 → it is outside; default = `accept_overrun`, nothing applied; nobody resolves by the deadline → `expired_default`.
+  Claude choosing `accept_overrun` with authority 3 → rejected `outside_authority`, stays open for one retry. Block starting in 45 min → no escalation yet.
   **Harm ranking:** authority 3 kW / 20 min / 15 min, below-min not allowed. `accept_overrun` 2 kW → 0.667 · `extend_delay_dishwasher`
   past deadline 10 min → 0.5 · `deep_reduce_hvac` 10 pct below min → outside. Ranks 2, 1, 3; fallback `extend_delay_dishwasher`,
   its Commands in the same step's `new_commands` with reason `escalation_fallback`.
   **Update / obsolete:** the same block worsening → same `escalation_id`, new `problem`, `updated_ts`; the in-rules plan alone
   holding it later → `obsolete`, no command reversed. A second risk in the same block after closure → new id.
-  **Resolve revalidation:** Claude's within-authority pick, or an owner pick, after the deadline → escalation returned unchanged
+  **Resolve revalidation:** Claude's pick after the deadline → rejected `after_deadline`
   (`expired_default`, `resolved_by: "default"`); unknown option id → `RuleError`.
   **Deadline rule:** opened 12:00 for a 12:15 block → deadline 12:10; for the block in progress → `ts + 5`.
   **Food safety:** no option ever takes a refrigeration device below 50 %.
@@ -367,4 +360,4 @@ Dishwasher 6 kW × 30 min scheduled at block 2 (max delay 60 min).
   raises; a full replay day must not raise.
   **Boundary:** the engine imports nothing outside `engine/` and `contracts/`; decider tests run on HubReport fixtures from
   `contracts/fixtures/hub_protocol/` alone.
-  **Escalation shape:** alternatives 1–3 plus `ask_owner`, `accept_overrun` always present, the default is one of them, ranks are 1..n.
+  **Escalation shape:** alternatives 1–3, `accept_overrun` always present, the default is one of them, ranks are 1..n.

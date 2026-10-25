@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
-import { Bot, LoaderCircle, MapPin, Minus, Plus, ShieldCheck } from "lucide-react";
+import { LoaderCircle, MapPin, Minus, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,14 +22,28 @@ const CATEGORIES: { id: Category; label: string }[] = [
   { id: "other", label: "Other" },
 ];
 const MAX_COUNT = 5;
-const PRESET_COUNT = 1; // "Demo Café": one of each type
+/**
+ * "Demo Café": the kitchen of the team's recorded demo (contracts/fixtures/facade/kitchen.json), so KITCHEN_IMPL=fake can
+ * build it: one of each type except two HVAC units, the dishwasher finishing by 19:30, and the owner's preference.
+ */
+const DEMO_CAFE = {
+  count: 1,
+  counts: { hvac: 2 } as Record<string, number>,
+  units: { dishwasher_1: { importance: "deferrable", limits: { max_delay_min: 60, must_finish_by: "19:30" } } } as Record<string, UnitSetting>,
+  preferences: "Keep the dining room comfortable during dinner service.",
+};
 
 const LOCATIONS = [{ label: "Marina, San Francisco", lat: 37.8, lon: -122.44 }];
-const DEFAULT_AUTHORITY: ClaudeAuthority = {
+/**
+ * Claude resolves every escalation itself so the kitchen never stops for the owner (DECISIONS: full authority).
+ * It may let the peak run over the cap and keep flexible units reduced longer, but deadlines stay hard (no extra
+ * delay), units never go below their minimum power, and refrigeration never goes below 50 %.
+ */
+const FULL_AUTHORITY: ClaudeAuthority = {
   enabled: true,
-  max_cap_overrun_kw: 3,
-  max_extra_delay_min: 20,
-  max_extra_reduce_min: 15,
+  max_cap_overrun_kw: 1000,
+  max_extra_delay_min: 0,
+  max_extra_reduce_min: 1440,
   may_go_below_min_power: false,
 };
 /** Food safety (SIMULATION.md): refrigeration never goes below 50 % power, whatever the owner sets. */
@@ -73,8 +87,7 @@ export function BuilderPage() {
   const [close, setClose] = useState("22:00");
   const [seed, setSeed] = useState("42");
   const [locationIdx, setLocationIdx] = useState(0);
-  const [preferences, setPreferences] = useState("");
-  const [authority, setAuthority] = useState<ClaudeAuthority>(DEFAULT_AUTHORITY);
+  const [preferences, setPreferences] = useState(DEMO_CAFE.preferences);
   // Per-unit overrides keyed by device id (`<type_id>_<n>`); units without one use the type's defaults.
   const [units, setUnits] = useState<Record<string, UnitSetting>>({});
   const [building, setBuilding] = useState(false);
@@ -85,7 +98,9 @@ export function BuilderPage() {
       (types) => {
         setCatalog(types);
         setStoreCatalog(types);
-        setCounts(Object.fromEntries(types.map((t) => [t.type_id, PRESET_COUNT])));
+        setCounts(Object.fromEntries(types.map((t) => [t.type_id, DEMO_CAFE.counts[t.type_id] ?? DEMO_CAFE.count])));
+        const known = new Set(types.map((t) => t.type_id));
+        setUnits(Object.fromEntries(Object.entries(DEMO_CAFE.units).filter(([id]) => known.has(id.replace(/_\d+$/, "")))));
       },
       (err) => setError(errorMessage(err)),
     );
@@ -107,22 +122,29 @@ export function BuilderPage() {
   const capKw = Number(peakCap);
   const capValid = peakCap !== "" && Number.isFinite(capKw) && capKw > 0;
 
+  /** The setting KitchenConfig sends for a type: what all its units share, else the type's default. */
+  const typeSetting = (t: EquipmentType): UnitSetting => {
+    const settings = unitList.filter((u) => u.type.type_id === t.type_id).map((u) => u.setting);
+    return settings.length > 0 && settings.every((s) => sameSetting(s, settings[0])) ? settings[0] : typeDefault(t);
+  };
+
   async function build() {
     if (!catalog) return;
+    const sent = Object.fromEntries(catalog.map((t) => [t.type_id, typeSetting(t)]));
     const config: KitchenConfig = {
       name,
       equipment: catalog.map((t) => ({
         type_id: t.type_id,
         count: counts[t.type_id] ?? 0,
-        importance: t.default_importance,
-        limits: limitsFor(t, t.default_importance, close),
+        importance: sent[t.type_id].importance,
+        limits: structuredClone(sent[t.type_id].limits),
       })),
       peak_mode: "cap",
       peak_cap_kw: capKw,
       operating_hours: { open, close },
       location: LOCATIONS[locationIdx],
       owner_preferences: preferences.trim(),
-      authority,
+      authority: FULL_AUTHORITY,
       tariff_id: "demo_tariff_v1", // STUB: no tariff list endpoint exists yet.
       seed: Number(seed) || 42,
     };
@@ -131,8 +153,8 @@ export function BuilderPage() {
     clearRun();
     try {
       await transport.createKitchen(config);
-      // KitchenConfig sets importance per type; units that differ are set one by one once they exist.
-      const overrides = unitList.filter((u) => !sameSetting(u.setting, typeDefault(u.type)));
+      // KitchenConfig sets importance per type; units that differ from their type's setting are set one by one once they exist.
+      const overrides = unitList.filter((u) => !sameSetting(u.setting, sent[u.type.type_id]));
       await Promise.all(overrides.map((u) => transport.setImportance(u.id, u.setting)));
       setKitchen(await transport.getKitchen());
       navigate("/live");
@@ -147,7 +169,7 @@ export function BuilderPage() {
     <div className="mx-auto grid max-w-6xl gap-6 p-6 lg:grid-cols-[1fr_320px]">
       <div className="flex flex-col gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Kitchen Builder</h1>
+          <h1 className="text-3xl font-bold">Kitchen Builder</h1>
           <p className="text-muted-foreground">Pick your equipment and how many of each. Every unit reports to one hub.</p>
         </div>
         {!catalog && !error && <p className="text-sm text-muted-foreground">Loading equipment…</p>}
@@ -158,8 +180,8 @@ export function BuilderPage() {
             </CardHeader>
             <CardContent className="flex flex-col divide-y px-4">
               {g.types.map((t) => (
-                <div key={t.type_id} className="flex items-center gap-3 py-2">
-                  <div className="flex-1">
+                <div key={t.type_id} className="flex flex-wrap items-center gap-3 py-2">
+                  <div className="min-w-32 flex-1">
                     <div className="font-medium">{t.name}</div>
                     <div className="text-xs text-muted-foreground">{fmtKw(t.rated_kw)} rated</div>
                   </div>
@@ -184,34 +206,6 @@ export function BuilderPage() {
           </Card>
         )}
 
-        <Card className="gap-3 py-4">
-          <CardHeader className="px-4">
-            <CardTitle className="flex items-center gap-2">
-              <Bot className="size-4" /> Claude's authority
-            </CardTitle>
-            <CardDescription>
-              When routine moves can't hold the cap, Claude may pick an option within these limits. Anything beyond them waits for you.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3 px-4">
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <input type="checkbox" className="size-4 accent-[var(--color-importance-flexible)]" checked={authority.enabled} onChange={(e) => setAuthority((a) => ({ ...a, enabled: e.target.checked }))} />
-              Let Claude decide escalations on its own
-            </label>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <NumberField id="auth-overrun" label="Go over the cap by up to (kW)" value={authority.max_cap_overrun_kw} step={0.5} disabled={!authority.enabled} onChange={(v) => setAuthority((a) => ({ ...a, max_cap_overrun_kw: v }))} />
-              <NumberField id="auth-delay" label="Extra delay (min)" value={authority.max_extra_delay_min} step={5} disabled={!authority.enabled} onChange={(v) => setAuthority((a) => ({ ...a, max_extra_delay_min: v }))} />
-              <NumberField id="auth-reduce" label="Extra reduce time (min)" value={authority.max_extra_reduce_min} step={5} disabled={!authority.enabled} onChange={(v) => setAuthority((a) => ({ ...a, max_extra_reduce_min: v }))} />
-            </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" className="size-4" disabled={!authority.enabled} checked={authority.may_go_below_min_power} onChange={(e) => setAuthority((a) => ({ ...a, may_go_below_min_power: e.target.checked }))} />
-              May go below a unit's minimum power
-            </label>
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <ShieldCheck className="size-3.5 text-lane-with" /> Refrigeration never goes below 50 % power, whatever you set here.
-            </p>
-          </CardContent>
-        </Card>
       </div>
 
       <Card className="h-fit gap-4 lg:sticky lg:top-6">
@@ -247,7 +241,7 @@ export function BuilderPage() {
               <MapPin className="size-4 shrink-0 text-muted-foreground" />
               <select
                 id="location"
-                className="h-9 w-full rounded-md border bg-transparent px-2 text-sm"
+                className="h-10 w-full rounded-xl border-2 border-[#22223B] bg-white px-3 text-sm font-semibold shadow-[0_2px_0_#22223B] outline-none focus:ring-4 focus:ring-primary/30"
                 value={locationIdx}
                 onChange={(e) => setLocationIdx(Number(e.target.value))}
               >
@@ -263,7 +257,7 @@ export function BuilderPage() {
             <textarea
               id="prefs"
               rows={3}
-              className="w-full rounded-md border bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground"
+              className="w-full rounded-xl border-2 border-[#22223B] bg-white px-3 py-2 text-sm shadow-[0_2px_0_#22223B] outline-none placeholder:text-muted-foreground focus:ring-4 focus:ring-primary/30"
               placeholder="Anything WattWise should know about how you run the kitchen"
               value={preferences}
               onChange={(e) => setPreferences(e.target.value)}
@@ -340,8 +334,8 @@ function UnitRow({ name, type: t, setting, close, onChange }: { name: string; ty
               onClick={() => onChange({ importance: imp, limits: limitsFor(t, imp, close) })}
               className={
                 setting.importance === imp
-                  ? `rounded-md border px-2 py-0.5 text-xs ${IMPORTANCE_BADGE[imp]}`
-                  : "rounded-md border px-2 py-0.5 text-xs text-muted-foreground hover:bg-secondary"
+                  ? `rounded-full border-2 border-[#22223B] px-2.5 py-0.5 text-xs font-bold ${IMPORTANCE_BADGE[imp]}`
+                  : "rounded-full border-2 border-transparent px-2.5 py-0.5 text-xs font-bold text-muted-foreground hover:bg-secondary"
               }
             >
               {IMPORTANCE_LABEL[imp]}
@@ -366,7 +360,7 @@ function UnitRow({ name, type: t, setting, close, onChange }: { name: string; ty
           </label>
           <label className="flex items-center gap-2">
             <span className="text-muted-foreground">Max</span>
-            <Input type="number" min={0} step={5} className="h-7 w-16" value={flex.max_reduce_min} onChange={(e) => onChange({ ...setting, limits: { ...flex, max_reduce_min: Number(e.target.value) || 0 } })} />
+            <Input type="number" min={0} step={5} className="h-7 w-16" aria-label={`${name} max reduce minutes`} value={flex.max_reduce_min} onChange={(e) => onChange({ ...setting, limits: { ...flex, max_reduce_min: Number(e.target.value) || 0 } })} />
             <span className="text-muted-foreground">min</span>
           </label>
           {floor > 0 && <span className="text-[11px] text-muted-foreground sm:col-span-2">Food safety: never below {floor}%.</span>}
@@ -376,23 +370,15 @@ function UnitRow({ name, type: t, setting, close, onChange }: { name: string; ty
         <div className="flex flex-wrap items-center gap-3 text-xs">
           <label className="flex items-center gap-2">
             <span className="text-muted-foreground">Delay up to</span>
-            <Input type="number" min={0} step={5} className="h-7 w-16" value={def.max_delay_min} onChange={(e) => onChange({ ...setting, limits: { ...def, max_delay_min: Number(e.target.value) || 0 } })} />
+            <Input type="number" min={0} step={5} className="h-7 w-16" aria-label={`${name} max delay minutes`} value={def.max_delay_min} onChange={(e) => onChange({ ...setting, limits: { ...def, max_delay_min: Number(e.target.value) || 0 } })} />
             <span className="text-muted-foreground">min</span>
           </label>
           <label className="flex items-center gap-2">
             <span className="text-muted-foreground">Finish by</span>
-            <Input type="time" className="h-7 w-28" value={def.must_finish_by} onChange={(e) => onChange({ ...setting, limits: { ...def, must_finish_by: e.target.value } })} />
+            <Input type="time" className="h-7 w-28" aria-label={`${name} finish by`} value={def.must_finish_by} onChange={(e) => onChange({ ...setting, limits: { ...def, must_finish_by: e.target.value } })} />
           </label>
         </div>
       )}
     </div>
-  );
-}
-
-function NumberField({ id, label, value, step, disabled, onChange }: { id: string; label: string; value: number; step: number; disabled?: boolean; onChange: (v: number) => void }) {
-  return (
-    <Field id={id} label={label}>
-      <Input id={id} type="number" min={0} step={step} value={value} disabled={disabled} onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))} />
-    </Field>
   );
 }

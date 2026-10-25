@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
 import { Gauge, Leaf, Receipt, Zap, type LucideIcon } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { fmtKw, fmtUsd } from "@/lib/format";
+import { fmtKw, fmtKwh, fmtUsd } from "@/lib/format";
+import { NO_REAL_TARIFF, NO_REAL_TARIFF_HINT, useRealTariff } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { useDashboardStore as useSim } from "@/data";
 
@@ -12,6 +13,7 @@ export function KpiRow() {
   // Lane differences come from the engine's LaneComparison; the browser never subtracts lanes (UI.md).
   const comparison = useSim((s) => s.comparison);
   const overCap = withLane ? withLane.block_avg_kw > withLane.target_kw : false;
+  const realTariff = useRealTariff();
 
   return (
     <div className="grid grid-cols-2 gap-3 2xl:grid-cols-4">
@@ -33,19 +35,31 @@ export function KpiRow() {
           </div>
         )}
       </Kpi>
-      <Kpi
-        icon={Receipt}
-        tone="var(--importance-deferrable)"
-        label="Bill this month"
-        value={fmtUsd(withLane?.cost_usd_month)}
-        sub={`Without WattWise ${fmtUsd(without?.cost_usd_month)}`}
-      />
+      {realTariff ? (
+        <Kpi
+          icon={Receipt}
+          tone="var(--importance-deferrable)"
+          label="Bill this month"
+          value={fmtUsd(withLane?.cost_usd_month)}
+          sub={`Without WattWise ${fmtUsd(without?.cost_usd_month)}`}
+        />
+      ) : (
+        <Kpi
+          icon={Receipt}
+          tone="var(--importance-deferrable)"
+          label="Energy this month"
+          value={fmtKwh(withLane?.energy_kwh_month)}
+          sub={`Bill: ${NO_REAL_TARIFF.toLowerCase()}`}
+          title={NO_REAL_TARIFF_HINT}
+        />
+      )}
       <Kpi
         icon={Leaf}
         tone="var(--lane-with)"
-        label="Saved today"
-        value={fmtUsd(comparison?.saved_today_usd)}
-        sub={`Peak avoided ${fmtKw(comparison?.peak_avoided_kw)}`}
+        label={realTariff ? "Saved today" : "Peak avoided"}
+        value={realTariff ? fmtUsd(comparison?.saved_today_usd) : fmtKw(comparison?.peak_avoided_kw)}
+        sub={realTariff ? `Peak avoided ${fmtKw(comparison?.peak_avoided_kw)}` : `Savings in $: ${NO_REAL_TARIFF.toLowerCase()}`}
+        title={realTariff ? undefined : NO_REAL_TARIFF_HINT}
         highlight
       />
     </div>
@@ -60,6 +74,7 @@ function Kpi({
   sub,
   live,
   highlight,
+  title,
   children,
 }: {
   icon: LucideIcon;
@@ -69,10 +84,11 @@ function Kpi({
   sub: string;
   live?: boolean;
   highlight?: boolean;
+  title?: string;
   children?: ReactNode;
 }) {
   return (
-    <Card className={cn("flex-row items-start gap-3 px-4 py-3.5", highlight && "border-lane-with/40 bg-lane-with/[0.06]")}>
+    <Card title={title} className={cn("flex-row items-start gap-3 px-4 py-3.5", highlight && "border-lane-with/40 bg-lane-with/[0.06]")}>
       <span
         className="flex size-10 shrink-0 items-center justify-center rounded-xl"
         style={{ background: `color-mix(in oklch, ${tone} 16%, transparent)`, color: tone }}

@@ -106,6 +106,8 @@ export const escalationMessage = (row: LiveEscalationRow, prev?: Escalation): Ws
   const problem = parse(row.problem_json, prev?.problem ?? { forecast_peak_kw: 0, target_kw: 0, excess_kw: 0, reason: "" });
   return {
     type: "escalation",
+    explanation: row.explanation,
+    explanation_source: row.explanation_source,
     data: {
       escalation_id: row.escalation_id,
       lane: row.lane,
@@ -121,6 +123,7 @@ export const escalationMessage = (row: LiveEscalationRow, prev?: Escalation): Ws
       resolved_by: row.resolved_by,
       chosen_option_id: row.chosen_option_id,
       rationale: row.rationale,
+      claude_attempts: parse(row.claude_attempts_json, prev?.claude_attempts ?? []),
     },
   };
 };

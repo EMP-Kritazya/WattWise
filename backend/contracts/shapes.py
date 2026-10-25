@@ -595,10 +595,10 @@ class PartialContext(ContractModel):
 # ---------------------------------------------------------------------------------------------------------------------
 
 RuleBreakKind = Literal["cap_overrun", "below_min_power", "past_deadline", "over_max_reduce", "over_max_delay"]
-EscalationStatus = Literal["open", "resolved", "awaiting_owner", "expired_default", "obsolete"]
-ResolvedBy = Literal["claude", "owner", "default"]
+EscalationStatus = Literal["open", "resolved", "expired_default", "obsolete"]
+ResolvedBy = Literal["claude", "default"]
 
-_OPTION_ID = re.compile(r"^(accept_overrun|ask_owner|deep_reduce_[a-z0-9_]+|extend_delay_[a-z0-9_]+)$")
+_OPTION_ID = re.compile(r"^(accept_overrun|deep_reduce_[a-z0-9_]+|extend_delay_[a-z0-9_]+)$")
 
 
 class EscalationProblem(ContractModel):
@@ -625,23 +625,32 @@ class EscalationOption(ContractModel):
     option_id: Annotated[str, Field(pattern=_OPTION_ID.pattern)]
     summary: str
     actions: list[Command]
-    projected: Optional[OptionProjection]
+    projected: OptionProjection
     rule_breaks: list[RuleBreak]
     within_authority: bool
-    harm_score: Optional[NonNegFloat]
-    rank: Optional[Annotated[int, Field(ge=1)]]
+    harm_score: NonNegFloat
+    rank: Annotated[int, Field(ge=1)]
 
     @model_validator(mode="after")
     def _check(self) -> "EscalationOption":
         if any(a.decision_id is not None for a in self.actions):
             raise ValueError(f"{self.option_id}: option actions are templates (decision_id null)")
-        if self.option_id == "ask_owner":
-            if self.projected is not None or self.harm_score is not None or self.rank is not None:
-                raise ValueError("ask_owner: projected, harm_score and rank are null")
-            if self.actions or self.rule_breaks or not self.within_authority:
-                raise ValueError("ask_owner: no actions, no rule_breaks, within_authority true")
-        elif self.projected is None or self.harm_score is None or self.rank is None:
+        if self.projected is None or self.harm_score is None or self.rank is None:
             raise ValueError(f"{self.option_id}: projected, harm_score and rank are required")
+        return self
+
+
+class ClaudeAttempt(ContractModel):
+    ts: UtcDatetime
+    option_id: str
+    accepted: bool
+    reason: Optional[Literal["outside_authority", "after_deadline"]]
+    rationale: Optional[str]
+
+    @model_validator(mode="after")
+    def _verdict(self) -> "ClaudeAttempt":
+        if self.accepted != (self.reason is None):
+            raise ValueError("accepted attempts have no rejection reason; rejected attempts require one")
         return self
 
 
@@ -652,7 +661,7 @@ class Escalation(ContractModel):
     updated_ts: UtcDatetime
     block_start: UtcDatetime
     problem: EscalationProblem
-    options: Annotated[list[EscalationOption], Field(min_length=2, max_length=4)]
+    options: Annotated[list[EscalationOption], Field(min_length=1, max_length=3)]
     default_option_id: str
     active_option_id: Optional[str]
     deadline_sim_ts: UtcDatetime
@@ -660,14 +669,15 @@ class Escalation(ContractModel):
     resolved_by: Optional[ResolvedBy]
     chosen_option_id: Optional[str]
     rationale: Optional[str]
+    claude_attempts: list[ClaudeAttempt]
 
     @model_validator(mode="after")
     def _check(self) -> "Escalation":
         ids = [o.option_id for o in self.options]
         if len(set(ids)) != len(ids):
             raise ValueError("option ids must be unique")
-        if "accept_overrun" not in ids or "ask_owner" not in ids:
-            raise ValueError("options always include accept_overrun and ask_owner")
+        if "accept_overrun" not in ids:
+            raise ValueError("options always include accept_overrun")
         for ref in (self.default_option_id, self.active_option_id, self.chosen_option_id):
             if ref is not None and ref not in ids:
                 raise ValueError(f"option id {ref!r} is not in options")
@@ -775,11 +785,6 @@ class CustomerEventPayload(ContractModel):
     start_sim_ts: UtcDatetime
 
 
-class ResolveEscalationPayload(ContractModel):
-    escalation_id: str
-    option_id: str
-
-
 class _ProposalBase(ContractModel):
     proposal_id: str
     ts: UtcDatetime
@@ -815,11 +820,6 @@ class CustomerEventProposal(_ProposalBase):
     payload: CustomerEventPayload
 
 
-class ResolveEscalationProposal(_ProposalBase):
-    kind: Literal["resolve_escalation"]
-    payload: ResolveEscalationPayload
-
-
 Proposal = Annotated[
     Union[
         ImportanceProposal,
@@ -827,7 +827,6 @@ Proposal = Annotated[
         AuthorityProposal,
         UndoDecisionProposal,
         CustomerEventProposal,
-        ResolveEscalationProposal,
     ],
     Field(discriminator="kind"),
 ]

@@ -8,6 +8,7 @@ const timeFmt = new Intl.DateTimeFormat("en-US", { timeZone: LA, hour: "numeric"
 const usdFmt = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 export const fmtKw = (kw: number | null | undefined) => (kw == null ? "–" : `${kw.toFixed(1)} kW`);
+export const fmtKwh = (kwh: number | null | undefined) => (kwh == null ? "–" : `${kwh.toFixed(1)} kWh`);
 export const fmtUsd = (usd: number | null | undefined) => (usd == null ? "–" : usdFmt.format(usd));
 export const fmtSimClock = (ts: string | number) => clockFmt.format(new Date(ts));
 export const fmtSimTime = (ts: string | number) => timeFmt.format(new Date(ts));

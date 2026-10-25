@@ -88,7 +88,18 @@ export const feedRow = (
   explanation_source: explanationSource,
 });
 
-export const escalationRow = (e: Escalation): LiveEscalationRow => ({
+/** Template fallback contains only the engine verdict; AI explanations arrive verbatim over the transport. */
+function escalationExplanation(e: Escalation): string {
+  const last = e.claude_attempts?.at(-1);
+  if (last && !last.accepted) return `Claude's choice rejected: ${last.reason}. Engine fallback remains active.`;
+  return e.status === "resolved" ? "Claude's choice accepted." : "Engine fallback remains active.";
+}
+
+export const escalationRow = (
+  e: Escalation,
+  explanation = e.explanation ?? escalationExplanation(e),
+  explanationSource: "ai" | "template" = e.explanation_source ?? "template",
+): LiveEscalationRow => ({
   escalation_id: e.escalation_id,
   lane: e.lane,
   status: e.status,
@@ -102,6 +113,9 @@ export const escalationRow = (e: Escalation): LiveEscalationRow => ({
   chosen_option_id: e.chosen_option_id,
   resolved_by: e.resolved_by,
   rationale: e.rationale,
+  claude_attempts_json: cj(e.claude_attempts ?? []),
+  explanation,
+  explanation_source: explanationSource,
 });
 
 /** Same summary text as backend/live/rows.py context_row (numbers as the agents posted them). */

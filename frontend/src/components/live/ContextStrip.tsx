@@ -1,5 +1,6 @@
 import { CalendarDays, Thermometer, Users, Zap } from "lucide-react";
 import type { ReactNode } from "react";
+import { NoData } from "@/components/NoData";
 import { useLiveContext } from "@/data";
 import { fmtSimTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -18,13 +19,19 @@ const STRESS: Record<string, string> = {
  */
 export function ContextStrip() {
   const ctx = useLiveContext();
-  if (!ctx) return null;
+  if (!ctx)
+    return (
+      <NoData title="No live context yet">
+        The weather, grid-price and events agents have not posted anything. When they run, their readings appear here with
+        their source labels; nothing is filled in meanwhile.
+      </NoData>
+    );
   const temps = ctx.weather?.hourly ?? [];
   const prices = ctx.prices?.hourly ?? [];
   const event = ctx.events?.items[0];
 
   return (
-    <div className="grid gap-3 rounded-xl border bg-card px-4 py-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-3 rounded-[22px] border-2 border-[#22223B] bg-white px-4 py-3 shadow-[0_5px_0_#22223B] sm:grid-cols-2 xl:grid-cols-4">
       {ctx.weather && (
         <Cell icon={<Thermometer className="size-4" />} title="Outdoor" label={ctx.weather.label} source={ctx.weather.source}>
           <span className="text-lg font-semibold tabular-nums">{temps[0] ? `${temps[0].temp_c.toFixed(1)} °C` : "–"}</span>
@@ -67,11 +74,11 @@ export function ContextStrip() {
 
 function Cell({ icon, title, label, source, children }: { icon: ReactNode; title: string; label: DataLabel | null; source: string; children: ReactNode }) {
   return (
-    <div className="min-w-0">
+    <div className="min-w-0 rounded-2xl bg-[#FFF6E9] px-3 py-2">
       <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
         {icon}
         {title}
-        {label && <span className="rounded bg-secondary px-1 text-[10px] uppercase">{label === "live_api" ? "live" : "recorded"}</span>}
+        {label && <span className="rounded-full border border-[#22223B]/20 bg-secondary px-1.5 text-[10px] font-bold uppercase">{label === "live_api" ? "live" : "recorded"}</span>}
       </div>
       <div className="mt-0.5 flex flex-wrap items-baseline">{children}</div>
       <div className="truncate text-[10px] text-muted-foreground/70">{source}</div>

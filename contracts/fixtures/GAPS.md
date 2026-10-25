@@ -41,8 +41,7 @@ where it shows up, what the fixtures do, and a suggested contract line. Earlier 
    does not repeat it in `new_escalations` (that lists changes made by the step). The runtime publishes the returned object
    (ws `escalation`, `publish_escalation`). Suggested: "a resolve's result is published by the runtime, not echoed in the next
    step".
-9. **`active_option_id` after a resolve with a different option.** Fixtures set it to the chosen option (owner example in
-   `rest/post_escalation_resolve.json`); the switch Commands follow in the next step. Contract: "only a resolve changes the last".
+9. **`active_option_id` after a resolve with a different option.** Fixtures set it to an accepted Claude option; the switch Commands follow in the next step. Contract: "only a resolve changes the last".
 10. **`expired_default.rationale`.** Fixtures keep Claude's rationale with its pick (`shapes/escalation_expired_default.json`).
 
 ## Engine state (CONTRACTS §3 snapshot)
@@ -108,10 +107,10 @@ where it shows up, what the fixtures do, and a suggested contract line. Earlier 
 29. **Authority used by the Demo Café.** The config keeps the ClaudeAuthority example (3 kW / 20 min / 15 min / below-min
     false). The Oct 24 note says the Builder always sends full authority (1000 kW / 0 / 1440 / false); with that, harm uses
     the engine reference for the 0 values and `accept_overrun` would always be within authority. Fixtures apply the other Oct 24
-    rule: Claude is offered only `within_authority` options, never `ask_owner` (`choose_escalation_option` `input_enum`; the
-    scripted Claude gives no answer when nothing is offered). `shapes/escalation_awaiting_owner.json` stays as the path where
-    Claude's offered pick fails revalidation; `proposal_resolve_escalation` is now an owner request. Suggested: state the
-    Demo Café's authority in CONTRACTS §1 KitchenConfig.
+    rule is superseded by G73: Claude sees every ranked option with its authority flag. The engine validates the pick,
+    records the verdict in `claude_attempts`, and permits one retry before the deadline. `shapes/escalation_rejected_claude.json`
+    illustrates an outside-authority rejection with the fallback still in force. Owner resolution, its Proposal and REST
+    endpoint are removed. The Demo Café retains the illustrative 3 kW / 20 min / 15 min authority in its fixtures.
 
 ## Fixture wrapper fields (not contract shapes)
 `rest/*` `status`, `facade/*` `raises`, `facade/run_backtest.json` `note`, `facade/run_backtest_on_progress.jsonl` (the

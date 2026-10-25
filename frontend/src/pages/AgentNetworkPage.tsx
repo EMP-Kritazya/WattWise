@@ -19,12 +19,12 @@ interface Node {
 }
 
 const NODES: Node[] = [
-  { id: "concierge", label: "Concierge", sub: "Fetch.ai uAgent · ASI:One", x: 300, y: 210, icon: Network, color: "oklch(0.76 0.17 152)" },
-  { id: "weather", label: "Weather", sub: "agent", x: 110, y: 80, icon: Cloud, color: "oklch(0.8 0.12 220)" },
-  { id: "grid", label: "Grid", sub: "agent · prices", x: 300, y: 50, icon: Zap, color: "oklch(0.8 0.15 75)" },
-  { id: "events", label: "Events", sub: "agent", x: 490, y: 80, icon: Ticket, color: "oklch(0.75 0.15 330)" },
-  { id: "claude", label: "Claude", sub: "explains · resolves escalations", x: 490, y: 350, icon: Bot, color: "oklch(0.72 0.15 50)" },
-  { id: "engine", label: "WattWise engine", sub: "decides · computes every number", x: 110, y: 350, icon: Cpu, color: "oklch(0.72 0.14 250)" },
+  { id: "concierge", label: "Concierge", sub: "Fetch.ai uAgent · ASI:One", x: 300, y: 210, icon: Network, color: "#2EC4B6" },
+  { id: "weather", label: "Weather", sub: "agent", x: 110, y: 80, icon: Cloud, color: "#A9D6F5" },
+  { id: "grid", label: "Grid", sub: "agent · prices", x: 300, y: 50, icon: Zap, color: "#FFB703" },
+  { id: "events", label: "Events", sub: "agent", x: 490, y: 80, icon: Ticket, color: "#FFC8DD" },
+  { id: "claude", label: "Claude", sub: "explains · resolves escalations", x: 490, y: 350, icon: Bot, color: "#FFB4A2" },
+  { id: "engine", label: "WattWise engine", sub: "decides · computes every number", x: 110, y: 350, icon: Cpu, color: "#C3CEF6" },
 ];
 const NODE = Object.fromEntries(NODES.map((n) => [n.id, n]));
 const EDGES: [string, string][] = [
@@ -57,12 +57,13 @@ export function AgentNetworkPage() {
             Agents sense the world, the engine decides and does the math, Claude judges the hard cases and talks to the owner.
           </CardDescription>
         </CardHeader>
-        <CardContent className="px-2">
+        <CardContent className="px-4">
+          <div className="rounded-[18px] border-2 border-[#22223B] bg-[#FFF6E9] p-2">
           <svg viewBox="0 0 600 450" className="mx-auto h-auto w-full max-w-xl" role="img" aria-label="Agent network graph">
             {EDGES.map(([a, b]) => {
               const na = nodeFor(a);
               const nb = nodeFor(b);
-              return <line key={`${a}-${b}`} x1={na.x} y1={na.y} x2={nb.x} y2={nb.y} stroke="oklch(1 0 0 / 12%)" strokeWidth={1.5} />;
+              return <line key={`${a}-${b}`} x1={na.x} y1={na.y} x2={nb.x} y2={nb.y} stroke="#22223B" strokeOpacity={0.25} strokeWidth={2} strokeDasharray="7 6" />;
             })}
             {flying.map(({ m, key }) => {
               const a = nodeFor(m.from_agent);
@@ -80,9 +81,9 @@ export function AgentNetworkPage() {
               const on = active.has(n.id);
               return (
                 <g key={n.id} transform={`translate(${n.x}, ${n.y})`}>
-                  <circle r={n.id === "concierge" ? 38 : 30} fill="oklch(0.21 0.022 262)" stroke={n.color} strokeWidth={on ? 3 : 1.5} strokeOpacity={on ? 1 : 0.5} />
+                  <circle r={n.id === "concierge" ? 38 : 30} fill={n.color} stroke="#22223B" strokeWidth={on ? 4 : 2.5} />
                   <foreignObject x={-12} y={-12} width={24} height={24}>
-                    <Icon className="size-6" style={{ color: n.color }} />
+                    <Icon className="size-6 text-[#22223B]" />
                   </foreignObject>
                   <text y={n.id === "concierge" ? 56 : 48} textAnchor="middle" className="fill-foreground text-[13px] font-semibold">
                     {n.label}
@@ -94,6 +95,7 @@ export function AgentNetworkPage() {
               );
             })}
           </svg>
+          </div>
         </CardContent>
       </Card>
 
@@ -117,12 +119,12 @@ function MessageRow({ m }: { m: AgentLog }) {
   const from = nodeFor(m.from_agent);
   const to = nodeFor(m.to_agent);
   return (
-    <div className="rounded-lg border bg-secondary/40 px-3 py-2 text-xs">
+    <div className="rounded-2xl border-2 border-[#22223B] bg-[#FFF6E9] px-3 py-2 text-xs">
       <div className="flex items-center gap-1.5">
         <b style={{ color: from.color }}>{from.label}</b>
         <span className="text-muted-foreground">→</span>
         <b style={{ color: to.color }}>{to.label}</b>
-        <span className={cn("ml-auto rounded bg-secondary px-1 text-[10px] uppercase text-muted-foreground")}>{m.kind}</span>
+        <span className={cn("ml-auto rounded-full border border-[#22223B]/20 bg-secondary px-2 text-[10px] font-bold uppercase text-muted-foreground")}>{m.kind}</span>
       </div>
       <div className="mt-0.5 text-muted-foreground">{m.summary}</div>
     </div>

@@ -1043,7 +1043,7 @@ class ToyEngine:
         self.protected = {}   # dev -> tick until which the engine leaves it alone (owner action)
         self.esc_blocks = set()
         self.warned_blocks = set()
-        self.active = {}      # escalation_id -> latest object (open / awaiting_owner)
+        self.active = {}      # escalation_id -> latest object (open)
         self.esc_prev = {}    # escalation_id -> {dev: state before the fallback} (to move devices on a switch)
         self.esc_acts = {}    # escalation_id -> {option_id: (acts, restores, holds)}
         self.switch = None    # pending escalation_choice commands for the next step
@@ -1548,23 +1548,21 @@ class ToyEngine:
                                                           cands[i]["option_id"]))
         for r_, i in enumerate(order, 1):
             options[i]["rank"] = r_
-        options.append({"option_id": "ask_owner", "summary": "Ask the owner", "actions": [], "projected": None,
-                        "rule_breaks": [], "within_authority": True, "harm_score": None, "rank": None})
         top = cands[order[0]]
-        default = top["option_id"] if top["within"] else "ask_owner"
+        default = top["option_id"] if top["within"] else "accept_overrun"
         deadline = max(ts + timedelta(minutes=5), min(ts + timedelta(minutes=15), bs - timedelta(minutes=5)))
         esc = {"escalation_id": eid, "lane": "with", "ts": iso(ts), "updated_ts": iso(ts), "block_start": iso(bs),
                "problem": {"forecast_peak_kw": f.r1[j], "target_kw": target, "excess_kw": rnd(f.r1[j] - target, 1),
                            "reason": problem_reason(n)},
                "options": options, "default_option_id": default,
-               "active_option_id": default if default != "ask_owner" else None,
+               "active_option_id": default,
                "deadline_sim_ts": iso(deadline), "status": "open", "resolved_by": None, "chosen_option_id": None,
-               "rationale": None}
+               "rationale": None, "claude_attempts": []}
         self.esc_acts[eid] = {c["option_id"]: c for c in cands}
         self.esc_prev[eid] = {}
         final = f
-        if default != "ask_owner":
-            final = self.apply_option(n, eid, top, moves, peaks, out, "escalation_fallback", f)
+        fallback = next(c for c in cands if c["option_id"] == default)
+        final = self.apply_option(n, eid, fallback, moves, peaks, out, "escalation_fallback", f)
         self.active[eid] = esc
         run.esc_latest[eid] = esc
         out["escalations"].append(esc)
@@ -1595,16 +1593,20 @@ class ToyEngine:
     def resolve(self, eid, option_id, resolved_by, rationale, n):
         """resolve_escalation(...) between step n and step n + 1 (Claude answers asynchronously)."""
         e = self.run.esc_latest[eid]
-        if e["status"] not in ("open", "awaiting_owner"):
+        if e["status"] != "open":
             return e
         opt = next(o for o in e["options"] if o["option_id"] == option_id)
         e = copy.deepcopy(e)
         e["updated_ts"] = iso(rep_dt(n))
-        e["chosen_option_id"], e["rationale"], e["resolved_by"] = option_id, rationale, resolved_by
-        if option_id == "ask_owner" or (resolved_by == "claude" and not opt["within_authority"]):
-            e["status"] = "awaiting_owner"
+        late = iso(rep_dt(n)) >= e["deadline_sim_ts"]
+        accepted = opt["within_authority"] and not late
+        e["claude_attempts"].append({"ts": iso(rep_dt(n)), "option_id": option_id, "accepted": accepted,
+                                    "reason": "after_deadline" if late else None if accepted else "outside_authority",
+                                    "rationale": rationale})
+        if not accepted:
             self.active[eid] = e
         else:
+            e["chosen_option_id"], e["rationale"], e["resolved_by"] = option_id, rationale, "claude"
             e["status"] = "resolved"
             self.active.pop(eid, None)
             if option_id != e["active_option_id"]:
@@ -1796,9 +1798,9 @@ class Run:
         rec["clock"] = self.clock_after(n)
 
     def claude_answer(self, e, n):
-        """Scripted stand-in for Claude: it is offered only the within-authority options (never ask_owner, CONTRACTS.md
-        ClaudeAuthority) and picks the cheapest (ties: the engine's rank). Nothing offered -> no answer, the fallback stays."""
-        cands = [o for o in e["options"] if o["option_id"] != "ask_owner" and o["within_authority"]]
+        """Scripted stand-in for Claude: sees every option, chooses an authorized one by cost then rank.
+        No authorized choice -> no answer, the engine fallback stays."""
+        cands = [o for o in e["options"] if o["within_authority"]]
         if not cands:
             return None
         o = min(cands, key=lambda x: (x["projected"]["cost_delta_usd"], x["rank"]))
@@ -2101,7 +2103,16 @@ def escalation_row(e):
             "updated_ts": e["updated_ts"], "problem_json": cj(e["problem"]), "options_json": cj(e["options"]),
             "default_option_id": e["default_option_id"], "active_option_id": e["active_option_id"],
             "deadline_sim_ts": e["deadline_sim_ts"], "chosen_option_id": e["chosen_option_id"],
-            "resolved_by": e["resolved_by"], "rationale": e["rationale"]}
+            "resolved_by": e["resolved_by"], "rationale": e["rationale"],
+            "claude_attempts_json": cj(e["claude_attempts"]),
+            "explanation": escalation_message(e)["explanation"], "explanation_source": "template"}
+
+
+def escalation_message(e):
+    verdict = "Claude's choice accepted." if e["status"] == "resolved" else "Engine fallback remains active."
+    if e["claude_attempts"] and not e["claude_attempts"][-1]["accepted"]:
+        verdict = "Claude's choice rejected: %s. Engine fallback remains active." % e["claude_attempts"][-1]["reason"]
+    return {"type": "escalation", "data": e, "explanation": verdict, "explanation_source": "template"}
 
 
 def backtest_point_row(run_id, p):
@@ -2207,11 +2218,11 @@ def build_streams(R, ticks, run_days, last_tick, mode):
                            "explanation_source": "template"})
         for l in LANES:
             for e in r["states"][l]["new_escalations"]:
-                ws.append({"type": "escalation", "data": e})
+                ws.append(escalation_message(e))
             for w in r["states"][l]["warnings"]:
                 ws.append(dict({"type": "warning"}, **w))
         for e in r["after"]:
-            ws.append({"type": "escalation", "data": e})
+            ws.append(escalation_message(e))
         c = clock_state(n, run_days, last_tick)
         if mode == "multiday" and (c["phase"] != prev_clock["phase"] or c["day_index"] != prev_clock["day_index"] or
                                    (c["phase"] == "overnight" and n % 15 == 0) or c["paused_reason"] is not None):
@@ -2362,6 +2373,12 @@ def write_days(days, out_dir):
 def main(out_dir):
     global OUT
     OUT = out_dir
+    for retired in ("shapes/escalation_awaiting_owner.json", "shapes/proposal_resolve_escalation.json",
+                    "ai_tools/propose_escalation_choice.json", "rest/post_escalation_resolve.json"):
+        path = os.path.join(OUT, retired)
+        if os.path.isfile(path):
+            os.unlink(path)
+
     hist, totals = build_history()
     init = history_meter_init(totals)
     multi_last = run_ticks_for_days(MULTI_DAYS)
@@ -2417,17 +2434,13 @@ def main(out_dir):
 
     # ---- escalation variants (alternative outcomes of the same e_0001; only `resolved` is in the stream)
     eid = esc_open["escalation_id"]
-    outside = next((o for o in esc_open["options"] if not o["within_authority"] and o["option_id"] != "ask_owner"), None)
-    awaiting = dict(copy.deepcopy(esc_open), status="awaiting_owner", resolved_by="claude",
-                    chosen_option_id=outside["option_id"],
-                    rationale="%s would hold the block better but is outside my authority, so the owner decides."
-                              % outside["summary"])
-    expired = dict(copy.deepcopy(awaiting), status="expired_default", resolved_by="default",
+    outside = next(o for o in esc_open["options"] if not o["within_authority"])
+    rejected = copy.deepcopy(esc_open)
+    rejected["claude_attempts"] = [{"ts": esc_open["ts"], "option_id": outside["option_id"], "accepted": False,
+                                     "reason": "outside_authority", "rationale": "The engine rejected this pick outside authority."}]
+    expired = dict(copy.deepcopy(rejected), status="expired_default", resolved_by="default",
                    updated_ts=esc_open["deadline_sim_ts"])
     obsolete = dict(copy.deepcopy(esc_open), status="obsolete", updated_ts=iso(rep_dt(esc_n + REPLAN_EVERY)))
-    owner_pick = next(o for o in esc_open["options"] if o["option_id"] not in ("ask_owner", esc_open["active_option_id"]))
-    owner_resolved = dict(copy.deepcopy(esc_open), status="resolved", resolved_by="owner",
-                          chosen_option_id=owner_pick["option_id"], active_option_id=owner_pick["option_id"])
 
     # ---- proposals (one per kind)
     def proposal(pid, kind, payload, summary, ts_n=N, expires=None):
@@ -2450,10 +2463,6 @@ def main(out_dir):
         "customer_event": proposal("p_0005", "customer_event",
                                    {"customers": 40, "duration_min": 60, "start_sim_ts": iso(rep_dt(N) + timedelta(minutes=30))},
                                    "40-person party at 20:00"),
-        "resolve_escalation": proposal("p_0006", "resolve_escalation",
-                                       {"escalation_id": eid, "option_id": outside["option_id"]},
-                                       "Owner asked for %s (outside Claude's authority)" % outside["option_id"], esc_n,
-                                       esc_open["deadline_sim_ts"]),
     }
 
     # ---- bills and backtest
@@ -2514,7 +2523,7 @@ def main(out_dir):
     wjson(S + "warning_cap_unreachable.json", warning)
     wjson(S + "escalation_open.json", esc_open)
     wjson(S + "escalation_resolved_claude.json", resolved)
-    wjson(S + "escalation_awaiting_owner.json", awaiting)
+    wjson(S + "escalation_rejected_claude.json", rejected)
     wjson(S + "escalation_expired_default.json", expired)
     wjson(S + "escalation_obsolete.json", obsolete)
     wjson(S + "meter.json", st(esc_n, "with")["meter"])
@@ -2610,7 +2619,7 @@ def main(out_dir):
 
     # ---------------- ai tools
     A = "ai_tools/"
-    offered = [o["option_id"] for o in esc_open["options"] if o["within_authority"] and o["option_id"] != "ask_owner"]
+    offered = [o["option_id"] for o in esc_open["options"]]
     wjson(A + "get_kitchen_state.json", {"tool": "get_kitchen_state", "input": {}, "output": snapshot})
     wjson(A + "get_forecast.json", {"tool": "get_forecast", "input": {}, "output": snapshot["forecast_kw"]})
     wjson(A + "what_if.json", {"tool": "what_if", "input": dict(wi_args, lane="with"), "output": wi_effect})
@@ -2618,7 +2627,7 @@ def main(out_dir):
     wjson(A + "explain_decision.json", {"tool": "explain_decision", "input": {"decision_id": first_dec["decision_id"]},
                                         "output": first_dec})
     for tool, kind in (("propose_importance_change", "importance"), ("propose_peak_cap_change", "peak_cap"),
-                       ("propose_escalation_choice", "resolve_escalation"), ("propose_undo", "undo_decision"),
+                       ("propose_undo", "undo_decision"),
                        ("propose_customer_event", "customer_event")):
         p = proposals_by_kind[kind]
         wjson(A + tool + ".json", {"tool": tool, "input": dict(p["payload"], summary=p["summary"]), "output": p})
@@ -2646,7 +2655,7 @@ def main(out_dir):
     wjson(Wd + "backtest_month.json", {"type": "backtest_month", "run_id": BACKTEST_RUN, "data": bt_july})
     wjson(Wd + "comparison.json", {"type": "comparison", "data": comparison(st(N, "without"), st(N, "with"))})
     wjson(Wd + "proposal.json", {"type": "proposal", "data": proposal_pending})
-    wjson(Wd + "escalation.json", {"type": "escalation", "data": esc_open})
+    wjson(Wd + "escalation.json", escalation_message(esc_open))
     wjson(Wd + "context.json", {"type": "context", "data": CONTEXT_1})
     wjson(Wd + "agent_log.json", {"type": "agent_log", "data": logs1[0]})
     wjsonl(Wd + "stream.jsonl", E["ws"])
@@ -2707,8 +2716,6 @@ def main(out_dir):
     rest("post_context_crowd_effect", "POST", "/api/context/crowd-effect",
          {"value": "medium", "reason": CONTEXT_1["crowd_effect"]["reason"]}, ok)
     rest("get_escalations", "GET", "/api/escalations?status=open", None, [esc_open])
-    rest("post_escalation_resolve", "POST", "/api/escalations/%s/resolve" % eid, {"option_id": owner_pick["option_id"]},
-         owner_resolved)
     rest("post_agent_log", "POST", "/api/agent-log", logs1[0], ok)
     rest("get_health", "GET", "/api/health", None, {"ok": True, "kitchen_impl": "fake", "live_transport": "spacetime",
                                                      "store": "convex", "hardware": "off", "sim_host": "connected"})

@@ -45,9 +45,8 @@ load is in kW, so each unit runs at a higher duty and never draws more than 8.0 
   and dishwasher, reductions of HVAC, water heater and walk-in, each ≤ 30 min, 30-min cooldown, restored at the limit.
 - **Escalation `e_0001`** opens at tick 50 (18:20) for the 18:45 block (forecast 40.7 kW after every in-rules move). Options:
   `accept_overrun` (0.7 kW over, within authority, rank 1), `extend_delay_dishwasher` (5 min past its deadline and
-  `max_delay_min`, within authority, rank 2), `deep_reduce_water_heater` (20 % below `min_power_pct`, outside, rank 3) +
-  `ask_owner`. The fallback (rank 1, `accept_overrun`) is in force from the step it opens (no Commands to issue). Claude is
-  offered only the within-authority options (`ai_tools/choose_escalation_option.json` `input_enum`, never `ask_owner`) and
+  `max_delay_min`, within authority, rank 2), `deep_reduce_water_heater` (20 % below `min_power_pct`, outside, rank 3). The fallback (rank 1, `accept_overrun`) is in force from the step it opens (no Commands to issue). Claude is
+  offered every ranked option with `within_authority` (`ai_tools/choose_escalation_option.json` `input_enum`) and
   answers between ticks 50 and 51 with the same option → `resolved`, no extra command. The clock never slows.
 - **Owner click:** after tick 118 the owner presses "start dishwasher" while it runs in both lanes: `owner_command` on both
   lanes (without first), `owner_override` decisions `d_0014`/`d_0015` in step 119, both acks `ok: false, job_running` in tick 120.
@@ -109,7 +108,7 @@ and the context in force at tick 240; commands across the gap are not visible. F
 ## Files and who loads them
 | Folder | What | Consumed by |
 |---|---|---|
-| `shapes/` | One example per §1 shape. Variants: kitchen_config cap + `_minimize`; hub_report/tick_state with + without (tick 50 / the escalation tick); command (engine) + `command_owner` (standalone owner reduce 10 %) with `decision_owner_override`; acks ok / clamped (`out_of_range`) / rejected (`job_running`, from the stream); escalation open / resolved_claude / awaiting_owner / expired_default / obsolete (alternative outcomes of `e_0001`; only `resolved` happens in the stream); `warning_cap_unreachable` (illustrative: what a 30 kW cap would trigger at 18:20); `warm_up_history` (the last block of the history); one Proposal per kind; `tariff` (demo) + `tariff_pge_b19` (URDB); `backtest_result` / `backtest_point` / `backtest_inputs` | everyone (generated types, tests) |
+| `shapes/` | One example per §1 shape. Variants: kitchen_config cap + `_minimize`; hub_report/tick_state with + without (tick 50 / the escalation tick); command (engine) + `command_owner` (standalone owner reduce 10 %) with `decision_owner_override`; acks ok / clamped (`out_of_range`) / rejected (`job_running`, from the stream); escalation open / resolved_claude / rejected_claude / expired_default / obsolete (alternative outcomes of `e_0001`; only `resolved` happens in the stream); `warning_cap_unreachable` (illustrative: what a 30 kW cap would trigger at 18:20); `warm_up_history` (the last block of the history); one Proposal per kind; `tariff` (demo) + `tariff_pge_b19` (URDB); `backtest_result` / `backtest_point` / `backtest_inputs` | everyone (generated types, tests) |
 | `history/` | Fake 2-month warm-up + daily inputs (above) | Suyog: runtime `warm_up(history)` until ComStock · Kritazya: engine warm-up, forecaster, backtest · Ashirwad: Proof screen |
 | `hub_protocol/` | §8 messages, one file per type (+ `sim_tick_replay`, `sim_tick_overnight`), `server_to_hub.jsonl` (hub_welcome, sim_build, 120 sim_ticks), `hub_to_server.jsonl` (hub_hello, 120 hub_reports) | Ashirwad: `src/mocks/mockHubServer.ts` plays `server_to_hub.jsonl` · Suyog: `fakes/fake_hub_client.py` answers each `sim_tick` with the matching `hub_to_server` line · Kritazya: HubReports as engine input |
 | `rest/` | One file per §2 endpoint `{method, path, status, request, response}` + `_422`/`_404` examples (incl. `post_sim_control_next_day`, `post_sim_control_422`, `post_decision_undo_422`) | Ashirwad: `src/mocks` REST handlers · Suyog: API tests |

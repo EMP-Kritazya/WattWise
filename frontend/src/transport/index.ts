@@ -29,8 +29,6 @@ const lazyFixtureTransport: Transport = {
   setPreferences: (text) => loadFixture().then((transport) => transport.setPreferences(text)),
   getContext: () => loadFixture().then((transport) => transport.getContext()),
   listEscalations: (status) => loadFixture().then((transport) => transport.listEscalations(status)),
-  resolveEscalation: (escalationId, optionId) =>
-    loadFixture().then((transport) => transport.resolveEscalation(escalationId, optionId)),
   health: () => loadFixture().then((transport) => transport.health()),
   subscribe(onMessage, onStatus) {
     let stopped = false;

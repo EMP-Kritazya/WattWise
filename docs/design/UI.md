@@ -22,7 +22,7 @@ Charts, KPIs, energy and cost always come from SpacetimeDB in every tab (they ar
 **Where live data comes from.** With `LIVE_TRANSPORT=spacetime` (default) screens subscribe to SpacetimeDB tables (`live_tick`,
 `tick_history`, `live_device`, `live_comparison`, `live_feed`, `live_clock`, `live_context`, `live_escalation`, `live_agent_log`):
 energy, current price, cost today/month, peaks, every device's state and physical gauges, decisions, escalations. Updates arrive
-as the runtime publishes each tick (≈ 2 per second at 120×). REST is used for config, clicks, escalation choices, proposals and
+as the runtime publishes each tick (≈ 2 per second at 120×). REST is used for config, manual clicks, proposals and
 chat; `/ws` carries chat streaming and proposals. With `LIVE_TRANSPORT=ws` everything comes over `/ws` (offline fallback).
 One data hook hides the switch. Until the backend exists, `src/mocks` serves the shared fixtures (`contracts/fixtures/`).
 
@@ -69,9 +69,8 @@ chat drawer (slide-in). The toggle is a per-viewer preference (remembered locall
 - **Context strip:** outdoor temp now and next hours, price now + sparkline + stress, nearby events, crowd effect; each with its label.
 - **Escalation card:** problem (forecast peak vs target), options in `rank` order with engine numbers, rule breaks and
   `within authority` badges, the option in force (`active_option_id`) highlighted. States: *Fallback applied: X, Claude is
-  reviewing…* → *Claude kept X* / *Claude switched to Y: rationale* (or *Waiting for you* with option buttons until the deadline
-  when outside authority) · *Deadline passed: X stays* (`expired_default`) · *Risk passed* (`obsolete`). One card per escalation id,
-  updated in place. The clock never pauses or slows for an escalation.
+  reviewing…* → *Claude kept X* / *Claude switched to Y: rationale* (or *Choice rejected: outside authority*, with one Claude retry before the deadline) · *Deadline passed: X stays* (`expired_default`) · *Risk passed* (`obsolete`). One card per escalation id,
+  updated in place. Show claude_attempts verdicts plus explanation/source; no owner-choice controls. The clock never pauses or slows for an escalation.
 - **Overnight** (`phase: overnight`): dim the floor and show a "Closed — fast-forwarding to 10:00" overlay with the sim clock;
   no per-tick animation (the hub re-renders once per 15 sim min; viewers get one row per 15-min block). Charts keep drawing the
   block rows so the night's always-on load is visible. Surge buttons are disabled (held until open).

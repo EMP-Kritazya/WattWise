@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAction } from "@/hooks/useAction";
 import { useDeviceNames } from "@/hooks/useDeviceNames";
 import { fmtAction, fmtKw, fmtSimTime, fmtUsd } from "@/lib/format";
+import { useRealTariff } from "@/lib/money";
 import { STATUS_LABEL } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { useDashboardStore as useSim, type FeedItem } from "@/data";
@@ -47,7 +48,7 @@ export function DecisionFeed() {
       <CardContent className="flex max-h-80 flex-col gap-2 overflow-y-auto px-4">
         {items.length === 0 && (
           <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-            Nothing yet. Press Play, then add customers to push the kitchen toward its cap.
+            No WattWise decisions yet. The engine's decisions appear here as it makes them.
           </p>
         )}
         {items.map((item) => (
@@ -61,14 +62,15 @@ export function DecisionFeed() {
 function FeedRow({ item, name }: { item: FeedItem; name: string }) {
   const d = item.decision;
   const upsertDecisions = useSim((s) => s.upsertDecisions);
+  const realTariff = useRealTariff();
   const { run, busy, error } = useAction();
   const canUndo = d.status === "executed";
   const Icon = ACTION_ICON[d.action];
   const faded = d.status === "undone";
 
   return (
-    <div className={cn("flex gap-3 rounded-lg border bg-secondary/40 p-3 text-sm", faded && "opacity-60")}>
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-importance-flexible/15 text-importance-flexible">
+    <div className={cn("flex gap-3 rounded-2xl border-2 border-[#22223B] bg-[#FFF6E9] p-3 text-sm", faded && "opacity-60")}>
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-[#22223B] bg-[#CDEAC0] text-[#22223B]">
         <Icon className="size-4" />
       </span>
       <div className="min-w-0 flex-1">
@@ -95,7 +97,7 @@ function FeedRow({ item, name }: { item: FeedItem; name: string }) {
           <span>
             {fmtKw(d.effect.peak_before_kw)} → {fmtKw(d.effect.peak_after_kw)}
           </span>
-          <span className="font-medium text-lane-with">saves {fmtUsd(d.effect.saving_usd)}</span>
+          {realTariff && <span className="font-medium text-lane-with">saves {fmtUsd(d.effect.saving_usd)}</span>}
           {canUndo && (
             <Button
               variant="outline"

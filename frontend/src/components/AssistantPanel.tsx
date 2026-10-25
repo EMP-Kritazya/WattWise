@@ -49,9 +49,9 @@ export function AssistantPanel({ className, bare }: { className?: string; bare?:
   }
 
   return (
-    <section className={cn("flex min-h-0 flex-col", !bare && "rounded-xl border bg-card", className)}>
-      <header className="flex items-center gap-3 border-b px-4 py-3">
-        <span className="flex size-9 items-center justify-center rounded-xl bg-importance-flexible/15 text-importance-flexible">
+    <section className={cn("flex min-h-0 flex-col", !bare && "rounded-[22px] border-2 border-[#22223B] bg-white shadow-[0_5px_0_#22223B]", className)}>
+      <header className="flex items-center gap-3 border-b-2 border-[#22223B] px-4 py-3">
+        <span className="flex size-9 items-center justify-center rounded-xl border-2 border-[#22223B] bg-[#CDEAC0] text-[#22223B]">
           <Bot className="size-5" />
         </span>
         <div>
@@ -64,7 +64,7 @@ export function AssistantPanel({ className, bare }: { className?: string; bare?:
         <AssistantBubble text="Hi! Ask me why WattWise did something, or tell me about a rush coming up. Every number I give comes from the engine." />
         {chat.map((m) =>
           m.role === "owner" ? (
-            <div key={m.id} className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-[oklch(0.55_0.17_262)] px-3 py-2 text-sm text-white">
+            <div key={m.id} className="max-w-[85%] self-end rounded-2xl rounded-br-md border-2 border-[#22223B] bg-[#2EC4B6] px-3 py-2 text-sm font-semibold text-[#22223B] shadow-[0_2px_0_#22223B]">
               {m.text}
             </div>
           ) : (
@@ -85,7 +85,7 @@ export function AssistantPanel({ className, bare }: { className?: string; bare?:
               key={text}
               type="button"
               onClick={() => send(text)}
-              className="flex items-center gap-2 rounded-lg border bg-secondary/40 px-3 py-2 text-left text-xs transition-colors hover:bg-secondary"
+              className="flex items-center gap-2 rounded-xl border-2 border-[#22223B] bg-[#FFF6E9] px-3 py-2 text-left text-xs font-semibold transition-colors hover:bg-secondary"
             >
               <Icon className="size-3.5 shrink-0 text-importance-flexible" />
               {text}
@@ -95,7 +95,7 @@ export function AssistantPanel({ className, bare }: { className?: string; bare?:
       </div>
 
       {error && <p className="px-4 pt-2 text-xs text-destructive">{error}</p>}
-      <form onSubmit={submit} className="flex gap-2 p-4">
+      <form onSubmit={submit} className="flex gap-2 border-t-2 border-[#22223B] p-4">
         <Input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask anything…" />
         <Button type="submit" size="icon" aria-label="Send">
           <Send />
@@ -108,10 +108,10 @@ export function AssistantPanel({ className, bare }: { className?: string; bare?:
 function AssistantBubble({ text, streaming }: { text: string; streaming?: boolean }) {
   return (
     <div className="flex max-w-[92%] items-start gap-2 self-start">
-      <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-lg bg-importance-flexible/15 text-importance-flexible">
+      <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-lg border border-[#22223B] bg-[#CDEAC0] text-[#22223B]">
         <Bot className="size-3.5" />
       </span>
-      <div className="rounded-2xl rounded-tl-md bg-secondary px-3 py-2 text-sm leading-relaxed">
+      <div className="rounded-2xl rounded-tl-md border-2 border-[#22223B] bg-[#FFF1E2] px-3 py-2 text-sm leading-relaxed shadow-[0_2px_0_#22223B]">
         {text}
         {streaming && <span className="animate-pulse">▍</span>}
       </div>
@@ -131,7 +131,7 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
       if (confirm) setKitchen(await transport.getKitchen());
     });
   return (
-    <div className="ml-8 rounded-xl border border-importance-flexible/40 bg-importance-flexible/10 p-3 text-sm">
+    <div className="ml-8 rounded-2xl border-2 border-[#22223B] bg-[#DFF6F3] p-3 text-sm shadow-[0_3px_0_#22223B]">
       <div className="text-[11px] font-medium tracking-wide text-importance-flexible uppercase">Suggested change</div>
       <div className="mt-1 font-medium">{proposal.summary}</div>
       <div className="mt-2 flex gap-2">

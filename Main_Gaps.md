@@ -36,9 +36,9 @@ Legend: **Decided by Kritazya** = your instruction · **Filled** = chosen here t
 | G12 | Option actions | **Filled.** Option `actions` are templates (`decision_id: null`). The fallback's Commands are issued in the step the escalation opens (`escalation_fallback`); a later choice issues **new** Commands with `escalation_choice` Decisions in the next step | — | ✔ |
 | G13 | `rule_breaks.kind` | **Filled.** `cap_overrun` · `below_min_power` · `past_deadline` · `over_max_reduce` · `over_max_delay`; any option whose projected peak is over the target lists `cap_overrun` | — | ✔ |
 | G14 | `cost_delta_usd` baseline | **Decided by Kritazya.** `cost_delta_usd = optimized_cost_usd − baseline_cost_usd`, `saving_usd = −cost_delta_usd`. Options: baseline = in-rules plan holding the target exactly (so it is the option's extra cost). Decisions: baseline = the plan before this move | — | ✔ |
-| G15 | Default option | **Decided (proposed by Claude, agreed direction by Kritazya; confirm the tolerances).** Engine ranks options by `harm_score` = Σ rule-break amount ÷ the owner's tolerance for that kind (authority bounds), within authority first, then cost. Fallback = rank 1 if within authority, else `ask_owner`; applied the moment the escalation opens; Claude gets the ranked list and may pick any option | Add comfort to harm once an HVAC model exists | ✔ |
+| G15 | Default option | **Decided (proposed by Claude, agreed direction by Kritazya; confirm the tolerances).** Engine ranks options by `harm_score` = Σ rule-break amount ÷ the owner's tolerance for that kind (authority bounds), within authority first, then cost. Fallback = rank 1 if within authority, else `accept_overrun`; applied the moment the escalation opens; Claude gets the ranked list and may pick any option | Add comfort to harm once an HVAC model exists | ✔ |
 | G16 | Option ids | **Filled.** By type: `deep_reduce_<type_id>`, `extend_delay_<type_id>`; actions list every affected device | — | ✔ |
-| G17 | `awaiting_owner`, deadline | **Decided by Kritazya.** Open when a block starting within 30 sim min can't be held in-rules. Deadline = `max(ts + 5, min(ts + 15, block_start − 5))` sim min. `awaiting_owner` keeps Claude's pick + rationale; the fallback stays meanwhile. The owner may pick any option before the deadline (G61) | — | ✔ |
+| G17 | Claude retry and deadline | **G73:** one retry before the engine deadline; no owner escalation control; fallback never waits. | — | ✔ |
 | G18 | Decision `escalated` status | **Filled.** Removed. Decision `status`: executed \| undone; the Escalation itself carries the hard case | — | ✔ |
 | G19 | Owner command timing | **Filled.** `owner_command()` is recorded by the engine and returned in the next step's `new_commands` (no separate queue); delivered in the following `sim_tick` | — | ✔ |
 | G20 | Delay semantics | **Filled.** `value` = minutes from when the hub applies it; on an idle job device it holds the next job (`waiting`); on a waiting job it replaces the hold; idle job devices report `off` | — | ✔ |
@@ -51,7 +51,7 @@ Legend: **Decided by Kritazya** = your instruction · **Filled** = chosen here t
 ## D. AI tools
 | ID | Topic | Demo decision | Final design | |
 |---|---|---|---|---|
-| G25 | Tool inputs, Proposal payloads | **Filled.** Inputs: `explain_decision {decision_id}` · `what_if {device_id, action, value, at, lane?}` (lane default `with`) · `get_bill {period}` · `propose_importance_change {device_id, importance, limits, summary}` · `propose_peak_cap_change {peak_mode, peak_cap_kw, summary}` · `propose_escalation_choice {escalation_id, option_id, summary}` · `propose_undo {decision_id, summary}` · `propose_customer_event {customers, duration_min, start_sim_ts, summary}`. Proposal `payload` per kind = the same fields without `summary`; `authority` payload = ClaudeAuthority. `created_by: "ai"` only | — | ✔ |
+| G25 | Tool inputs, Proposal payloads | **Filled.** Inputs: `explain_decision {decision_id}` · `what_if {device_id, action, value, at, lane?}` (lane default `with`) · `get_bill {period}` · `propose_importance_change {device_id, importance, limits, summary}` · `propose_peak_cap_change {peak_mode, peak_cap_kw, summary}` · `propose_undo {decision_id, summary}` · `propose_customer_event {customers, duration_min, start_sim_ts, summary}`. Proposal `payload` per kind = the same fields without `summary`; `authority` payload = ClaudeAuthority. `created_by: "ai"` only | — | ✔ |
 
 ## E. Hub protocol
 | ID | Topic | Demo decision | Final design | |
@@ -113,13 +113,14 @@ Legend: **Decided by Kritazya** = your instruction · **Filled** = chosen here t
 ## K. Doc sync (2026-10-24): behaviour pinned so every doc says the same thing
 | ID | Topic | Decision | |
 |---|---|---|---|
-| G61 | Owner window | The owner resolves an escalation before its deadline, like Claude; after it the escalation is `expired_default` and the Proposal expires | ✔ |
+| G61 | Owner window | Superseded by G73: owner is out of escalation resolution; manual command and undo remain. | ✔ |
 | G62 | `cap_unreachable` cadence | Once per block, on the decision tick it first appears | ✔ |
 | G63 | Closed hours | No reductions or holds start outside `operating_hours`; overnight the engine meters, forecasts and may escalate | ✔ |
-| G64 | Asking Claude | Once per escalation, when it opens; updates are published (ws `escalation`, `live_escalation` upsert), not re-asked; a late or stale answer is returned unchanged / RuleError and the Concierge reports what is in force | ✔ |
+| G64 | Asking Claude | On open, all ranked alternatives + Fetch.ai context; one retry after rejection before deadline. Publish every engine verdict with explanation/source; late choice records after_deadline. | ✔ |
 | G65 | Month-to-date restore | **Revised 2026-10-24:** `WarmUpHistory.month_to_date` is null (the engine meters the month's history itself) or restored from the SpacetimeDB `live_tick` row of the same month (CONTRACTS.md §1 WarmUpHistory); it carries `demand_peaks` so every seasonal charge's peak is restored | ✔ |
 | G66 | Undo window | Only while the decision's command is in force (API 422 otherwise); `explain_decision` reads `recent_decisions`, else Convex `decisions` | ✔ |
 | G67 | Escalation bookkeeping | `problem.forecast_peak_kw` = forecast after in-rules moves (what `accept_overrun` leaves); `expired_default` sets `resolved_by: "default"`; `default_option_id` never changes after opening | ✔ |
+| G73 | Owner-out escalations | Ranked 1–3 alternatives, immediate safe fallback (accept_overrun if none authorized), all options + Fetch.ai context to Claude, engine attempt verdicts + one retry, explanation/source in ws and live rows. Owner command and undo retained. | ✔ |
 
 ## Open questions for Kritazya
 - **Q1 — clock slowdown during escalations.** Answered: dropped. Fallback at once, Claude async, manual pause only (G35).

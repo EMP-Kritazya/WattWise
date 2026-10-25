@@ -63,7 +63,7 @@
 5. **The engine does no I/O.** It gets HubReports and context as plain objects through the facade and returns TickStates.
    "The engine contacts Claude" means: the engine emits an Escalation; the runtime calls Claude and hands the chosen id back.
 6. **Claude only on escalation.** The engine handles every routine move within the owner's limits and preferences. Only
-   when no such move holds the cap does it escalate: it ranks up to 3 evaluated alternatives plus `ask_owner`, applies the best
+   when no such move holds the cap does it escalate: it ranks up to 3 evaluated alternatives, applies the best
    one within `ClaudeAuthority` at once (the fallback) and asks Claude once, who may switch to another option; the engine
    revalidates it; beyond the authority → owner confirmation; no answer by the deadline → the fallback stays.
 7. **Context is periodic.** The Concierge fetches Weather, Grid and Events every `CONTEXT_INTERVAL_S` (default 600 real s)
@@ -103,10 +103,10 @@ multiplier) also go to the simulation inside `sim_tick.inputs`. Claude classifie
 Every agent message is logged → SpacetimeDB `live_agent_log`.
 
 **3. Escalation (judgment).** Engine finds a block over the cap with no move inside the owner's limits and preferences →
-Escalation with up to 3 evaluated, harm-ranked alternatives + `ask_owner`, engine numbers for each, `within_authority` → the engine
-applies the safe fallback (best-ranked option within authority) **at once** → runtime asks Claude (context + preferences + ranked
+Escalation with up to 3 evaluated, harm-ranked alternatives, engine numbers for each, `within_authority` → the engine
+applies the safe fallback (best-ranked option within authority, else accept_overrun) **at once** → runtime asks Claude (context + preferences + ranked
 options) asynchronously → Claude returns an id → `resolve_escalation(...)` → engine revalidates on the latest state: within
-authority and in time → it switches with the next tick; outside → owner Proposal. No answer by the deadline → the fallback stays.
+authority and in time → it switches with the next tick; outside → rejection verdict and one Claude retry before deadline. No answer by the deadline → the fallback stays.
 The clock keeps running at its speed throughout.
 
 **4. Owner (control).** Dashboard REST or ASI:One chat → answers from engine tools → any change is a Proposal → owner confirms →
@@ -140,7 +140,7 @@ slowed for it; instead:
 1. **Escalate within 30 minutes of the risk.** The engine opens an escalation when a block starting in the next 30 sim min is
    still over the target after every in-rules move (deadline = `max(ts + 5, min(ts + 15, block start − 5))` sim min).
 2. **Act first, ask second.** The engine applies the best safe option within the owner's authority the moment the escalation
-   opens; Claude's answer can only switch it, after the engine revalidates it on the latest state (safe, authorized, in time).
+   opens (accept_overrun if none is authorized); Claude's answer can only switch it, after the engine revalidates it on the latest state (safe, authorized, in time).
 3. **Never wait.** Claude timeout 8 real s; on timeout the fallback simply continues. Manual pause/resume exists for judges and
    presenters; it is a runtime control the engine and the backtest never see.
 

@@ -39,11 +39,11 @@ Fill brackets only with numbers on screen, cleared by `backtest-auditor`.
 3. 2:00 Live tab: two lanes, decision feed with explanations, judge surge from a second device.
 4. 3:00 ESP32 receiving a command through Convex; fail safe when WiFi drops.
 5. 3:30 Proof tab, checks, worst case. Architecture slide (Fetch.ai, Claude, SpacetimeDB, Convex, Azure).
-6. 4:30 Where Claude could go wrong and how we guard it (no numbers from the model, owner confirms every change).
+6. 4:30 Where Claude could go wrong and how we guard it (no numbers from the model, owner confirms configuration proposals; code validates escalation choices).
 
 ## Likely questions
 - Does the AI make the decisions? The engine makes every routine decision and computes every number. Only when no in-rules move
-  can hold the cap does Claude choose among the engine's options, inside limits the owner set; beyond them the owner decides,
+  can hold the cap does Claude choose among the engine's options, inside limits the owner set; outside authority the engine rejects the choice and allows one retry; the fallback stays active,
   and if nobody answers, the safe fallback the engine applied at once simply stays. The kitchen runs the same with the AI off.
 - Why several agents? Each owns one live source (weather, prices, events); the Concierge orchestrates them and talks to the owner.
 - Does the backtest see the future? No. Rows are fed one at a time; a test enforces it.

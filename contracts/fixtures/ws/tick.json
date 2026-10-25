@@ -334,16 +334,6 @@
             "within_authority": true,
             "harm_score": 0.733,
             "rank": 2
-          },
-          {
-            "option_id": "ask_owner",
-            "summary": "Ask the owner",
-            "actions": [],
-            "projected": null,
-            "rule_breaks": [],
-            "within_authority": true,
-            "harm_score": null,
-            "rank": null
           }
         ],
         "default_option_id": "accept_overrun",
@@ -352,7 +342,8 @@
         "status": "open",
         "resolved_by": null,
         "chosen_option_id": null,
-        "rationale": null
+        "rationale": null,
+        "claude_attempts": []
       }
     ],
     "warnings": [],

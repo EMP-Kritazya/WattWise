@@ -250,8 +250,9 @@ class SpacetimeClient:
         self._put_state("context", "publish_context", [R.cj(row)])
         return row
 
-    def publish_escalation(self, escalation: Mapping) -> dict:
-        row = R.escalation_row(escalation)
+    def publish_escalation(self, escalation: Mapping, explanation: str | None = None,
+                           explanation_source: str = "template") -> dict:
+        row = R.escalation_row(escalation, explanation, explanation_source)
         if self.validate:
             LiveEscalationRow.model_validate(row)
         self._put_event("publish_escalation", [R.cj(row)])

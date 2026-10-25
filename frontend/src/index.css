@@ -1,3 +1,4 @@
+@import url("https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Nunito:wght@500;600;700;800&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -34,35 +35,35 @@
   --color-cap-line: var(--cap-line);
 }
 
-/* Dark dashboard theme (the app is dark-only, like the design mockup). */
+/* Toy Box product theme: the same paper, ink and pastel system as the live restaurant. */
 :root {
-  color-scheme: dark;
-  --radius: 0.75rem;
-  --background: oklch(0.165 0.02 262);
-  --foreground: oklch(0.96 0.005 260);
-  --card: oklch(0.205 0.022 262);
-  --card-foreground: oklch(0.96 0.005 260);
-  --popover: oklch(0.23 0.024 262);
-  --popover-foreground: oklch(0.96 0.005 260);
-  --primary: oklch(0.74 0.17 152);
-  --primary-foreground: oklch(0.2 0.04 160);
-  --secondary: oklch(0.27 0.022 262);
-  --secondary-foreground: oklch(0.96 0.005 260);
-  --muted: oklch(0.27 0.02 262);
-  --muted-foreground: oklch(0.7 0.02 262);
-  --accent: oklch(0.29 0.025 262);
-  --accent-foreground: oklch(0.96 0.005 260);
-  --destructive: oklch(0.68 0.19 25);
-  --border: oklch(1 0 0 / 9%);
-  --input: oklch(1 0 0 / 13%);
-  --ring: oklch(0.74 0.17 152 / 60%);
+  color-scheme: light;
+  --radius: 1rem;
+  --background: #fff6e9;
+  --foreground: #22223b;
+  --card: #ffffff;
+  --card-foreground: #22223b;
+  --popover: #ffffff;
+  --popover-foreground: #22223b;
+  --primary: #2ec4b6;
+  --primary-foreground: #143b38;
+  --secondary: #f7d9c4;
+  --secondary-foreground: #22223b;
+  --muted: #f2e9df;
+  --muted-foreground: #6b687b;
+  --accent: #ffe7d1;
+  --accent-foreground: #22223b;
+  --destructive: #ef476f;
+  --border: #22223b;
+  --input: #9a91a4;
+  --ring: #2ec4b6;
 
-  --importance-always-on: oklch(0.74 0.01 260);
-  --importance-flexible: oklch(0.72 0.14 250);
-  --importance-deferrable: oklch(0.8 0.14 75);
-  --lane-without: oklch(0.68 0.17 25);
-  --lane-with: oklch(0.76 0.17 152);
-  --cap-line: oklch(0.88 0.01 260);
+  --importance-always-on: #7d7885;
+  --importance-flexible: #277da1;
+  --importance-deferrable: #b87800;
+  --lane-without: #e43f62;
+  --lane-with: #168f84;
+  --cap-line: #22223b;
 }
 
 @layer base {
@@ -71,6 +72,25 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
+    min-width: 320px;
+    font-family: "Nunito", ui-rounded, system-ui, sans-serif;
+    background-image:
+      radial-gradient(circle at 12% 8%, rgb(255 231 209 / 45%) 0, transparent 25rem),
+      radial-gradient(circle at 92% 22%, rgb(205 234 192 / 30%) 0, transparent 28rem);
+    background-attachment: fixed;
+  }
+  h1,
+  h2,
+  h3,
+  [data-slot="card-title"],
+  [data-slot="dialog-title"],
+  [data-slot="sheet-title"] {
+    font-family: "Fredoka", ui-rounded, system-ui, sans-serif;
+    letter-spacing: -0.025em;
+  }
+  ::selection {
+    color: #22223b;
+    background: #ffb703;
   }
 }
 

@@ -116,6 +116,8 @@ class ProposalMessage(ContractModel):
 class EscalationMessage(ContractModel):
     type: Literal["escalation"]
     data: Escalation
+    explanation: str
+    explanation_source: Literal["ai", "template"]
 
 
 class ContextMessage(ContractModel):

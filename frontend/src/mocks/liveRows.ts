@@ -1,9 +1,10 @@
-import type { LiveTables, WsMessage } from "@/types";
+import type { ClockState, LiveTables, SimControlRequest, WsMessage } from "@/types";
 import { contextRow, escalationRow, feedRow } from "@/data/rows";
 import { emptyTables } from "@/data/useLive";
 import { liveRowFrames, seedLiveTables, viewerWsMessages } from "./fixtures";
 
 const FRAME_MS = 500;
+const FIXTURE_START_TS = "2026-07-18T00:30:00Z"; // the recorded scenario's first sim minute
 type Listener = (tables: LiveTables, messages: WsMessage[]) => void;
 
 const messageFrames = (() => {
@@ -44,36 +45,69 @@ class FixtureLiveRows {
 
   start(): () => void {
     if (this.timer) return () => this.stop();
-    this.frame = 0;
-    // The table fixtures are final-state seeds for static component work. Clear them before replay so the UI never sees
-    // future decisions, agent messages, or the already-consumed surge.
-    // The backtest tables are a finished run (not part of the live replay), so they stay seeded.
-    const seed = seedLiveTables();
-    this.tables = { ...emptyTables(), backtest_point: seed.backtest_point ?? [], backtest_month: seed.backtest_month ?? [] };
-    const advance = () => {
-      const payload = liveRowFrames[this.frame++];
-      if (!payload) {
-        this.stop();
-        return;
-      }
-      this.tables.live_tick = structuredClone(payload.live_tick);
-      this.tables.tick_history = upsert(this.tables.tick_history, payload.tick_history, (row) => `${row.lane}:${row.ts}`).slice(-360);
-      this.tables.live_device = upsert(this.tables.live_device, payload.live_device, (row) => row.key);
-      this.tables.live_comparison = [structuredClone(payload.live_comparison)];
-      const tickId = payload.live_tick[0]?.tick_id ?? 0;
-      const messages = [...(this.frame === 1 ? messageFrames.get(0) ?? [] : []), ...(messageFrames.get(tickId) ?? [])];
-      this.applyMessages(messages);
-      const snapshot = this.snapshot();
-      this.listeners.forEach((listener) => listener(snapshot, structuredClone(messages)));
-    };
-    advance();
-    this.timer = setInterval(advance, FRAME_MS);
+    this.clear();
+    this.advance(); // the first frame at once, then one per FRAME_MS
+    this.resume();
     return () => this.stop();
   }
 
   stop() {
     clearInterval(this.timer);
     this.timer = undefined;
+  }
+
+  /** Fixture-mode simulation controls (dev and tests only): pause freezes the replay, play resumes it, reset clears it. */
+  control(body: SimControlRequest): ClockState {
+    if (body.action === "reset") {
+      this.stop();
+      this.clear();
+    } else if (body.action === "pause") {
+      this.stop();
+    } else if (!this.timer) {
+      this.resume();
+    }
+    const tick = this.tables.live_tick.find((row) => row.lane === "with") ?? this.tables.live_tick[0];
+    return {
+      playing: this.timer !== undefined,
+      speed: body.speed ?? 120,
+      sim_ts: tick?.ts ?? FIXTURE_START_TS,
+      tick_id: tick?.tick_id ?? 0,
+      paused_reason: this.timer ? null : "manual",
+      day_index: 1,
+      run_days: 1,
+      phase: "service",
+    };
+  }
+
+  /** Back to before tick 1. The table fixtures are final-state seeds for static component work, so the replay starts empty
+   * and the UI never sees future decisions, agent messages, or the already-consumed surge. The backtest tables are a finished
+   * run (not part of the live replay), so they stay seeded. */
+  private clear() {
+    this.frame = 0;
+    const seed = seedLiveTables();
+    this.tables = { ...emptyTables(), backtest_point: seed.backtest_point ?? [], backtest_month: seed.backtest_month ?? [] };
+  }
+
+  /** One frame per FRAME_MS from where the replay stands (play after pause continues exactly one tick later). */
+  private resume() {
+    this.timer = setInterval(() => this.advance(), FRAME_MS);
+  }
+
+  private advance() {
+    const payload = liveRowFrames[this.frame++];
+    if (!payload) {
+      this.stop();
+      return;
+    }
+    this.tables.live_tick = structuredClone(payload.live_tick);
+    this.tables.tick_history = upsert(this.tables.tick_history, payload.tick_history, (row) => `${row.lane}:${row.ts}`).slice(-360);
+    this.tables.live_device = upsert(this.tables.live_device, payload.live_device, (row) => row.key);
+    this.tables.live_comparison = [structuredClone(payload.live_comparison)];
+    const tickId = payload.live_tick[0]?.tick_id ?? 0;
+    const messages = [...(this.frame === 1 ? messageFrames.get(0) ?? [] : []), ...(messageFrames.get(tickId) ?? [])];
+    this.applyMessages(messages);
+    const snapshot = this.snapshot();
+    this.listeners.forEach((listener) => listener(snapshot, structuredClone(messages)));
   }
 
   requestSurge(customers: number, durationMin: number) {
@@ -86,6 +120,8 @@ class FixtureLiveRows {
       created_at: new Date().toISOString(),
       consumed: false,
     });
+    const snapshot = this.snapshot();
+    this.listeners.forEach((listener) => listener(snapshot, []));
   }
 
   private applyMessages(messages: WsMessage[]) {
@@ -101,7 +137,7 @@ class FixtureLiveRows {
       } else if (message.type === "escalation") {
         this.tables.live_escalation = upsert(
           this.tables.live_escalation,
-          [escalationRow(message.data)],
+          [escalationRow(message.data, message.explanation, message.explanation_source)],
           (row) => row.escalation_id,
         ).slice(-20);
       } else if (message.type === "agent_log") {

@@ -50,8 +50,6 @@ export interface Transport {
   setPreferences(text: string): Promise<void>;
   getContext(): Promise<Context>;
   listEscalations(status?: Escalation["status"]): Promise<Escalation[]>;
-  /** Owner's choice from the UI; the engine validates it. */
-  resolveEscalation(escalationId: string, optionId: string): Promise<Escalation>;
   health(): Promise<Health>;
 
   /** Listen to /ws. Returns an unsubscribe function. */

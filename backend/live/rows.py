@@ -91,14 +91,22 @@ def feed_row(decision: Mapping, lane: str, explanation: str, explanation_source:
     }
 
 
-def escalation_row(escalation: Mapping) -> dict:
+def escalation_row(escalation: Mapping, explanation: str | None = None,
+                   explanation_source: str = "template") -> dict:
     e = _plain(escalation)
+    if explanation is None:
+        explanation = "Claude's choice accepted." if e["status"] == "resolved" else "Engine fallback remains active."
+        attempts = e.get("claude_attempts", [])
+        if attempts and not attempts[-1]["accepted"]:
+            explanation = "Claude's choice rejected: %s. Engine fallback remains active." % attempts[-1]["reason"]
     return {
         "escalation_id": e["escalation_id"], "lane": e["lane"], "status": e["status"], "block_start": e["block_start"],
         "updated_ts": e["updated_ts"], "problem_json": cj(e["problem"]), "options_json": cj(e["options"]),
         "default_option_id": e["default_option_id"], "active_option_id": e["active_option_id"],
         "deadline_sim_ts": e["deadline_sim_ts"], "chosen_option_id": e["chosen_option_id"],
         "resolved_by": e["resolved_by"], "rationale": e["rationale"],
+        "claude_attempts_json": cj(e.get("claude_attempts", [])),
+        "explanation": explanation, "explanation_source": explanation_source,
     }
 
 

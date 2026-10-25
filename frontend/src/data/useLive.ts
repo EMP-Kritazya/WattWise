@@ -93,7 +93,7 @@ export const useLive = create<LiveRowState>()((set) => ({
         } else if (message.type === "context") {
           next.live_context = [contextRow(message.data)];
         } else if (message.type === "escalation") {
-          next.live_escalation = upsert(next.live_escalation, [escalationRow(message.data)], (row) => row.escalation_id).slice(-20);
+          next.live_escalation = upsert(next.live_escalation, [escalationRow(message.data, message.explanation, message.explanation_source)], (row) => row.escalation_id).slice(-20);
         } else if (message.type === "agent_log") {
           const id = Math.max(0, ...next.live_agent_log.map((row) => row.id)) + 1;
           next.live_agent_log = [...next.live_agent_log, { id, ...message.data }].slice(-300);

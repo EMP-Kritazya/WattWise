@@ -128,8 +128,8 @@ the engine). Count 0 = not in this kitchen. Each unit becomes a Device with id `
 roster is sent to the simulation (`sim_build.devices`) and built into both engine lanes.
 `peak_mode`: `minimize` (no fixed number; `peak_cap_kw` is null. The engine holds, as a hard limit for the local day, the highest
 15-min peak of the 4 previous same weekdays, from history) |
-`cap` (hold the owner's `peak_cap_kw`; going above it happens only through an escalation within `ClaudeAuthority.max_cap_overrun_kw`
-or with owner confirmation — set that authority to 0 for a strictly hard limit).
+`cap` (plan against the owner's `peak_cap_kw`; an unavoidable overrun opens an escalation. Claude may accept only
+within its authority; if no option is authorized, the engine keeps the in-rules plan with accept_overrun as fallback).
 `run_days`: how many service days one run lasts (integer ≥ 1, default 1; Builder offers 1 · 3 · 7 · 14). Day 1 starts at
 `start_sim_ts`, every later day at `operating_hours.open`; the run pauses with `paused_reason: "run_complete"` after the last
 day's close, and `POST /api/sim/control {action: "next_day"}` adds one more day (Day lifecycle, section 8).
@@ -259,7 +259,7 @@ crossable, whatever the authority says. `enabled: false` → Claude chooses noth
 **Full authority (Oct 24):** the Builder no longer shows these settings; it always sends
 `{ "enabled": true, "max_cap_overrun_kw": 1000, "max_extra_delay_min": 0, "max_extra_reduce_min": 1440, "may_go_below_min_power": false }`
 (the peak may run over the cap and flexible units stay reduced longer, but deadlines and minimum power stay hard). Claude is
-offered only the `within_authority` options, never `ask_owner`, so escalations never wait for the owner and never pause the clock.
+offered all ranked options with their `within_authority` flags, so escalations never wait for the owner and never pause the clock.
 
 ### Device (live state of one unit)
 
@@ -434,7 +434,7 @@ Engine uses: crowd effect → forecast of customer-driven (demand_driven) device
 shown, not used by the forecast in this build (no HVAC model). Fetched periodically
 (every `CONTEXT_INTERVAL_S`, default 600 real s, and on kitchen build); the engine always uses the latest it has.
 
-### Escalation (engine → runtime → Claude or owner)
+### Escalation (engine → runtime → Claude)
 
 ```json
 {
@@ -505,16 +505,6 @@ shown, not used by the forecast in this build (no HVAC model). Fetched periodica
       "within_authority": true,
       "harm_score": 0.5,
       "rank": 1
-    },
-    {
-      "option_id": "ask_owner",
-      "summary": "Ask the owner",
-      "actions": [],
-      "projected": null,
-      "rule_breaks": [],
-      "within_authority": true,
-      "harm_score": null,
-      "rank": null
     }
   ],
   "default_option_id": "extend_delay_dishwasher",
@@ -523,36 +513,41 @@ shown, not used by the forecast in this build (no HVAC model). Fetched periodica
   "status": "open",
   "resolved_by": null,
   "chosen_option_id": null,
-  "rationale": null
+  "rationale": null,
+  "claude_attempts": []
 }
 ```
 
-`status`: open | resolved | awaiting*owner | expired_default | obsolete. `resolved_by`: claude | owner | default.
-Active = `open` or `awaiting_owner`; at most one active escalation per lane per `block_start`.
-**Opens** on a decision tick when a block starting within the next 30 sim min (the block in progress included) is still over the
-target after every in-rules move. `problem.target_kw` = Meter `target_kw` (cap mode: `peak_cap_kw`; minimize mode: the day's target).
-**Fallback.** `default_option_id` = the rank-1 option if it is within authority, else `ask_owner`. The fallback is applied **when the
-escalation opens** (its Commands are in that step's `new_commands`, Decisions `reason_code: escalation_fallback`);
-`active_option_id` = the option in force (`null` while nothing extra is applied). The clock never slows or pauses for an escalation.
-**Ranking.** `harm_score` (engine) = Σ rule-break amount ÷ the owner's tolerance for that kind (ENGINE.md section 6); `rank`: within
-authority first, then lower `harm_score`, then lower `cost_delta_usd`. `ask_owner`: both null. Claude sees the ranked list and may pick any option.
-**Updates in place.** While active, each decision tick may change `problem`, `options` (projections, ranks) and `updated_ts`; never
-`escalation_id`, `deadline_sim_ts` or `active_option_id`. `obsolete` (terminal): a newer forecast shows the in-rules plan alone holds
-the block; executed commands are never reversed automatically. Risk returning after closure → a new escalation.
-**Resolve.** Revalidated against the latest state. `claude`: an option within authority before the deadline → `resolved` (the next step
-switches devices from the active option to it, Decisions `escalation_choice`); outside authority, or `ask_owner` → `awaiting_owner`
-(`chosen_option_id` and `rationale` hold Claude's pick, `resolved_by: "claude"`; the fallback stays). `owner`: any current option until the
-block ends → `resolved`, `resolved_by: "owner"`. Already closed → returned unchanged. Unknown option id → RuleError.
-`deadline_sim_ts` = `max(ts + 5 min, min(ts + 15 min, block_start − 5 min))`. Still active at the deadline, or when the block ends →
-`expired_default`; the fallback stays in force (default `ask_owner` → nothing extra, physically the overrun).
-Option ids are by type: `deep_reduce*<type*id>`, `extend_delay*<type*id>`; `actions`list every affected device.
-Option`actions` are templates (`decision_id: null`); applying an option issues **new** Commands with Decisions.
-`rule_breaks[].kind`: cap_overrun | below_min_power | past_deadline | over_max_reduce | over_max_delay. Every option whose
-projected peak is above the target lists a `cap_overrun`.
-`projected.cost_delta_usd`=`optimized_cost_usd − baseline_cost_usd`, baseline = the in-rules plan with the block held exactly at the
-target (no rule broken): the extra cost of the option. `projected.max_indoor_temp_change_c`: null = not modelled (no HVAC model in this build).
-Options: **1–3 evaluated alternatives** (`accept_overrun`always; the best`deep_reduce*<type*id>`and the best`extend_delay*<type_id>`when such a device exists, so 2–3 in practice) **plus`ask_owner`\*\*. Options and every number in them come from the engine.
-Food-safety breaks are never generated as options.
+`status`: open | resolved | expired_default | obsolete. `resolved_by`: claude | default (nullable).
+Active = `open`; at most one active escalation per lane per `block_start`.
+**Opens** on decision ticks when a block starting within 30 sim minutes remains over target after all in-rules moves.
+**Fallback:** best-ranked option within authority, else `accept_overrun`. Applied immediately, with
+`escalation_fallback` Decisions and Commands in that step; `active_option_id` identifies the fallback. The clock never waits.
+**Options:** 1–3 evaluated alternatives: `accept_overrun` always, the best `deep_reduce_<type_id>` and
+`extend_delay_<type_id>` when possible. No owner-choice option or owner resolution. Food safety is absolute.
+Action templates have `decision_id: null`; execution creates fresh Commands and Decisions.
+Each option has non-null projection, harm_score and rank. Every projected peak above target includes `cap_overrun`.
+Rank by within_authority first, harm_score, cost_delta_usd, number of affected devices, then option_id.
+`harm_score` = sum of rule-break amount / authority tolerance (ENGINE.md §6). Disabled authority permits no Claude choice.
+Claude sees **all** ranked alternatives, their authority flags, owner preferences and Fetch.ai context.
+**Update:** re-evaluate an open escalation in place on decision ticks. Preserve id, deadline, default and active ids.
+If the in-rules plan alone now holds the block, mark `obsolete`; executed commands end at their planned times.
+A new risk after closure gets a new id.
+**Resolve:** `resolve_escalation(id, option_id, "claude", rationale)` validates current authority, food safety and time.
+An accepted choice resolves the escalation and switches devices on the next tick (`escalation_choice`). A rejected
+choice leaves the fallback active and records `outside_authority` or `after_deadline`. Claude gets one retry before
+the deadline (at most two pre-deadline attempts); unknown option or exhausted retry budget raises RuleError.
+`claude_attempts` is a list of `{ts, option_id, accepted, reason, rationale}`; `reason` is null on acceptance,
+otherwise `outside_authority` or `after_deadline`. `rationale` is nullable text. Late attempts may be recorded after expiry;
+closed resolved/obsolete escalations return unchanged. `chosen_option_id` and `rationale` describe an accepted choice only.
+**Deadline:** `max(ts + 5 min, min(ts + 15 min, block_start − 5 min))`. At the deadline an open escalation becomes
+`expired_default`, `resolved_by: default`; fallback remains in force.
+`rule_breaks[].kind`: cap_overrun | below_min_power | past_deadline | over_max_reduce | over_max_delay.
+Projection cost = option cost minus in-rules baseline with the problem block hypothetically held at target,
+using tariff energy and per-charge demand peaks; indoor temperature change is null (not modelled).
+Runtime publishes `ws escalation` and `live_escalation` with explanation and explanation_source (`ai` | `template`).
+Claude explains the choice, acceptance/rejection and reason, quoting only engine numbers; AI off uses template text.
+The owner retains `owner_command` and `undo` for manual control.
 
 ### Meter
 
@@ -650,7 +645,7 @@ The browser shows these numbers; it never subtracts lanes itself.
 }
 ```
 
-`kind`: importance | peak*cap | authority | undo_decision | customer_event | resolve_escalation.
+`kind`: importance | peak*cap | authority | undo_decision | customer_event.
 `payload` per kind = the matching `propose*\*`input without`summary`; `authority`payload = ClaudeAuthority.`created_by`: ai.
 `status`: pending | confirmed | cancelled | expired. `confirmed_via`: ui | asi_one | null.
 Applied by code (never by the model) when the owner confirms; the result is the normal facade call.
@@ -765,7 +760,6 @@ seeded forecast noise. `base` = 1.0 / 1.0 / 0.0.
 | POST   | `/api/context`                                | partial Context → ok (agents, header `X-Agent-Token`)                                                                                                                         |
 | POST   | `/api/context/crowd-effect`                   | `{ value, reason }` → ok (Concierge, `X-Agent-Token`)                                                                                                                         |
 | GET    | `/api/escalations?status=open`                | → list[Escalation]                                                                                                                                                            |
-| POST   | `/api/escalations/{id}/resolve`               | `{ option_id }` → Escalation (owner choice from the UI)                                                                                                                       |
 | POST   | `/api/agent-log`                              | AgentLog → ok (agents, `X-Agent-Token`)                                                                                                                                       |
 | GET    | `/api/health`                                 | → `{ ok, kitchen_impl, live_transport, store, hardware, sim_host }` (Azure health probe)                                                                                      |
 
@@ -791,7 +785,7 @@ ClockState = `{ playing, speed, sim_ts, tick_id, paused_reason, day_index, run_d
 { "type": "backtest_month", "run_id": "...", "data": "<BacktestResult>" }
 { "type": "comparison", "data": "<LaneComparison>" }
 { "type": "proposal", "data": "<Proposal>" }
-{ "type": "escalation", "data": "<Escalation>" }
+{ "type": "escalation", "data": "<Escalation>", "explanation": "text", "explanation_source": "ai | template" }
 { "type": "context", "data": "<Context>" }
 { "type": "agent_log", "data": "<AgentLog>" }
 ```
@@ -809,7 +803,7 @@ hub_offline (no ESP32 reading for 30 s; that device falls back to simulated) |
 live_transport_down (SpacetimeDB unreachable; switched to /ws) | store_down (Convex unreachable; switched to memory).
 
 **Live transport.** With `LIVE_TRANSPORT=spacetime` (default) the runtime publishes ticks, comparison, feed and clock
-to SpacetimeDB (section 5) and every UI tab subscribes there (the UI's only live source); chat, proposals and owner escalation choices still use REST + `/ws`.
+to SpacetimeDB (section 5) and every UI tab subscribes there (the UI's only live source); chat, configuration proposals and manual commands still use REST + `/ws`.
 With `LIVE_TRANSPORT=ws` every message above goes over `/ws` (offline fallback).
 
 ---
@@ -820,7 +814,7 @@ With `LIVE_TRANSPORT=ws` every message above goes over `/ws` (offline fallback).
 The engine does no I/O: HubReports and context come in and Commands go out as plain objects. The signatures below are what
 the runtime and FakeKitchen build against; how the engine works behind them is in `docs/design/ENGINE.md`.
 Call order is part of the contract: every tick the runtime steps `without`, then `with`, and calls id-creating methods
-(`owner_command`, `undo`, `resolve_escalation`) in that lane order, so the shared id counters are deterministic.
+(`owner_command`) in that lane order, so the shared id counters are deterministic. Undo and escalation resolution use the `with` lane.
 
 | Call                                                                   | Returns                                                                                                                                                                                          | Notes                                                                                                                                                                                                                                                                                                                                                           |
 | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -836,7 +830,7 @@ Call order is part of the contract: every tick the runtime steps `without`, then
 | `set_context(context)`                                                 | None                                                                                                                                                                                             | Merges context; used from the next step. Plain object, no I/O.                                                                                                                                                                                                                                                                                                  |
 | `set_authority(authority)` · `set_preferences(text)`                   | None                                                                                                                                                                                             | `with` lane only                                                                                                                                                                                                                                                                                                                                                |
 | `open_escalations()`                                                   | list[Escalation]                                                                                                                                                                                 |                                                                                                                                                                                                                                                                                                                                                                 |
-| `resolve_escalation(escalation_id, option_id, resolved_by, rationale)` | Escalation                                                                                                                                                                                       | Revalidates on the latest state: `claude` + within authority + before the deadline → `resolved`; `claude` + outside authority or `ask_owner` → `awaiting_owner` (runtime makes a Proposal); `owner` may pick any current option until the block ends; already closed → returned unchanged; unknown option → RuleError. The fallback was applied when it opened. |
+| `resolve_escalation(escalation_id, option_id, resolved_by, rationale)` | Escalation | Claude only; validates authority and deadline, records attempt verdict, one retry. Accepted choice switches next tick; rejected choice keeps fallback. Unknown option → RuleError. |
 | `forecast(horizon_min)`                                                | list[float]                                                                                                                                                                                      | kW per 15 min, 8 values. `horizon_min` is fixed at 120 in this build (other values → ValueError). Latest decision tick's forecast.                                                                                                                                                                                                                              |
 | `what_if(device_id, action, value, at)`                                | Effect `{peak_before_kw, peak_after_kw, saving_usd}`                                                                                                                                             | `at`: sim ts where the hypothetical command starts, within `[now, now + 120 min)` (else RuleError). Read-only: no state, commands, ids or escalations change. Per lane; the runtime picks the lane (default `with`).                                                                                                                                            |
 | `snapshot()`                                                           | `{ tick_id, sim_ts, lane, control, peak_mode, config, meter, forecast_kw, forecast_ts, devices, active_commands, owed_kwh, open_escalations, warnings, recent_decisions, context, id_counters }` | Per lane; pure (no side effects, no I/O). `recent_decisions`: last 20, newest first. `devices`: latest HubReport state. `active_commands`: Commands acked and still in force. The runtime and AI use the `with` lane                                                                                                                                            |
@@ -860,7 +854,6 @@ Customer arrivals are simulated in the browser (section 9); surges reach them th
 | `get_bill`                  | `snapshot()` meter, or a stored engine Bill / BacktestResult | Input `{ period: "YYYY-MM" }`. Never computed by the agent or the store                                                                               |
 | `propose_importance_change` | —                                                            | Input `{ device_id, importance, limits, summary }` → Proposal (`kind: importance`)                                                                    |
 | `propose_peak_cap_change`   | —                                                            | Input `{ peak_mode, peak_cap_kw, summary }` → Proposal (`kind: peak_cap`)                                                                             |
-| `propose_escalation_choice` | —                                                            | Input `{ escalation_id, option_id, summary }` → Proposal (`kind: resolve_escalation`) when the owner says "do option 2"                               |
 | `propose_undo`              | —                                                            | Input `{ decision_id, summary }` → Proposal (`kind: undo_decision`)                                                                                   |
 | `propose_customer_event`    | —                                                            | Input `{ customers, duration_min, start_sim_ts, summary }` → Proposal (`kind: customer_event`), applied as a surge                                    |
 
@@ -894,7 +887,7 @@ Current state only, small rows, one batched write per real tick. Fields mirror s
 | `live_feed`       | `decision_id`                  | lane, ts, device_id, action, value, status, reason_code, effect_json, explanation, explanation_source (last 50)                                                                                                                                                                                                                                                                                      | runtime    |
 | `live_clock`      | single row (`id` = 0)          | playing, speed, sim_ts, tick_id, paused_reason, day_index, run_days, phase, sim_host (connected \| offline)                                                                                                                                                                                                                                                                                          | runtime    |
 | `live_context`    | single row (`id` = 0)          | weather_summary, weather_label, prices_summary, prices_label, events_summary, events_label, crowd_effect                                                                                                                                                                                                                                                                                             | runtime    |
-| `live_escalation` | `escalation_id`                | lane, status, block_start, updated_ts, problem_json, options_json (with `harm_score`, `rank`), default_option_id, active_option_id, deadline_sim_ts, chosen_option_id, resolved_by, rationale (last 20; upserted on every change)                                                                                                                                                                    | runtime    |
+| `live_escalation` | `escalation_id`                | lane, status, block_start, updated_ts, problem_json, options_json (with `harm_score`, `rank`), default_option_id, active_option_id, deadline_sim_ts, chosen_option_id, resolved_by, rationale, claude_attempts_json, explanation, explanation_source (last 20; upserted on every change)                                                                                                                                                                    | runtime    |
 | `live_agent_log`  | auto id                        | ts_real, from_agent, to_agent, kind, summary (last 300)                                                                                                                                                                                                                                                                                                                                              | runtime    |
 | `backtest_point`  | `key` = `"<run_id>:<day>"`     | run_id, day, month, ts, partial, cost_to_date_json, saved_month_to_date_usd, saved_vs_timer_month_to_date_usd, saved_year_to_date_usd, dataset, tariff_id, assumptions_id (latest run only; ≤ 366 rows) | runtime |
 | `backtest_month`  | `key` = `"<run_id>:<month>"`   | run_id, month, partial, saved_usd, saved_vs_timer_usd, policies_json, checks_json, dataset, tariff_id, assumptions_id (latest run only; ≤ 12 rows) | runtime |

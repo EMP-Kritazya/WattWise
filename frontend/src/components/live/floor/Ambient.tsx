@@ -9,6 +9,7 @@ import type { Lane, Meter } from "@/types";
 import { LANE_HEX, SHIRTS, SKIN } from "./palette";
 import { FOOTPRINT, HUB_BOX, HUB_FLOOR, SEATS, TABLES, type Pt, type Seat } from "./plan";
 import { Ink, Toon } from "./toon";
+import { LightPool } from "./Effects3D";
 
 const glow = (hex: string, k: number) => new Color(hex).multiplyScalar(k);
 
@@ -168,34 +169,62 @@ function Diner({ seat, index, visible }: { seat: Seat; index: number; visible: b
   const shirt = SHIRTS[index % SHIRTS.length];
   return (
     <group ref={g} position={[seat.at[0], 0, seat.at[1]]} rotation-y={seat.rot} scale={0.0001}>
-      {/* thighs on the seat, shins down */}
-      <mesh position={[0, 0.54, 0.1]} castShadow>
-        <boxGeometry args={[0.3, 0.12, 0.34]} />
-        <Toon color={PANTS[index % PANTS.length]} roughness={0.85} />
-      </mesh>
-      <mesh position={[0, 0.27, 0.25]} castShadow>
-        <boxGeometry args={[0.26, 0.5, 0.1]} />
-        <Toon color={PANTS[index % PANTS.length]} roughness={0.85} />
-      </mesh>
-      {/* torso, leaning slightly toward the table */}
-      <mesh position={[0, 0.84, -0.06]} rotation-x={0.12} castShadow>
-        <capsuleGeometry args={[0.14, 0.24, 4, 12]} />
-        <Toon color={shirt} roughness={0.8} />
-      </mesh>
-      {/* arms resting toward the table */}
-      {[-0.18, 0.18].map((x) => (
-        <mesh key={x} position={[x, 0.86, 0.08]} rotation-x={-1.05} castShadow>
-          <capsuleGeometry args={[0.045, 0.24, 4, 8]} />
-          <Toon color={shirt} roughness={0.8} />
+      <ToyPerson index={index} shirt={shirt} seated />
+    </group>
+  );
+}
+
+/** Guests waiting outside the host stand when the contract-provided customer rate shows the surge. */
+export function GuestQueue({ count }: { count: number }) {
+  return (
+    <group>
+      {Array.from({ length: 6 }, (_, index) => (
+        <QueuedGuest key={index} index={index} visible={index < count} />
+      ))}
+    </group>
+  );
+}
+
+function QueuedGuest({ index, visible }: { index: number; visible: boolean }) {
+  const g = useRef<Group>(null);
+  useFrame((_, dt) => {
+    const group = g.current;
+    if (!group) return;
+    const next = group.scale.x + ((visible ? 1 : 0) - group.scale.x) * Math.min(1, dt * 4);
+    group.scale.setScalar(Math.max(0.0001, next));
+    group.visible = next > 0.02;
+  });
+  return (
+    <group ref={g} position={[20.2 - index * 0.58, 0, 13.72 + (index % 2) * 0.12]} rotation-y={Math.PI} scale={0.0001}>
+      <ToyPerson index={index + 13} shirt={SHIRTS[(index + 2) % SHIRTS.length]} />
+    </group>
+  );
+}
+
+function ToyPerson({ index, shirt, seated = false }: { index: number; shirt: string; seated?: boolean }) {
+  const torsoY = seated ? 0.88 : 0.75;
+  const headY = seated ? 1.2 : 1.16;
+  return (
+    <group>
+      {[-0.09, 0.09].map((x) => (
+        <mesh key={x} position={[x, seated ? 0.36 : 0.28, seated ? 0.18 : 0]} castShadow>
+          <boxGeometry args={[0.11, seated ? 0.42 : 0.52, 0.13]} />
+          <Toon color={PANTS[index % PANTS.length]} />
         </mesh>
       ))}
-      <mesh position={[0, 1.2, -0.03]} castShadow>
-        <sphereGeometry args={[0.11, 16, 12]} />
-        <Toon color={SKIN[index % SKIN.length]} roughness={0.7} />
+      <mesh position={[0, torsoY, 0]} castShadow>
+        <boxGeometry args={[0.38, 0.48, 0.26]} />
+        <Toon color={shirt} />
+        <Ink thickness={1.2} />
       </mesh>
-      <mesh position={[0, 1.24, -0.06]} castShadow>
-        <sphereGeometry args={[0.115, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <Toon color={HAIR[index % HAIR.length]} roughness={0.9} />
+      <mesh position={[0, headY, 0]} castShadow>
+        <sphereGeometry args={[0.15, 16, 12]} />
+        <Toon color={SKIN[index % SKIN.length]} />
+        <Ink thickness={1.2} />
+      </mesh>
+      <mesh position={[0, headY + 0.045, -0.03]} castShadow>
+        <sphereGeometry args={[0.155, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2]} />
+        <Toon color={HAIR[index % HAIR.length]} />
       </mesh>
     </group>
   );
@@ -228,6 +257,7 @@ export function Lamps({ tables, level }: { tables: number[]; level: number }) {
               <sphereGeometry args={[0.07, 12, 10]} />
               <meshBasicMaterial color={glow("#ffcf8a", 0.3 + level * 0.6)} toneMapped={false} />
             </mesh>
+            <LightPool position={[0, 0.018, 0]} radius={0.78} color="#FFD166" opacity={level * 0.2} />
           </group>
         );
       })}

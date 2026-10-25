@@ -1,19 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
-import { ContextStrip } from "@/components/live/ContextStrip";
-import { DecisionFeed } from "@/components/live/DecisionFeed";
-import { EscalationCard } from "@/components/live/EscalationCard";
 import { LiveFloor } from "@/components/live/floor/LiveFloor";
-import { KpiRow } from "@/components/live/KpiRow";
-import { PowerTrendCard } from "@/components/live/LaneChart";
-import { SimControls } from "@/components/live/SimControls";
 import { WarningBanner } from "@/components/live/WarningBanner";
 import { Button } from "@/components/ui/button";
 import { useDashboardStore as useSim } from "@/data";
 import { transport } from "@/transport";
 
-/** The main demo screen: controls · KPIs · the 3D floor · charts and decisions, with the assistant docked on the right. */
-export function LivePage() {
+/**
+ * The Live Simulation tab: the 3D floor with its controls and one line of savings and demand. From tablet width up it fills
+ * exactly the window below the top bar (`--topbar-h`), so nothing scrolls. The owner's numbers live on Dashboard.
+ */
+/** `active`: false while another tab shows; the page stays mounted (App Shell) and the 3D floor pauses. */
+export function LivePage({ active = true }: { active?: boolean }) {
   const kitchen = useSim((s) => s.kitchen);
   const hasCatalog = useSim((s) => s.catalog != null);
   const [demo, setDemo] = useState(false);
@@ -43,26 +41,18 @@ export function LivePage() {
         <h1 className="text-xl font-semibold">No kitchen yet</h1>
         <p className="mt-2 text-muted-foreground">Build one first. Both lanes start from it.</p>
         <Button asChild className="mt-4">
-          <Link to="/builder">Open Kitchen Builder</Link>
+          <Link to="/dashboard/builder">Open Kitchen Builder</Link>
         </Button>
       </div>
     );
   }
 
   return (
-    <div className="grid items-start gap-4 p-4 xl:p-5">
-      <div className="flex min-w-0 flex-col gap-4">
+    <div className="flex min-w-0 flex-col gap-3 p-3 md:h-[calc(100dvh-var(--topbar-h,72px))] md:overflow-hidden xl:px-4">
+      <div className="flex shrink-0 flex-col gap-3 empty:hidden">
         <WarningBanner />
-        <SimControls />
-        <ContextStrip />
-        <EscalationCard />
-        <LiveFloor demo={demo} onDemoChange={setDemoMode} />
-        <KpiRow />
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-          <PowerTrendCard />
-          <DecisionFeed />
-        </div>
       </div>
+      <LiveFloor className="md:min-h-0 md:flex-1" active={active} demo={demo} onDemoChange={setDemoMode} />
     </div>
   );
 }

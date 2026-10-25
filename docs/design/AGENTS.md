@@ -35,7 +35,7 @@ Message models: CONTRACTS.md section 7. Tariff stays a fixed engine input (CONTR
 - **Chat (ASI:One):** each message → the same Claude agent + tools as the dashboard → reply (Interactive Cards if time).
   Owner flows that must work: "What will lunch cost me?" · "Why did you delay the dishwasher?" · "Undo that" ·
   "Never touch the walk-in after 9 PM" (proposal → confirm) · "How much did we save this month?" ·
-  "What did you decide about tonight?" (escalation + rationale) · "Choose option 2" (owner resolves an escalation).
+  "What did you decide about tonight?" (escalation + rationale).
 - Confirmation (`confirm` / `yes` to the latest pending Proposal, or a card button) is matched by code, never by the model.
 - Escalation choices are made by the runtime's Claude call (API.md), not inside the chat; the Concierge reports them.
 

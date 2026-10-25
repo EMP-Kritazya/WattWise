@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useAction } from "@/hooks/useAction";
 import { useDeviceNames } from "@/hooks/useDeviceNames";
 import { fmtAction, fmtKw, fmtSimClock, fmtUsd } from "@/lib/format";
+import { NO_REAL_TARIFF_HINT, useRealTariff } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { requestSurge, useDashboardStore as useSim, type FeedItem } from "@/data";
 import { transport } from "@/transport";
@@ -77,6 +78,7 @@ export function DecisionToast({ className }: { className?: string }) {
   const feed = useSim((s) => s.feed);
   const names = useDeviceNames();
   const newest = useMemo(() => newestDecision(feed), [feed]);
+  const realTariff = useRealTariff();
   const [shownId, setShownId] = useState<string | null>(null);
   const id = newest?.decision.decision_id;
 
@@ -121,7 +123,7 @@ export function DecisionToast({ className }: { className?: string }) {
             <span className="text-white/60">
               {fmtKw(d.effect.peak_before_kw)} → {fmtKw(d.effect.peak_after_kw)}
             </span>
-            <span className="font-semibold text-emerald-300">saves {fmtUsd(d.effect.saving_usd)}</span>
+            {realTariff && <span className="font-semibold text-emerald-300">saves {fmtUsd(d.effect.saving_usd)}</span>}
           </div>
         </div>
       </div>
@@ -151,19 +153,17 @@ export function DemoBar({ onExit }: { onExit: () => void }) {
   const { run, busy } = useAction();
   const simTs = latest?.ts ?? clock?.sim_ts;
   const playing = clock?.playing ?? false;
-  const waiting = clock?.paused_reason === "escalation";
-  // From the engine's LaneComparison; the browser never subtracts lanes.
+  // From the engine's LaneComparison; the browser never subtracts lanes. $ only on a real tariff, else peak avoided (kW).
+  const realTariff = useRealTariff();
   const saved = comparison?.saved_today_usd ?? null;
 
   return (
     <div className={cn(GLASS, "flex flex-wrap items-center gap-3 px-3 py-2")}>
       <div className="px-1">
         <div className="text-lg leading-tight font-semibold tabular-nums">{simTs ? fmtSimClock(simTs) : "–"}</div>
-        <div className={cn("text-[11px]", waiting ? "text-amber-300" : "text-white/50")}>
-          {waiting ? "Paused — waiting for you" : playing ? `Running ${clock?.speed}×` : "Paused"}
-        </div>
+        <div className="text-[11px] text-white/50">{playing ? `Running ${clock?.speed}×` : "Paused"}</div>
       </div>
-      <Button size="sm" disabled={busy || waiting} onClick={() => run(() => transport.simControl({ action: playing ? "pause" : "play" }))}>
+      <Button size="sm" disabled={busy} onClick={() => run(() => transport.simControl({ action: playing ? "pause" : "play" }))}>
         {playing ? <Pause /> : <Play />}
         {playing ? "Pause" : "Play"}
       </Button>
@@ -179,8 +179,10 @@ export function DemoBar({ onExit }: { onExit: () => void }) {
         +40 customers
       </Button>
       <div className="px-2 text-right">
-        <div className="text-[11px] text-white/50">Saved today</div>
-        <div className="text-lg leading-tight font-semibold text-emerald-300 tabular-nums">{fmtUsd(saved)}</div>
+        <div className="text-[11px] text-white/50">{realTariff ? "Saved today" : "Peak avoided"}</div>
+        <div className="text-lg leading-tight font-semibold text-emerald-300 tabular-nums" title={realTariff ? undefined : NO_REAL_TARIFF_HINT}>
+          {realTariff ? fmtUsd(saved) : fmtKw(comparison?.peak_avoided_kw)}
+        </div>
       </div>
       <Button size="icon" variant="ghost" className="size-8" aria-label="Exit demo mode" title="Exit demo mode (Esc)" onClick={onExit}>
         <Minimize2 />

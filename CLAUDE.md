@@ -32,7 +32,7 @@ SpacetimeDB, Convex, Microsoft Azure.
 | **tick**               | One `sim_tick` from FastAPI = 1 simulated minute; 120× = one tick every 0.5 real s. The engine replans every 5 ticks                            |
 | **context**            | Structured live data from Fetch agents: weather, prices, events, crowd effect                                                                   |
 | **decision**           | One engine action on one device, with a reason and an engine-computed effect                                                                    |
-| **escalation**         | Engine found no way inside the owner's rules and preferences to hold the cap; it offers 2–3 evaluated alternatives + `ask_owner`                |
+| **escalation**         | Engine found no way inside the owner's rules and preferences to hold the cap; it offers 1–3 evaluated alternatives                |
 | **authority**          | Bounds within which Claude resolves every escalation itself (`ClaudeAuthority`; the Builder sends full authority, no UI)                        |
 | **proposal**           | A change suggested by the AI, applied by code only after an owner confirmation                                                                  |
 | **owner confirmation** | UI Confirm, an ASI:One card button, or a `confirm` / `yes` reply to the latest pending item (matched by code)                                   |
@@ -54,7 +54,7 @@ SpacetimeDB, Convex, Microsoft Azure.
 ## Golden rules (non-negotiable)
 
 1. **The engine computes every number.** kW, kWh, $, forecasts, savings, option projections. No LLM ever produces a user-facing number; the AI quotes tool results only.
-2. **The engine decides routine moves; Claude only resolves escalations.** Claude picks one engine-computed option id, offered only options within its authority (never `ask_owner`). Code validates it and applies it. The owner is never asked and the clock never pauses for an escalation. No answer in time → the engine's safe default.
+2. **The engine decides routine moves; Claude only resolves escalations.** Claude picks one engine-computed option id, offered all ranked options with their authority flags; only authorized choices are accepted. Code validates it and applies it. The owner is never asked and the clock never pauses for an escalation. No answer in time → the engine's safe default.
 3. **The engine never waits for AI.** The kitchen runs identically with Claude and every agent switched off (default options, last known context, template text).
 4. **Owner rules are hard limits.** `always_on` never commanded; `flexible` never below `min_power_pct`; `deferrable` always finishes by `must_finish_by`; the food-safety floor (refrigeration ≥ 50 %) can never be crossed, not even by escalation.
 5. **Energy is moved, never deleted.** Owed-energy ledger per flexible device, repaid the same day.

@@ -43,7 +43,6 @@ export const realTransport: Transport = {
   setPreferences: (text) => request("PUT", "/api/kitchen/preferences", { text }),
   getContext: () => request("GET", "/api/context"),
   listEscalations: (status = "open") => request("GET", `/api/escalations?status=${status}`),
-  resolveEscalation: (escalationId, optionId) => request("POST", `/api/escalations/${enc(escalationId)}/resolve`, { option_id: optionId }),
   health: () => request("GET", "/api/health"),
 
   subscribe(onMessage, onStatus) {

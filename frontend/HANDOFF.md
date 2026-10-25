@@ -3,6 +3,175 @@
 You are taking over Ashirwad's work on **WattWise** (Cal Hacks 13.0, Oct 23–25 2026). Work carefully, keep the existing code style,
 and run `npm run build` and `npm test` (in `frontend/`) before calling anything done.
 
+## ⭐ Oct 25 (latest): integration frontend on Kritazya's engine — now on `engine_backend` (main folder `~/Downloads/WattWise`, local, not pushed)
+Base: `engine_backend` @ `b23923a` + a snapshot commit of the uncommitted G73 working tree from `~/Downloads/WattWise`
+(owner-out escalation contract, escalation/ledger modules, regenerated fixtures; `docs/team/G73_HANDOFF.md`). The main folder
+was only read, never changed. Then `integrate/ashirwad-suyog`'s **frontend only** was squash-merged (non-frontend paths restored
+to the snapshot, so Suyog's backend is NOT recorded as merged and comes in next).
+- Kept from engine_backend/G73 (authoritative): `types/contracts.ts` (no awaiting_owner/ask_owner, `ClaudeAttempt`), the data
+  layer (`data/index.ts`, `spacetime.ts`, `useLive.ts`, `rows.ts`), `mocks/liveRows.ts`, Kritazya's Proof page + charts, G73's
+  `EscalationCard` (+ its test; added: Toy Box styling and no $ unless the tariff is real).
+- Kept from the integration branch: four tabs/Dashboard/SectionTabs, one-screen Live with controls in the floor header, slim
+  savings line, 3D framing + slab/greenery, `lib/money` (no $ on the illustrative tariff), `NoData`, Builder fixes, Eval Lab empty.
+- Adapted: `SimControlRequest` gains `next_day` (it is in CONTRACTS §2); `data/index.ts` exports `useEvalArtifact`;
+  `ToyBoxRail` drops the removed `awaiting_owner`; `mocks/liveRows.ts` gains `control()` (pause/play/reset) and surges reach
+  subscribers while paused (dev/test only).
+- Checks: typecheck clean, build passes, **26/26 tests** (G73's 23 + ours). Fixture smoke: all tabs render, Live one screen with
+  the 3D floor. No-backend smoke (API_TARGET to a dead port): "Live data offline", "No kitchen yet", no crash.
+- Fixed: leaving Live threw a `removeChild` NotFoundError (drei `<Html>` labels unmount their own React roots during React 19's
+  commit). App `Shell` now keeps Live mounted once visited (hidden on other tabs, Canvas `frameloop="never"`), so nothing is torn
+  down; 0 errors across 7 tab switches, Live re-frames on return.
+- How it got here: built on a temporary branch `engine-frontend` (deleted), then `engine_backend` was moved to the G73 snapshot
+  commit (files identical to the uncommitted working tree, verified) and fast-forwarded. Backend on this branch: 355 passed,
+  24 skipped (use `backend/.venv`, it has numpy). The `pitch/` slides folder had been deleted from this folder and was recreated.
+Next: bring Suyog's API/runtime/agents onto this branch following CONTRACTS (G73_HANDOFF.md lists what his code must change).
+
+## ⭐ Oct 25: real data instead of fixtures (done, local on integrate/ashirwad-suyog)
+Ashirwad approved: keep full authority in CLAUDE.md, no synthetic warm-up, hide $ until a real tariff exists, "no data yet" states.
+Done on `integrate/ashirwad-suyog` (commits `3daa141` Suyog merge, `1b927b8` Kritazya merge, then backend glue):
+- Merges: CLAUDE.md = full authority + Kritazya's engine-applied fallback; CONTRACTS REST = Kritazya's table + Suyog's
+  `POST /api/proposals`; `.gitignore` union with root-only `/data/`; `backend/pytest.ini` now also carries Suyog's
+  `--import-mode=importlib` + `asyncio_mode = auto` (pytest.ini overrides pyproject).
+- Contract §3 signature: `Kitchen.build_lanes(config, tariff, catalog, seed)` in `runtime/lanes.py` (Lanes takes the catalog),
+  `fakes/fake_kitchen.py`, and tests. Catalog loaded from `backend/data/equipment_catalog.json` (identical to the fixture).
+- Real mode never invents data: no fixture warm-up when `engine.impl == "real"`; `NotImplementedError` (engine stubs) → 501;
+  no context posted yet → 404 "No live context yet" (`NoContextError`) instead of a 500; Claude tools treat stubs as errors.
+- Smoke (KITCHEN_IMPL=real, LIVE_TRANSPORT=ws): every endpoint answers (decisions/escalations `[]`, backtest 501, context 404).
+- Backend tests: 457 pass. Failing: Kritazya's 42 engine tests (forecaster not built) + 23 of Suyog's fake-mode tests whose
+  expected values predate Kritazya's regenerated fixtures (ids, ranks, texts) — for Suyog to refresh; not user-facing.
+Frontend done (commits `8915ad0` contract types, then no-data/money):
+- Types follow Kritazya's contract (§D): clock day_index/run_days/phase (no slowed_reason), Meter on_peak + energy_kwh_month,
+  TickState warnings, Escalation updated_ts/active_option_id/obsolete/harm_score/rank, live_escalation columns, run_days,
+  fast_forward. EscalationCard shows "Engine fallback in force" and the `obsolete` state.
+- `$` only on a real tariff: `lib/money.ts` `useRealTariff()` (Tariff.label === "urdb"); illustrative → KPI shows energy (kWh)
+  and peak avoided (kW), "Needs a real tariff" on hover; decision "saves $", demo bar, rail card, escalation cost hidden.
+- `components/NoData.tsx` states: Context ("No live context yet"), Proof (501 → "No backtest data yet"), Eval Lab
+  (`mocks/evalStub.ts` deleted; `useEvalArtifact` returns "empty"), decision feed ("No WattWise decisions yet").
+- SimControls: "Day n of N · Service/Overnight/Closed"; `run_complete` → "Day complete" + "Continue +1 day" (`next_day`).
+End to end verified (`integrate-api` = KITCHEN_IMPL=real, LIVE_TRANSPORT=ws, STORE=memory; `integrate-web`; a separate `/sim` tab):
+- Engine fix (Kritazya's file, flagged for him): `Kitchen.snapshot()["devices"]` now lists the roster before the first step
+  (`set(self._units) | set(self._devices)`); before, `sim_build.devices` was empty under the real engine, so the floor had no
+  appliances and every meter read 0 kW. Engine tests unchanged (180 pass, the same 42 forecaster failures).
+- Running: appliances report from the simulation, the engine meters energy/15-min demand (e.g. 19.2 kWh by 6:15 PM), both lanes
+  equal and peak avoided 0 because the decider is a stub. Dashboard: kWh + "needs a real tariff", "No live context yet".
+  Proof: "No backtest data yet". Eval: "No evaluation results yet". Agent Network: "No agent messages yet".
+- Proof's "fake fixture data" badge / "Run fixture backtest" label now show only in fixture mode.
+Testing tip: in the browser pane, tab ids `seed` and the preview's own tab can alias one page; open the host with `tabs_create`.
+Open: Suyog's agents need `agents/.env` (seeds, AGENT_TOKEN, keys) to post live context; 23 of Suyog's fake-mode tests
+need their expected values refreshed for Kritazya's regenerated fixtures; Kritazya: decider/escalation/forecaster/backtest,
+URDB tariff, ComStock warm-up.
+
+### Findings that led to this plan
+Ashirwad: "don't use fake data; integrate real data from Suyog and Kritazya per the docs/contract; if there is no data, tell
+the user, don't crash". What exists (checked Oct 25 on `origin/Kritazya` c1f12c7 and `origin/Suyog` aab8a46):
+- Kritazya's real engine (`backend/engine`, `backend/contracts`): build_lanes, warm_up and the **meter** work (energy, cost,
+  15-min and month peaks from the simulated hub readings). **Stubs** (`NotImplementedError`): forecaster (placeholder only),
+  decider, escalation, owner_command, undo, resolve_escalation, what_if, `run_backtest`. 42/234 of his tests fail (forecaster).
+  So the With lane makes no decisions yet. Facade is `Kitchen.build_lanes(config, tariff, catalog, seed)` (catalog added).
+- Tariff: only `demo_tariff_v1`, label `illustrative`. Warm-up: only the synthetic fixture history. No ComStock, no URDB tariff.
+- Suyog: `KITCHEN_IMPL=real` switch exists (`runtime/kitchen_factory.py`), passes no catalog; service warms up from the
+  fixture history; agents fetch live Open-Meteo, CAISO OASIS, Ticketmaster but need `agents/.env` (seeds, AGENT_TOKEN,
+  mailbox, keys) which is not on this machine.
+- Kritazya's branch reverts CLAUDE.md to "owner confirms" (conflicts with the full-authority decision on main).
+
+## ⭐ Oct 25: 3D floor fills its frame + nicer Toy Box look (`integrate/ashirwad-suyog`, worktree `~/Downloads/WattWise-integrate`)
+Ashirwad: "too much blank space, the model is small; research and make the 3D model better, same theme".
+Measured in the isometric view (744×399 canvas): the restaurant drew only 220×167 px. Causes:
+1. `CameraRig` frames the hard-coded `SINGLE_BOX` (31.3×19 projected units) but the meshes project to 24.5×16, so ~25% is empty.
+2. Insets eat the height: 90 px on top for the label stack + 44 px at the bottom for the legend (of 399).
+3. The 43° isometric azimuth makes a squarish diamond; the canvas is ~2:1 wide, so the sides stay empty.
+Done (committed; build + tests pass; verified in the browser in With and Side by side, tablet and laptop widths):
+- `CameraRig` fits what the stage draws (`stagePoints`: visible meshes' world bbox corners inside `<group ref={stage}>`),
+  not `SINGLE_BOX` (removed). Insets: top 64 px with labels (16 without), bottom 14, sides 12. `fitKey` re-fits on compare.
+- Isometric dir `(20, 28, 40)`: azimuth ≈ 27°, elevation ≈ 31°, ~1.9:1 silhouette for the wide stage.
+- Result on a 744×399 canvas: restaurant drawn 587×314 px (79 % × 79 %), was 220×167 px.
+- `Scenery`: the spec's building slab (`SLAB` #E8B89A, `RoundedBox`, ink outline, `STAGE` bounds) + `Greenery` (front
+  sidewalk, 3 toy trees, 5 potted bushes on free slab; hidden in Equipment focus). `ContactShadows` under each slab (frames=1).
+- Legend moved to a compact 2×2 card in the top-right corner (empty in the 3/4 view).
+- `TiltShift2` (blur 0.06, taper 0.6) added. **N8AO was tried and removed**: with `multisampling={4}` it blanked the frame on
+  a fresh load.
+Verify by measuring drawn px in the browser (`_roots.get(canvas).store` from `/node_modules/.vite/deps/@react-three_fiber.js`).
+
+## ⭐ Oct 25: Live Simulation is one screen (on `integrate/ashirwad-suyog`)
+- From tablet width up (≥768 px) the Live tab fills exactly the window below the top bar (`--topbar-h`, set by `TopBar`
+  in `App.tsx`); nothing scrolls. Phones keep the scrolling layout.
+- The controls card is gone: clock, Play/Pause, speed, reset, customers/h and +20/+40 sit in the floor's dark header bar
+  (`SimControls embedded`), around the 3D view. Demo mode is the prominent green button there.
+- The savings card and the demand strip became one slim line inside the floor frame (`SavingsPanel`): saved today, peak
+  avoided, 15-min demand with / without, cap, and the simulated label. Month peak and bill stay on Dashboard;
+  `DemandSummary` was removed. The label band above the building shrank (top inset 130 → 90 px), so the restaurant draws bigger.
+- Laptop width: floor and appliance list side by side, both filling the height (the list scrolls inside itself). Tablet
+  width: a Floor / Appliances switch in the header shows one at a time; "Locate appliance on floor" switches back.
+- Camera: the settled starting view is the furthest out. Orthographic views lock `minZoom` to the fitted zoom (up to 6× in);
+  Street / POV lock `maxDistance` to the pose (in to 30 %). Verified: wheel-out leaves the view unchanged, wheel-in enlarges it.
+- Demo mode (full screen) is unchanged.
+
+## ⭐ Oct 24 night: `integrate/ashirwad-suyog` (worktree `~/Downloads/WattWise-integrate`, local, not pushed)
+Branch from `ashirwad` (`0db6689`) with Suyog's branch merged in, as planned:
+- `77f28d3` merge `origin/Suyog` @ `930c472` (only conflict `docs/Claude_EVAL.md`: main's version, identical to Suyog's).
+- `0af0d61`, `00160a9` the two fixes from `ashirwad-suyog-work`: `sim_build` re-sent for a kitchen restored from the store;
+  the loop pauses at the end of the fake recording (its frontend half was already on `ashirwad`).
+- `02bb3be` merge Suyog's latest `f7ceb51` ("Updated docs rule"): engine-owned escalations, **never ask the owner** (Claude is
+  offered only within-authority options, never `ask_owner`; no Proposal for Claude's choice; the clock is never touched for an
+  escalation; the fake kitchen accepts `FULL_AUTHORITY`; ASI:One cards say "Outside Claude's authority"). This branch had its
+  own version of that change; it was dropped for Suyog's (kept on local branch `backup/integrate-own-fullauth`).
+  `loop.py` conflict: Suyog's play / `next_day` control plus `restore_build()` on play.
+- Checks: backend `pytest` 297 passed, 11 skipped, 8 xfailed (Suyog's "fixtures predate CONTRACTS 10528e2"); agents `pytest`
+  80 passed (needs a venv with `agents/requirements.txt`); frontend build + 8 tests pass.
+- End to end (`integrate-api` + `integrate-web` in `.claude/launch.json`, `/sim` host tab open, fake kitchen, Claude off): the clock
+  ran through the tick-60 escalation without pausing and stopped at 7:30 PM, the end of the recording; no owner text, no dialog.
+- **Known gaps, not from the merge:**
+  - ~~The Builder cannot build the fake's recorded kitchen~~ Fixed: the "Demo Café" preset is now the recorded kitchen (2 HVAC,
+    dishwasher finishing by 19:30, the owner preference), and `KitchenConfig` sends, per type, the setting all its units share
+    (else the type default); only units that differ are patched with `PUT …/importance` afterwards. Verified against
+    `KITCHEN_IMPL=fake`: Build kitchen with the untouched preset → `/live`. Any edit still fails on the fake (it only knows the
+    recording); that is the fake's STUB limit.
+  - `GET /api/escalations?status=open` returns 500 in fake mode: Suyog's models need the new contract fields (`updated_ts`,
+    `active_option_id`, `harm_score`, `rank`) the old recordings lack. Clears when Kritazya's regenerated fixtures land.
+  - The Dashboard escalation card stays "Claude is choosing…" when Claude is off; showing `active_option_id` (the engine's
+    fallback in force) is part of the ASHIRWAD.md section D contract migration.
+- Next: PR `integrate/ashirwad-suyog` → `main` (architecture-reviewer), then the section D migration once Kritazya's fixtures merge.
+
+## ⭐ Oct 24 evening: four-tab UI ported from `WattWise-suyog-work` (uncommitted on `ashirwad`)
+**Pitch work is parked** on local branch `pitch-wip` (commit `62c0add`, not pushed): `PitchPage.tsx`, `.env.demo`, `public/`
+(`_redirects`, `staticwebapp.config.json`), and its edits to `App.tsx`, `SimControls.tsx`, `Hud.tsx`, `LiveFloor.tsx`, `ToyBoxRail.tsx`,
+`vite.config.ts`, `package.json`. The new `App.tsx` replaced the pitch version, so re-add the `/pitch` route when rebuilding it.
+
+Copied as-is from `~/Downloads/WattWise-suyog-work` (branch `ashirwad-suyog-work`, uncommitted UI there); see its HANDOFF
+("four top tabs…", "Play doesn't work") for the why:
+- New: `components/SectionTabs.tsx`, `pages/DashboardPage.tsx`, `components/live/SavingsPanel.tsx`.
+- Replaced: `App.tsx` (no sidebar; top tabs Live Simulation `/live` · Dashboard `/dashboard` [+ Kitchen Builder `/dashboard/builder`] ·
+  Evaluation Lab `/eval` · Proof & Agents `/proof` [+ Agent Network `/proof/agents`]; `/` → `/live`; `/builder` and `/agents` redirect;
+  Ask WattWise in the top bar), `pages/LivePage.tsx` (controls · savings panel · 3D floor; KPIs/context/escalation/trend/decisions moved to
+  Dashboard), `pages/BuilderPage.tsx` (no "Claude's authority" card; always sends `FULL_AUTHORITY`), `components/live/SimControls.tsx`
+  (simulation-host-offline notice + "Open simulation host" button; also brings commit `a63d76d`'s outline style for "+40 customers"),
+  `components/live/floor/OperationsPanel.tsx` (no "your decision needed" state).
+- Deleted: `components/live/EscalationDialog.tsx`. `EscalationCard` (on Dashboard) only displays; there is no UI Confirm path now.
+- Backend half (Claude full authority, sim-host pause) is only on `ashirwad-suyog-work`; nothing under `backend/`, `contracts/`, `docs/` changed here.
+- Verified: build + tests pass; in `dev:mocks` the four tabs, both sub-tab rows, both redirects, Build kitchen → `/live` with controls,
+  savings panel and 3D floor, and the Dashboard all work.
+
+## ⭐ Oct 24 evening: the project never stops for the owner (uncommitted on `ashirwad`)
+Ashirwad's product decision: on an escalation Claude picks the best option itself and the system keeps running. The owner is never
+asked, nothing waits for the owner, the clock never pauses for an escalation. Full authority (Builder sends `FULL_AUTHORITY`, no UI);
+hard floors stay: always_on untouched, never below `min_power_pct`, `must_finish_by` holds, refrigeration ≥ 50 %.
+- **Docs:** `CLAUDE.md` (product paragraph, `authority` row, golden rule 2, "Never" list) and `docs/CONTRACTS.md` (ClaudeAuthority
+  full-authority note) now use the wording from `ashirwad-suyog-work`. **Tell Suyog and Kritazya** (CLAUDE.md + CONTRACTS.md changed).
+- **Frontend:** `Hud.tsx` DemoBar has no "Paused — waiting for you" label and Play is never disabled for an escalation; `LiveFloor.tsx`
+  Space toggles play/pause regardless of `paused_reason`; `EscalationCard.tsx` shows `awaiting_owner` as "Claude chose" + Claude's
+  pick + "Engine default applies at <deadline_sim_ts>" (contract numbers only; no "Claude asked you"); `ToyBoxRail.tsx` heading
+  is "Claude chose · engine default applies" (the rail row has no deadline column on this branch's types yet).
+- **Fixture mode:** `mocks/viewerWs.ts` loops the recording at its end (`resetPlayback(true)`, keeping the chosen speed) instead of
+  stopping. The recorded `escalation_awaiting_owner` fixture is unchanged (Kritazya's); the UI just doesn't treat it as a question.
+- **Backend part lives only on `ashirwad-suyog-work`** (`agent/tools.py` `claude_choices()`: Claude is offered only within-authority
+  options, never `ask_owner`; `runtime/escalations.py`: no escalation pause). Bring it in when Suyog's backend merges; this branch
+  has no backend code.
+- Still open: `docs/design/UI.md` and `docs/team/ASHIRWAD.md` (main) still describe the Builder "Claude's authority" card and
+  "Waiting for you" option buttons; main's section D contract migration (`run_days`, phases, `obsolete`, `active_option_id`, …) is
+  not started, and its `scenario/demo_cafe_multiday/` fixtures don't exist on main yet.
+- Verified in `dev:mocks` at 600×: the replay runs through the tick-60 escalation and past its end, loops back to 5:31 PM and keeps
+  running; no dialog, no owner-waiting text, no console errors.
+
 ## ⭐ CURRENT TASK (Oct 24, latest): build the Toy Box restaurant design
 **Spec:** `frontend/UI_CONCEPTS.md`, chosen by Ashirwad. **Visual target:** `frontend/design/toybox-restaurant-mockup.html`; open it in a browser.
 
@@ -10,6 +179,19 @@ The whole restaurant in the current `plan.ts` layout, restyled as a toy miniatur
 - a 15-min peak gauge (With needle, plus a ghost needle for Without);
 - the **demand-charge card** (Without +$67.20 / With $0 extra);
 - a Claude card.
+
+### Follow-up complete — Toy Box now spans the product (commit `28585f2`)
+Ashirwad asked Codex to make the rest of the interface feel like the same product as the completed live floor. The shared warm-cream
+canvas, Fredoka/Nunito typography, white ink-outlined cards, toy-like controls and semantic teal/coral/amber palette now cover navigation,
+Builder, Agent Network, Proof, `/sim`, charts, dialogs and assistant surfaces. Data flow and interaction behavior are unchanged.
+
+- Shared design tokens and primitives were updated in `src/index.css` and `src/components/ui/`; page components now inherit the same system.
+- The normal Live view retains its dark control header but its demand summary and equipment inspector now use the Toy Box paper treatment.
+- Agent nodes use the floor palette and ink; Proof policy cards make the WattWise result teal; `/sim` device cards use the same state colours.
+- Raw WebSocket counters moved into the connection status tooltip, removing debug noise while preserving diagnostics.
+- Phone-width fixes: the replay speeds wrap to their own row and Builder equipment steppers wrap without horizontal overflow.
+- Browser-verified `/live`, `/builder`, `/agents`, `/proof` (including completed backtest results) and `/sim` at phone width, plus Builder,
+  Live and Proof at desktop width. `npm run build`, `npm test` and `git diff --check` pass.
 
 ### Build order (UI_CONCEPTS.md §5)
 1. **Step 1, done and pushed (commit `6ac918d`):** toon materials, ink outlines, Toy Box palette, warm lighting, raised Street view.
@@ -24,20 +206,31 @@ The whole restaurant in the current `plan.ts` layout, restyled as a toy miniatur
      - `Environment` removed (toon ignores it);
      - `ToneMappingMode.NEUTRAL`;
      - Street pose `pos [10.5,10,21] → target [10,0.4,4.5]`, looking down over the dining room as Ashirwad asked.
-2. **Step 2, next:** recognisable appliance shapes and the four states, on the appliance itself (UI_CONCEPTS.md §2):
+2. **Step 2, done by Codex (commit `57609e6`):** recognisable appliance shapes and the four states, on the appliance itself (UI_CONCEPTS.md §2):
    - **Running:** pastel, red LED, working detail lit.
    - **Reduced:** teal `#2EC4B6` floor ring, outline and LED; the cable to the hub turns teal and dashed.
    - **Held:** faded toward grey, dashed amber `#FFB703` ring, white clock badge.
    - **Off:** grey `#D9D4CC`.
 
-   Edit `Device3D.tsx` (`Details`, `StatusPad`, `StateRing`, `STATE_HEX` in `palette.ts`). The current status pads are green/blue/amber and need the new colours.
-3. **Step 3:** toy diners (block body and round head) using the unused `Diners` in `Ambient.tsx`; a guest queue at the door after +40; a warm glow under each table; furniture in toy colours. Note that furniture is hidden while "Equipment focus" is on.
-4. **Step 4:** the right column. Use Fredoka and Nunito from Google Fonts; white cards with ink outline and 22 px corners.
+   Implemented in `Device3D.tsx`, `Restaurant.tsx` and `palette.ts`: running red LED; reduced teal outline/ring/LED and dashed
+   teal cable; held faded body, dashed amber ring and 3D clock badge; off neutral grey. Added fryer baskets, four grill burners,
+   oven/dishwasher handles, reach-in doors and ice-bin details.
+3. **Step 3, done by Codex (commit `56c1409`):** toy diners (block body and round head), a guest queue at the door after +40, warm table glows and toy-colour furniture.
+   - `Ambient.tsx` now supplies deterministic toy diners, a six-person entrance queue and table `LightPool`s.
+   - `Restaurant.tsx` derives visual seat occupancy from contract `customers_per_hour`; an unconsumed `surge_request` of +40 makes the queue appear immediately, even while paused. No derived business number is displayed.
+   - Furniture, diners and table glows remain hidden when **Equipment focus** is on; the table pools follow the lights device reading.
+   - Browser-verified at `/live` in demo mode after pressing **+40 customers** while the fixture was paused.
+4. **Step 4, done by Codex (commit `594d8db`):** the full-screen demo right column uses Fredoka and Nunito; white cards have ink outlines and 22 px corners.
    - **Gauge:** `live_tick.block_avg_kw` per lane against `target_kw`.
    - **Demand-charge card:** the escalation's `accept_overrun.projected.cost_delta_usd` (67.20 in the fixtures) against the chosen option's `cost_delta_usd` (0).
    - **Claude card:** from `live_escalation`.
-   - **Also:** hide the debug text in the sidebar and the duplicate KPI cards.
-5. **Step 5:** when WattWise acts, fade untouched objects about 30% and show pinned museum-style labels for a few seconds.
+   - **Also:** the demo hides the appliance/debug sidebar and duplicate KPI strip. Outside demo mode, the existing keyboard-accessible appliance inspector and owner controls remain available.
+   - `ToyBoxRail.tsx` reads typed `live_tick` and `live_escalation` rows directly. Gauge geometry is presentational only; every displayed kW and dollar value remains contract-provided.
+   - Browser-verified at `/live` in full-screen demo mode: 37.9 kW With, 33.2 kW ghost Without, 40.0 kW cap, +$67.20 projected overrun, $0 chosen-option cost and “Claude chose 3 of 3.”
+5. **Step 5, done by Codex (commit `594d8db`):** when a new executed `live_feed` decision arrives, unrelated appliances fade 30% toward the Toy Box background, their secondary status effects and cables quiet down, and the changed appliance receives a brighter outline, cable and light.
+   - The pinned museum card stays for 6.5 seconds and uses only the engine decision: appliance/action plus `effect.peak_before_kw` → `effect.peak_after_kw`.
+   - It reuses each appliance's always-mounted drei `Html` anchor instead of adding another floating React root.
+   - Browser-verified during a 600× fixture replay: the walk-in cooler decision pinned to the appliance as “Turn down to 50% · 15-min peak 40.1 kW → 39.2 kW.”
 
 ### Rules
 - **No numbers from the browser:** never compute a number, e.g. kW × $/kW. If a figure isn't in the contract, show kW only and add a contract question.
@@ -94,7 +287,7 @@ Earlier work, built for the previous design. Much of the UI carries over; see PL
 
 - **`frontend/`:**
   - The stack: Vite, React 19, TS, Tailwind v4, hand-written shadcn/ui, Zustand, Recharts 3, react-router 7, and three.js / R3F for a 3D floor.
-  - Screens in `src/pages/`: Builder (location, preferences, Claude's authority, per-unit importance), Live (3D floor, KPIs, chart, decision feed, escalation card and dialog, context strip), Agent Network, Proof (with Replay month).
+  - Screens in `src/pages/`: Builder (location, preferences, Claude's authority, per-unit importance), Live (3D floor, KPIs, chart, decision feed, escalation card with engine verdicts, context strip), Agent Network, Proof (with Replay month).
   - A hand-written mock server (`src/mocks/server.ts`), a transport layer, a Zustand store, and data hooks with a SpacetimeDB / ws switch.
   - **Obsolete:** the mock server is **not** fixture-driven, and the types follow the old contract.
 - **`backend/data/equipment_catalog.json`:** still Ashirwad's, but it needs the new `params` keys and `default_limits`, and `min_power_pct` removed (PLAN.md B1).
@@ -172,12 +365,33 @@ the browser simulation or hub work.
 - **Next work is PLAN step 5.** D3 is settled: preserve the 3D floor, make its appliance states judge-readable, and layer in the
   Hub/reporting connections and physical gauges without adding distracting effects.
 
-### Active Codex bugfix — fixture pause/play/reset
+### Codex checkpoint 3 — fixture pause/play/reset complete
 - Reported by Ashirwad: the Live pause button changed state but the fixture simulation kept advancing.
 - Root cause: `VITE_MOCKS=1` returned a canned `/api/sim/control` response while `viewerWs.ts` and `liveRows.ts` each ran an
   independent interval with no control path.
-- In progress: route fixture controls into both replay sources, make speed affect actual frame cadence, and verify that tick/time
-  and device readings stay frozen while paused, resume from the same frame, and reset to tick 0.
+- Fixed both replay sources so play, pause, reset and speed control their actual frame cadence. Play after tick 120 restarts the
+  scenario instead of stopping again immediately.
+- Verification: `npm test` passes 7 tests including replay-control coverage; `npm run build` passes. Browser-verified at `/live`:
+  paused at 5:59 PM, stayed frozen for more than two seconds, then resumed from the same frame to 6:01 PM.
+
+### Active Codex Toy Box checkpoint — Steps 1–5 complete
+- Preserved Claude's Step 1 toon materials, ink system, palette and warm lighting.
+- Device state is now intentionally sparse: ordinary running appliances do not get a floor halo; teal is reserved for a WattWise
+  reduction, amber for a held job, and off devices are plain grey.
+- Browser-verified at the end-of-fixture state with HVAC 2 and the water heater reduced: both had teal outlines/rings and their
+  hub cables changed to teal/dashed, while ordinary appliances retained pastel bodies and red LEDs.
+- Added deterministic toy diners, contract-driven visual occupancy, table `LightPool`s controlled by the lights reading and a six-person
+  entrance queue for an unconsumed +40 surge request. Fixture surge updates now notify subscribers immediately while playback is paused.
+- Browser-verified the full-screen floor after pressing **+40 customers** at the paused end-of-fixture state.
+- Added `ToyBoxRail.tsx`: the judge-facing demo now has the semicircle With/Without/cap gauge, contract-backed demand-charge comparison,
+  and live Claude status/rationale card. The duplicate KPI strip and appliance/debug sidebar are hidden in demo mode; the inspector stays
+  available outside demo mode so appliance selection and owner controls are not removed.
+- The default floor view now shows the complete restaurant; **Equipment focus** remains available to hide furniture on demand.
+- Added the 6.5-second decision spotlight from executed `live_feed` rows: untouched appliances fade toward the background, non-target
+  effects/cables quiet down, and the changed appliance gets a bright outline, cable, local light and pinned museum card.
+- Browser-verified a fresh walk-in cooler decision during a 600× replay; the pin displayed only engine-provided action and peak-effect values.
+- The chosen Toy Box build order is complete. The remaining known cleanup is the older drei `Html` unmount warning noted above; it is not a
+  visible demo blocker, and the new decision pin does not create another `Html` root.
 
 ## Demo focus: the judging round is the priority
 The live demo in judging is the main point. The app should **read as a simulation**: calm, clear, a few impactful moments.
@@ -195,7 +409,7 @@ The fixture scenario matches this: surge at tick 31, escalation at tick 60, choi
 - the **Hub tile** pulsing each tick, with a wire to every appliance tile;
 - **tiles visibly changing state** when a Command lands (dishwasher → *waiting*, HVAC → *reduced 40 %*), with live physical gauges (room temperature, dirty racks, ice level, job time left);
 - the **cap line** on the two-lane chart, with Without crossing it and With staying under, plus the month peak line and the dashed forecast;
-- the **escalation card** state changes, with the owner option buttons **inside the card** (no modal);
+- the **escalation card** state changes, with the safe fallback, ranked options and Claude verdicts (no owner choice);
 - the **agent dots** moving on Agent Network.
 
 **Changes to the current UI:**
@@ -207,7 +421,7 @@ The fixture scenario matches this: surge at tick 31, escalation at tick 60, choi
 | No hub on screen, no physical gauges | Add both: "everything reports to one box" is a core story beat |
 | Chart without the month peak line | Add the cap line, month peak line and dashed `with` forecast from `live_tick.forecast_kw_json` |
 | No energy + cost strip | Add one from `live_tick`: energy today, price now, cost today and month, per lane |
-| Escalation decided in a pop-up dialog | Buttons inside the card; `POST /api/escalations/{id}/resolve` |
+| Escalation decided in a pop-up dialog | Read-only ranked options, fallback and Claude verdict; no owner resolve route |
 | Context strip with hourly data and a sparkline | `live_context` has summaries only: show summaries and labels (contract question Q2) |
 | Builder without a peak goal | Add **Minimize peak \| Hard limit** (`peak_mode`) |
 | Desktop-only layout | **The phone view must work**: a judge presses +40 on their own phone (surge buttons + live view at ~375 px) |
@@ -235,3 +449,10 @@ Nothing is merged now. Integration with Suyog happens later through the hub prot
 - **three.js lights:** keep them mounted and change their intensity. Shaders that can emit NaN black out the frame through Bloom.
 - **Stale HMR:** after a big change, hard-reload with `?fresh=1`.
 - **Edit tool:** re-read a file before using the Edit tool after a shell edit.
+
+## G73 reconstruction — 2026-10-25
+
+Owner escalation controls and transport method are removed. The card displays ranked engine options, active fallback,
+Claude attempt verdicts, explanation/source, and open/resolved/expired_default/obsolete states. `real.ts` health remains
+covered by a regression test. Live/ws rows carry attempts and notices. Suyog API/runtime/agent integration is deferred;
+see `docs/team/G73_HANDOFF.md`. Spacetime reducer tests/typecheck pass; CLI build/bindings still need the Spacetime CLI.

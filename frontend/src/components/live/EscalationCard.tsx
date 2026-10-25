@@ -1,86 +1,56 @@
-import { Bot, CheckCircle2, Clock, LoaderCircle, ShieldAlert, User } from "lucide-react";
+import { Bot, Clock, LoaderCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useEscalations } from "@/data";
 import { fmtKw, fmtSimTime, fmtUsd } from "@/lib/format";
+import { useRealTariff } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import type { Escalation } from "@/types";
 
-/**
- * The latest escalation, inline on the Live screen (UI.md): the problem in engine numbers, then
- * Claude is choosing… → Claude chose X: rationale · Waiting for you (the decision dialog opens) · Default applied.
- */
+/** Engine options, fallback and validated Claude verdict; escalation never waits for owner input. */
 export function EscalationCard() {
-  const [latest] = useEscalations();
-  if (!latest) return null;
-  const e = latest;
-  const chosen = e.options.find((o) => o.option_id === e.chosen_option_id);
-  const state = STATE[e.status];
-  const Icon = e.status === "open" ? LoaderCircle : e.status === "awaiting_owner" ? ShieldAlert : e.resolved_by === "owner" ? User : e.resolved_by === "claude" ? Bot : Clock;
+  const [e] = useEscalations();
+  return e ? <EscalationDetails escalation={e} /> : null;
+}
 
+export function EscalationDetails({ escalation: e }: { escalation: Escalation }) {
+  const state = STATE[e.status];
+  // $ only when the engine bills on a real tariff (lib/money); kW and the rule checks always show.
+  const realTariff = useRealTariff();
+  const active = e.options.find((o) => o.option_id === e.active_option_id);
+  const Icon = e.status === "open" ? LoaderCircle : e.resolved_by === "claude" ? Bot : Clock;
   return (
-    <section
-      aria-live="polite"
-      className={cn("flex flex-wrap items-start gap-4 rounded-xl border px-4 py-3", state.box)}
-    >
-      <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl", state.icon)}>
-        <Icon className={cn("size-5", e.status === "open" && "animate-spin")} />
-      </span>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Escalation · {fmtSimTime(e.ts || e.block_start || new Date().toISOString())}</span>
-          <Badge variant="outline" className={state.badge}>
-            {state.label(e)}
-          </Badge>
-        </div>
-        <div className="mt-1 text-sm">
-          Forecast peak <b className="tabular-nums">{fmtKw(e.problem.forecast_peak_kw)}</b> vs cap{" "}
-          <b className="tabular-nums">{fmtKw(e.problem.target_kw)}</b> ({e.problem.reason}). Routine moves weren't enough, so WattWise
-          offered {e.options.length} options.
-        </div>
-        {chosen && (
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-            <CheckCircle2 className="size-4 text-lane-with" />
-            <span className="font-medium">{chosen.summary}</span>
-            {chosen.projected && (
-              <span className="text-xs text-muted-foreground tabular-nums">
-                peak {fmtKw(chosen.projected.peak_kw)} · cost {fmtUsd(chosen.projected.cost_delta_usd)}
-              </span>
-            )}
-          </div>
-        )}
-        {e.rationale && (
-          <p className="mt-1 text-xs text-muted-foreground">
-            {e.resolved_by === "owner" ? "Claude asked you: " : "Claude: "}“{e.rationale}”
-          </p>
-        )}
+    <section aria-live="polite" className={cn("rounded-[22px] border-2 border-[#22223B] px-4 py-3 shadow-[0_4px_0_#22223B]", state.box)}>
+      <div className="flex flex-wrap items-center gap-2">
+        <Icon className={cn("size-4", e.status === "open" && "animate-spin")} />
+        <span className="text-xs font-medium text-muted-foreground">Escalation · {fmtSimTime(e.ts)}</span>
+        <Badge variant="outline">{state.label}</Badge>
       </div>
+      <p className="mt-2 text-sm">
+        Forecast peak <b>{fmtKw(e.problem.forecast_peak_kw)}</b> vs target <b>{fmtKw(e.problem.target_kw)}</b> ({e.problem.reason}).
+      </p>
+      <p className="mt-1 text-sm"><b>In force:</b> {active?.summary ?? e.active_option_id ?? "Engine safe fallback"}</p>
+      {e.explanation && <p className="mt-2 text-sm">{e.explanation} <span className="text-xs text-muted-foreground">{e.explanation_source === "ai" ? "Claude explanation" : "Engine notice"}</span></p>}
+      <ol className="mt-2 space-y-1 text-xs text-muted-foreground">
+        {[...e.options].sort((a, b) => a.rank - b.rank).map((option) => (
+          <li key={option.option_id}>
+            {option.rank}. {option.summary} · peak {fmtKw(option.projected.peak_kw)}
+            {realTariff && <> · cost {fmtUsd(option.projected.cost_delta_usd)}</>} · {option.within_authority ? "Within authority" : "Outside authority"}
+          </li>
+        ))}
+      </ol>
+      {e.claude_attempts.map((attempt, index) => (
+        <p className="mt-2 text-xs" key={`${attempt.ts}:${index}`}>
+          Claude chose {e.options.find((o) => o.option_id === attempt.option_id)?.summary ?? attempt.option_id}: {attempt.accepted ? "accepted by the engine" : attempt.reason === "outside_authority" ? "rejected: outside authority" : "rejected: after deadline"}.
+          {attempt.rationale && <> “{attempt.rationale}”</>}
+        </p>
+      ))}
     </section>
   );
 }
 
-const STATE: Record<Escalation["status"], { label: (e: Escalation) => string; box: string; icon: string; badge: string }> = {
-  open: {
-    label: () => "Claude is choosing…",
-    box: "border-importance-flexible/40 bg-importance-flexible/5",
-    icon: "bg-importance-flexible/15 text-importance-flexible",
-    badge: "border-importance-flexible/40 text-importance-flexible",
-  },
-  awaiting_owner: {
-    label: () => "Waiting for you",
-    box: "border-importance-deferrable/50 bg-importance-deferrable/10",
-    icon: "bg-importance-deferrable/15 text-importance-deferrable",
-    badge: "border-importance-deferrable/40 text-importance-deferrable",
-  },
-  resolved: {
-    label: (e) => (e.resolved_by === "claude" ? "Claude chose" : e.resolved_by === "owner" ? "You chose" : "Resolved"),
-    box: "border-lane-with/40 bg-lane-with/5",
-    icon: "bg-lane-with/15 text-lane-with",
-    badge: "border-lane-with/40 text-lane-with",
-  },
-  expired_default: {
-    label: () => "Default applied",
-    box: "border-border bg-secondary/40",
-    icon: "bg-muted text-muted-foreground",
-    badge: "text-muted-foreground",
-  },
+const STATE: Record<Escalation["status"], { label: string; box: string }> = {
+  open: { label: "Safe fallback active · Claude may choose", box: "border-importance-flexible/40 bg-importance-flexible/5" },
+  resolved: { label: "Claude choice accepted", box: "border-lane-with/40 bg-lane-with/5" },
+  expired_default: { label: "Deadline passed · safe fallback active", box: "border-border bg-secondary/40" },
+  obsolete: { label: "Risk passed", box: "border-border bg-secondary/40" },
 };

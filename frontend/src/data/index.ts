@@ -63,3 +63,4 @@ export function useBacktestRows(): BacktestRows {
     };
   }, [points, months]);
 }
+export { useEvalArtifact } from "./useEvalArtifact";

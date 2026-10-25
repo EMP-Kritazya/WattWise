@@ -14,6 +14,7 @@ from ._base import ContractModel, Importance, Lane, NonNegFloat, NonNegInt, Peak
 from .api import ClockState
 from .shapes import (
     AgentLog,
+    ClaudeAttempt,
     BacktestChecks,
     BacktestPolicies,
     CommandAction,
@@ -170,6 +171,14 @@ class LiveEscalationRow(ContractModel):
     chosen_option_id: Optional[str]
     resolved_by: Optional[ResolvedBy]
     rationale: Optional[str]
+    claude_attempts_json: str
+    explanation: str
+    explanation_source: Literal["ai", "template"]
+
+    @field_validator("claude_attempts_json")
+    @classmethod
+    def _attempts(cls, v: str) -> str:
+        return _json_of(TypeAdapter(list[ClaudeAttempt]), v, "claude_attempts_json")
 
     @field_validator("problem_json")
     @classmethod

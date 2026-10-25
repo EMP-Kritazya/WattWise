@@ -17,7 +17,7 @@ const spacetimeUri: string | undefined = import.meta.env.VITE_SPACETIME_URI;
 const spacetimeDb: string | undefined = import.meta.env.VITE_SPACETIME_DB;
 const spacetimeToken: string | undefined = import.meta.env.VITE_SPACETIME_TOKEN;
 
-/** Start live data. Chat, proposals and escalation choices always come over /ws as well. Returns a stop function. */
+/** Start live data. Chat, proposals and escalation notices always come over /ws as well. Returns a stop function. */
 export function startLive(): () => void {
   const stopRows = startLiveRows();
   let buffer: WsMessage[] = []; // /ws (and mock) messages: legacy screen store + row store

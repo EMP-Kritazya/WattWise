@@ -85,12 +85,12 @@ every real tick (0.5 s × 120 / speed; one tick = 1 sim minute):
 ## Escalations (`runtime/escalations.py`)
 1. Every escalation in `new_escalations` (opened or changed) → publish it (SpacetimeDB `live_escalation` upsert, `/ws escalation`);
    Convex `escalations` gets the final state. The engine already applied its fallback (`active_option_id`) when it opened.
-2. Only when it **opens**: ask Claude once with the ranked options (engine numbers, `harm_score`, `rank`, `within_authority`, the
+2. When it **opens**: ask Claude with the ranked options (engine numbers, `harm_score`, `rank`, `within_authority`, the
    fallback in force), context summary, owner preferences, authority. Claude must call
-   `choose_escalation_option(option_id, rationale)`; the id is an enum of the offered ids. Updates are published, not re-asked.
-3. `kitchen.resolve_escalation(id, option_id, "claude", rationale)`. `awaiting_owner` → create a Proposal (`kind: resolve_escalation`)
-   shown in the UI and ASI:One. Returned unchanged (already `resolved`, `expired_default` or `obsolete`) or `RuleError` (option no
-   longer offered) → log it; the Concierge tells the owner what is in force (`active_option_id`) and why.
+   `choose_escalation_option(option_id, rationale)`; the id is an enum of the offered ids. Updates are published; only a rejected choice permits one retry before deadline.
+3. `kitchen.resolve_escalation(id, option_id, "claude", rationale)` records the engine verdict in claude_attempts.
+   Rejected outside_authority → one retry before deadline; after_deadline → fallback remains. Publish every verdict
+   with explanation and explanation_source (ai or template). Quote only engine numbers. No owner escalation proposal.
 4. Claude timeout (8 real s) or error → nothing to do: the fallback stays. Log it.
 - Max **one** AI call in flight; if the queue is longer than 3, older items keep their template text.
 
@@ -104,7 +104,7 @@ System prompt essentials:
   call a `propose_*` tool; it applies only after the owner confirms.
 - In an escalation, the engine has already applied its fallback (`active_option_id`, the best-ranked option within your
   authority). Keep it or choose the option that better fits the context and the owner's preferences; explain in one sentence
-  using the option's numbers. Prefer options within your authority; choose `ask_owner` when the trade-off is the owner's to make.
+  using the option's numbers. Choose within authority; code validates every choice and allows one retry before the deadline.
 - When explaining a decision, say what changed, why (reason_code + forecast), and the effect from the tool.
 
 Tools: see CONTRACTS.md section 4. Implementation = thin wrappers over facade calls.
@@ -115,7 +115,7 @@ Chat replies stream over WebSocket (`chat_delta`, `chat_done`).
 - `propose_*` tools create a Proposal (CONTRACTS.md) in Convex `proposals` and push a `proposal` message.
 - Confirm paths, all handled by code in `agent/proposals.py`: `POST /api/proposals/{id}/confirm` (UI), an ASI:One card
   button, or a `confirm` / `yes` reply to the latest pending Proposal (matched by code in `agents/concierge.py`, not by the model).
-- Applying = the normal facade call (`set_importance`, `set_peak_cap`, `set_authority`, `undo`, `resolve_escalation`) or queueing
+- Applying = the normal facade call (`set_importance`, `set_peak_cap`, `set_authority`, `undo`) or queueing
   a customer event in the runtime. Escalation proposals expire at the escalation deadline.
 
 ## Fetch.ai Concierge (summary; full design in AGENTS.md)

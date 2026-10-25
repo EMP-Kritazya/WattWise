@@ -12,7 +12,7 @@ every screen sees it live.
 You build the **engine**: pure Python that takes each lane's HubReport (the hub's current state) every tick, meters energy and
 cost on a real tariff, forecasts, and every 5th tick decides Commands inside the owner's rules; when no such move holds the
 peak goal it escalates: it applies the best-ranked option within the owner's authority at once, offers up to 3 evaluated
-alternatives + `ask_owner`, and revalidates whatever Claude or the owner picks. You build
+alternatives, and revalidates Claude's choice with one retry before the deadline. You build
 **SpacetimeDB** (module + Python live client), the UI's live source for charts and engine results. You keep the **contracts and
 fixtures** that let the other two build without you, and the **backtest** that proves savings on ComStock data + a URDB tariff.
 
@@ -77,7 +77,7 @@ fixtures** that let the other two build without you, and the **backtest** that p
 
 ## 7. Checks before you say "done"
 `pytest backend/tests/{engine,backtest,live}` passes · hand-computed tests included · engine runs with no network · identical
-`DEMO_MODE` runs · escalations always resolve (Claude, owner or default) · live client never blocks · `spacetime build` passes ·
+`DEMO_MODE` runs · escalations always resolve (Claude or default) · live client never blocks · `spacetime build` passes ·
 `python3 contracts/fixtures/check.py` passes after any contract change · backtest checks all green before any savings number.
 
 ## 8. Out of scope — do not do these

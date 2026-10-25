@@ -116,23 +116,22 @@
       "within_authority": true,
       "harm_score": 0.733,
       "rank": 2
-    },
-    {
-      "option_id": "ask_owner",
-      "summary": "Ask the owner",
-      "actions": [],
-      "projected": null,
-      "rule_breaks": [],
-      "within_authority": true,
-      "harm_score": null,
-      "rank": null
     }
   ],
   "default_option_id": "accept_overrun",
   "active_option_id": "accept_overrun",
   "deadline_sim_ts": "2026-07-18T01:35:00Z",
-  "status": "awaiting_owner",
-  "resolved_by": "claude",
-  "chosen_option_id": "deep_reduce_water_heater",
-  "rationale": "Water heater 1 at 20 % until 19:00 would hold the block better but is outside my authority, so the owner decides."
+  "status": "open",
+  "resolved_by": null,
+  "chosen_option_id": null,
+  "rationale": null,
+  "claude_attempts": [
+    {
+      "ts": "2026-07-18T01:20:00Z",
+      "option_id": "deep_reduce_water_heater",
+      "accepted": false,
+      "reason": "outside_authority",
+      "rationale": "The engine rejected this pick outside authority."
+    }
+  ]
 }

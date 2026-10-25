@@ -34,7 +34,7 @@ describe("browser row builders equal the SpacetimeDB fixtures (same mapping as b
     const esc = ws.filter((m) => m.type === "escalation").pop();
     if (ctx?.type !== "context" || esc?.type !== "escalation") throw new Error("fixture stream changed");
     expect(parsed(contextRow(ctx.data))).toEqual(parsed(liveContextTable[0]));
-    expect(parsed(escalationRow(esc.data))).toEqual(parsed(liveEscalationTable[0]));
+    expect(parsed(escalationRow(esc.data, esc.explanation, esc.explanation_source))).toEqual(parsed(liveEscalationTable[0]));
   });
 
   it("backtest rows round-trip", () => {

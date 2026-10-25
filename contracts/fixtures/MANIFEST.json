@@ -132,13 +132,6 @@
     ],
     "seam": "S2 via API"
   },
-  "ai_tools/propose_escalation_choice.json": {
-    "contract_section": "§4 AI tools",
-    "consumers": [
-      "Suyog (agent/tools.py tests)"
-    ],
-    "seam": "S2 via API"
-  },
   "ai_tools/propose_importance_change.json": {
     "contract_section": "§4 AI tools",
     "consumers": [
@@ -762,14 +755,6 @@
     ],
     "seam": "S1"
   },
-  "rest/post_escalation_resolve.json": {
-    "contract_section": "§2 REST",
-    "consumers": [
-      "Ashirwad (src/mocks REST handlers)",
-      "Suyog (API tests)"
-    ],
-    "seam": "S1"
-  },
   "rest/post_events_customers.json": {
     "contract_section": "§2 REST",
     "consumers": [
@@ -1125,15 +1110,6 @@
     ],
     "seam": "all"
   },
-  "shapes/escalation_awaiting_owner.json": {
-    "contract_section": "§1 Shared shapes",
-    "consumers": [
-      "Ashirwad",
-      "Suyog",
-      "Kritazya"
-    ],
-    "seam": "all"
-  },
   "shapes/escalation_expired_default.json": {
     "contract_section": "§1 Shared shapes",
     "consumers": [
@@ -1153,6 +1129,15 @@
     "seam": "all"
   },
   "shapes/escalation_open.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/escalation_rejected_claude.json": {
     "contract_section": "§1 Shared shapes",
     "consumers": [
       "Ashirwad",
@@ -1261,15 +1246,6 @@
     "seam": "all"
   },
   "shapes/proposal_pending.json": {
-    "contract_section": "§1 Shared shapes",
-    "consumers": [
-      "Ashirwad",
-      "Suyog",
-      "Kritazya"
-    ],
-    "seam": "all"
-  },
-  "shapes/proposal_resolve_escalation.json": {
     "contract_section": "§1 Shared shapes",
     "consumers": [
       "Ashirwad",

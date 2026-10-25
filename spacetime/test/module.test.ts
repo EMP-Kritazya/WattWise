@@ -192,3 +192,31 @@ describe('bounded tables', () => {
     expect(Math.min(...ids)).toBe(6);
   });
 });
+
+describe('G73 escalation notices', () => {
+  const row = () => ({
+    ...tableFixture('live_escalation')[0],
+    status: 'open', resolved_by: null,
+    claude_attempts_json: JSON.stringify([{ ts: '2026-07-18T01:01:00Z', option_id: 'accept_overrun', accepted: false, reason: 'outside_authority', rationale: null }]),
+    explanation: 'The engine rejected the choice; the safe fallback remains in force.',
+    explanation_source: 'template',
+  });
+
+  test('persists attempts and notification source on upsert', () => {
+    const notice = row();
+    call('publish_escalation', [JSON.stringify(notice)]);
+    expect(plain(h.db.live_escalation.iter())[0]).toEqual(notice);
+    call('publish_escalation', [JSON.stringify({...notice, explanation: 'Claude explained the verdict.', explanation_source: 'ai'})]);
+    expect(plain(h.db.live_escalation.iter())[0].explanation_source).toBe('ai');
+  });
+
+  test('rejects removed owner states and invalid notices atomically', () => {
+    for (const patch of [
+      {status: 'awaiting_owner'}, {resolved_by: 'owner'}, {explanation_source: 'owner'},
+      {claude_attempts_json: '{}'}, {claude_attempts_json: '[{"accepted":false,"reason":"anything"}]'},
+    ]) {
+      expect(() => call('publish_escalation', [JSON.stringify({...row(), ...patch})])).toThrow();
+      expect(plain(h.db.live_escalation.iter())).toEqual([]);
+    }
+  });
+});

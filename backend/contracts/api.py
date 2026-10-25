@@ -165,12 +165,6 @@ class CrowdEffectRequest(ContractModel):
     reason: str
 
 
-class EscalationResolveRequest(ContractModel):
-    """POST /api/escalations/{id}/resolve -> Escalation"""
-
-    option_id: str
-
-
 class Health(ContractModel):
     """GET /api/health"""
 

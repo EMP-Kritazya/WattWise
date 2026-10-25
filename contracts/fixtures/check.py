@@ -69,7 +69,7 @@ AGENT = E("concierge", "weather", "grid", "events", "claude", "engine")
 PEAK_MODE = E("minimize", "cap")
 REASON = E("avoid_new_peak", "stay_under_cap", "release_into_valley", "catch_up", "owner_override", "escalation_fallback",
            "escalation_choice")
-ESC_STATUS = E("open", "resolved", "awaiting_owner", "expired_default", "obsolete")
+ESC_STATUS = E("open", "resolved", "expired_default", "obsolete")
 PAUSED = Nl(E("manual", "hub_waiting", "sim_host_offline", "run_complete"))
 PHASE = E("service", "overnight", "closed")
 DAYS = E("all", "weekdays", "weekends")
@@ -77,7 +77,6 @@ PARAMS_BY_MODEL = {"fixed": set(), "cycling": {"duty_idle_pct", "duty_busy_pct"}
                    "demand_driven": {"idle_kw", "kw_per_order"}, "job": {"cycle_min"}}
 PROPOSAL_PAYLOAD = {"importance": {"device_id", "importance", "limits"}, "peak_cap": {"peak_mode", "peak_cap_kw"},
                     "undo_decision": {"decision_id"}, "customer_event": {"customers", "duration_min", "start_sim_ts"},
-                    "resolve_escalation": {"escalation_id", "option_id"},
                     "authority": {"enabled", "max_cap_overrun_kw", "max_extra_delay_min", "max_extra_reduce_min",
                                   "may_go_below_min_power"}}
 PHYSICAL_KEYS = {"indoor_temp_c", "box_temp_c", "dirty_racks", "ice_level_pct", "job_remaining_min", "orders_in_progress"}
@@ -147,8 +146,9 @@ SHAPES = {
                      "problem": O({"forecast_peak_kw": NUM, "target_kw": NUM, "excess_kw": NUM, "reason": STR}),
                      "options": L(R("EscalationOption")), "default_option_id": STR, "active_option_id": Nl(STR),
                      "deadline_sim_ts": TS, "status": ESC_STATUS,
-                     "resolved_by": Nl(E("claude", "owner", "default")), "chosen_option_id": Nl(STR),
-                     "rationale": Nl(STR)}),
+                     "resolved_by": Nl(E("claude", "default")), "chosen_option_id": Nl(STR),
+                     "rationale": Nl(STR), "claude_attempts": L(O({"ts": TS, "option_id": STR, "accepted": BOOL,
+                         "reason": Nl(E("outside_authority", "after_deadline")), "rationale": Nl(STR)}))}),
     "Meter": O({"ts": TS, "total_kw": NUM, "block_avg_kw": NUM, "block_start": TS, "month_peak_kw": NUM,
                 "on_peak_month_peak_kw": Nl(NUM), "peak_mode": PEAK_MODE, "peak_cap_kw": Nl(NUM), "target_kw": NUM,
                 "energy_kwh_today": NUM, "energy_kwh_month": NUM, "price_usd_per_kwh_now": NUM, "cost_usd_today": NUM,
@@ -161,7 +161,7 @@ SHAPES = {
     "LaneComparison": O({"ts": TS, "saved_today_usd": NUM, "peak_avoided_kw": NUM, "month_peak_without_kw": NUM,
                          "month_peak_with_kw": NUM}),
     "Proposal": O({"proposal_id": STR, "ts": TS,
-                   "kind": E("importance", "peak_cap", "authority", "undo_decision", "customer_event", "resolve_escalation"),
+                   "kind": E("importance", "peak_cap", "authority", "undo_decision", "customer_event"),
                    "payload": DICT, "summary": STR, "status": E("pending", "confirmed", "cancelled", "expired"),
                    "created_by": E("ai"), "confirmed_via": Nl(E("ui", "asi_one")), "expires_at": TS}),
     "Bill": O({"period": YM, "energy_kwh": NUM, "energy_cost_usd": NUM,
@@ -206,7 +206,8 @@ WS = {
     "backtest_month": O({"type": STR, "run_id": STR, "data": R("BacktestResult")}),
     "comparison": O({"type": STR, "data": R("LaneComparison")}),
     "proposal": O({"type": STR, "data": R("Proposal")}),
-    "escalation": O({"type": STR, "data": R("Escalation")}),
+    "escalation": O({"type": STR, "data": R("Escalation"), "explanation": STR,
+                     "explanation_source": E("ai", "template")}),
     "context": O({"type": STR, "data": R("Context")}),
     "agent_log": O({"type": STR, "data": R("AgentLog")}),
 }
@@ -244,7 +245,8 @@ ST = {
     "live_escalation": O({"escalation_id": STR, "lane": LANE, "status": ESC_STATUS, "block_start": TS, "updated_ts": TS,
                           "problem_json": STR, "options_json": STR, "default_option_id": STR, "active_option_id": Nl(STR),
                           "deadline_sim_ts": TS, "chosen_option_id": Nl(STR),
-                          "resolved_by": Nl(E("claude", "owner", "default")), "rationale": Nl(STR)}),
+                          "resolved_by": Nl(E("claude", "default")), "rationale": Nl(STR),
+                          "claude_attempts_json": STR, "explanation": STR, "explanation_source": E("ai", "template")}),
     "live_agent_log": O({"id": INT, "ts_real": TS, "from_agent": AGENT, "to_agent": AGENT,
                          "kind": E("request", "response", "post", "error"), "summary": STR}),
     "surge_request": O({"id": INT, "customers": INT, "duration_min": INT, "requested_by": STR, "created_at": TS,
@@ -512,11 +514,10 @@ SHAPE_FILES = {
     "command_ack_rejected.json": R("CommandAck"), "command_owner.json": R("Command"), "tariff.json": R("Tariff"),
     "proposal_peak_cap.json": R("Proposal"), "proposal_authority.json": R("Proposal"),
     "proposal_undo_decision.json": R("Proposal"), "proposal_customer_event.json": R("Proposal"),
-    "proposal_resolve_escalation.json": R("Proposal"),
     "decision.json": R("Decision"), "decision_owner_override.json": R("Decision"), "context.json": R("Context"),
     "warning_cap_unreachable.json": R("Warning"),
     "escalation_open.json": R("Escalation"), "escalation_resolved_claude.json": R("Escalation"),
-    "escalation_awaiting_owner.json": R("Escalation"), "escalation_expired_default.json": R("Escalation"),
+    "escalation_rejected_claude.json": R("Escalation"), "escalation_expired_default.json": R("Escalation"),
     "escalation_obsolete.json": R("Escalation"),
     "meter.json": R("Meter"), "tick_state_with.json": R("TickState"), "tick_state_without.json": R("TickState"),
     "lane_comparison.json": R("LaneComparison"), "proposal_pending.json": R("Proposal"),
@@ -578,7 +579,6 @@ REST_SPECS = {   # file -> (method, path regex, request spec, response spec)
     "post_context_crowd_effect": ("POST", r"^/api/context/crowd-effect$",
                                   O({"value": E("none", "small", "medium", "large"), "reason": STR}), R("Ok")),
     "get_escalations": ("GET", r"^/api/escalations\?status=open$", None, L(R("Escalation"))),
-    "post_escalation_resolve": ("POST", r"^/api/escalations/e_\d{4}/resolve$", O({"option_id": STR}), R("Escalation")),
     "post_agent_log": ("POST", r"^/api/agent-log$", R("AgentLog"), R("Ok")),
     "get_health": ("GET", r"^/api/health$", None,
                    O({"ok": BOOL, "kitchen_impl": E("fake", "real"), "live_transport": E("spacetime", "ws"),
@@ -605,7 +605,7 @@ FACADE_SPECS = {   # file -> (call, args spec, returns spec)
     "set_preferences.json": ("set_preferences", O({"text": STR}), None),
     "open_escalations.json": ("open_escalations", O({}), L(R("Escalation"))),
     "resolve_escalation.json": ("resolve_escalation", O({"escalation_id": STR, "option_id": STR,
-                                                         "resolved_by": E("claude", "owner", "default"),
+                                                         "resolved_by": E("claude"),
                                                          "rationale": Nl(STR)}), R("Escalation")),
     "forecast.json": ("forecast", O({"horizon_min": INT}), L(NUM)),
     "what_if.json": ("what_if", O({"device_id": STR, "action": ACTION, "value": Nl(INT), "at": TS}), R("Effect")),
@@ -624,7 +624,6 @@ AI_SPECS = {
     "propose_importance_change.json": (O({"device_id": STR, "importance": IMPORTANCE, "limits": R("ImportanceLimits"),
                                           "summary": STR}), R("Proposal")),
     "propose_peak_cap_change.json": (O({"peak_mode": PEAK_MODE, "peak_cap_kw": Nl(NUM), "summary": STR}), R("Proposal")),
-    "propose_escalation_choice.json": (O({"escalation_id": STR, "option_id": STR, "summary": STR}), R("Proposal")),
     "propose_undo.json": (O({"decision_id": STR, "summary": STR}), R("Proposal")),
     "propose_customer_event.json": (O({"customers": INT, "duration_min": INT, "start_sim_ts": TS, "summary": STR}),
                                     R("Proposal")),
@@ -1162,10 +1161,9 @@ def harm(breaks, devices, auth):
 def check_escalation(e, devices, auth, cap):
     w = "escalation %s (%s)" % (e["escalation_id"], e["status"])
     ids = [o["option_id"] for o in e["options"]]
-    alts = e["options"][:-1]
-    if not (1 <= len(alts) <= 3) or ids[-1] != "ask_owner" or ids.count("ask_owner") != 1 or "accept_overrun" not in ids or \
-            len(set(ids)) != len(ids):
-        fail(w, "1-3 alternatives (accept_overrun always) plus ask_owner last")
+    alts = e["options"]
+    if not (1 <= len(alts) <= 3) or "accept_overrun" not in ids or len(set(ids)) != len(ids):
+        fail(w, "1-3 evaluated alternatives, accept_overrun always, unique ids")
     for o in alts:
         if not re.match(r"^(accept_overrun|deep_reduce_[a-z_]+|extend_delay_[a-z_]+)$", o["option_id"]):
             fail(w, "option id %s" % o["option_id"])
@@ -1186,7 +1184,7 @@ def check_escalation(e, devices, auth, cap):
                     fail(w, "cap_overrun amount = projected peak - target, unit kW, no device")
             elif b["kind"] == "below_min_power":
                 exp = exp and auth["may_go_below_min_power"]
-                if devices[b["device_id"]]["type"]["category"] == "refrigeration" or b["unit"] != "pct":
+                if b["unit"] != "pct":
                     fail(w, "food-safety option generated / unit pct")
             elif b["kind"] in ("past_deadline", "over_max_delay"):
                 exp = exp and b["amount"] <= auth["max_extra_delay_min"]
@@ -1204,17 +1202,13 @@ def check_escalation(e, devices, auth, cap):
             fail(w, "%s within_authority should be %s" % (o["option_id"], exp))
         if o["harm_score"] is None or not near(o["harm_score"], harm(o["rule_breaks"], devices, auth), 0.002):
             fail(w, "%s harm_score must be sum(amount / tolerance)" % o["option_id"])
-    ask = e["options"][-1]
-    if ask["projected"] is not None or ask["actions"] or ask["rule_breaks"] or not ask["within_authority"] or \
-            ask["harm_score"] is not None or ask["rank"] is not None:
-        fail(w, "ask_owner: no actions, no projection, harm_score and rank null")
     order = sorted(alts, key=lambda o: (not o["within_authority"], o["harm_score"], o["projected"]["cost_delta_usd"],
                                         len({a["device_id"] for a in o["actions"]}), o["option_id"]))
     if [o["rank"] for o in order] != list(range(1, len(alts) + 1)):
         fail(w, "rank: within authority first, then harm, cost, fewer devices, option_id")
     top = order[0]
-    if e["default_option_id"] != (top["option_id"] if top["within_authority"] else "ask_owner"):
-        fail(w, "default must be rank 1 if within authority, else ask_owner")
+    if e["default_option_id"] != (top["option_id"] if top["within_authority"] else "accept_overrun"):
+        fail(w, "default must be rank 1 if within authority, else accept_overrun")
     p = e["problem"]
     acc = next(o for o in alts if o["option_id"] == "accept_overrun")
     if not near(p["excess_kw"], p["forecast_peak_kw"] - p["target_kw"], 0.06) or p["target_kw"] != cap or \
@@ -1228,22 +1222,24 @@ def check_escalation(e, devices, auth, cap):
     if pts(e["updated_ts"]) < ts:
         fail(w, "updated_ts before ts")
     st = e["status"]
-    fallback = None if e["default_option_id"] == "ask_owner" else e["default_option_id"]
-    if st in ("open", "awaiting_owner", "expired_default", "obsolete") and e["active_option_id"] != fallback:
-        fail(w, "active_option_id must stay the fallback (null for ask_owner) until a resolve")
+    fallback = e["default_option_id"]
+    if st in ("open", "expired_default", "obsolete") and e["active_option_id"] != fallback:
+        fail(w, "active_option_id must stay the fallback until a resolve")
     if st == "open" and (e["resolved_by"] or e["chosen_option_id"] or e["rationale"]):
         fail(w, "open escalation has a resolution")
     if st == "resolved":
-        if e["chosen_option_id"] not in ids or e["chosen_option_id"] == "ask_owner" or \
-                e["resolved_by"] not in ("claude", "owner") or e["active_option_id"] != e["chosen_option_id"]:
-            fail(w, "resolved: chosen option (not ask_owner) by claude/owner, now active")
+        if e["chosen_option_id"] not in ids or e["resolved_by"] != "claude" or e["active_option_id"] != e["chosen_option_id"]:
+            fail(w, "resolved: chosen option by claude, now active")
         if e["resolved_by"] == "claude" and not next(o for o in e["options"] if o["option_id"] == e["chosen_option_id"])[
                 "within_authority"]:
-            fail(w, "claude resolved outside authority (must be awaiting_owner)")
-    if st == "awaiting_owner":
-        o = next((o for o in e["options"] if o["option_id"] == e["chosen_option_id"]), None)
-        if e["resolved_by"] != "claude" or o is None or (o["within_authority"] and o["option_id"] != "ask_owner"):
-            fail(w, "awaiting_owner holds Claude's outside-authority pick or ask_owner")
+            fail(w, "claude resolved outside authority")
+    if sum(pts(a["ts"]) < pts(e["deadline_sim_ts"]) for a in e["claude_attempts"]) > 2:
+        fail(w, "Claude gets one retry")
+    for attempt in e["claude_attempts"]:
+        if attempt["option_id"] not in ids or attempt["accepted"] != (attempt["reason"] is None):
+            fail(w, "attempt records a valid option and acceptance/rejection reason")
+        if attempt["accepted"] and pts(attempt["ts"]) >= pts(e["deadline_sim_ts"]):
+            fail(w, "accepted Claude attempt after deadline")
     if st == "expired_default" and (e["resolved_by"] != "default" or pts(e["updated_ts"]) < pts(e["deadline_sim_ts"])):
         fail(w, "expired_default: resolved_by default, at or after the deadline")
     if st == "obsolete" and (e["resolved_by"] is not None or e["chosen_option_id"] is not None):
@@ -1950,9 +1946,9 @@ def crossref_pass(store, ev, mrun, idx, midx, tariff):
                 if (o["status"] == "pending") != (o["confirmed_via"] is None) and o["status"] in ("pending", "confirmed"):
                     fail(path, "confirmed_via must be null iff pending")
             if set(o) == set(SHAPES["Snapshot"][1]):
-                if any(e["status"] not in ("open", "awaiting_owner") for e in o["open_escalations"]) or \
+                if any(e["status"] != "open" for e in o["open_escalations"]) or \
                         len(o["recent_decisions"]) > 20:
-                    fail(path, "snapshot: open_escalations open/awaiting_owner, recent_decisions <= 20")
+                    fail(path, "snapshot: open_escalations open, recent_decisions <= 20")
             if set(o) == set(SHAPES["Meter"][1]) or set(o) == set(SHAPES["KitchenConfig"][1]):
                 if o["peak_mode"] == "cap" and o["peak_cap_kw"] is None and "_422" not in path and "rule_error" not in path:
                     fail(path, "peak_mode cap needs peak_cap_kw")
@@ -1975,7 +1971,8 @@ def crossref_pass(store, ev, mrun, idx, midx, tariff):
             if "problem_json" in o and "options_json" in o:
                 e = ev["escalations"].get(o["escalation_id"])
                 if e is None or json.loads(o["problem_json"]) != e["problem"] or json.loads(o["options_json"]) != e["options"] \
-                        or any(o[k] != e[k] for k in o if not k.endswith("_json")):
+                        or json.loads(o["claude_attempts_json"]) != e["claude_attempts"] \
+                        or any(o[k] != e[k] for k in o if not k.endswith("_json") and k not in ("explanation", "explanation_source")):
                     fail(path, "live_escalation row != the escalation re-keyed")
     if seen_esc < 10:
         fail("escalations", "expected escalation examples across shapes/rest/facade/ai_tools/convex")
@@ -2040,9 +2037,8 @@ def crossref_pass(store, ev, mrun, idx, midx, tariff):
         fail("rest/post_sim_control_next_day.json", "next_day: run_days + 1, overnight, playing")
     ce = store["ai_tools/choose_escalation_option.json"]
     e_ = store["shapes/escalation_open.json"]
-    if ce["input_enum"]["option_id"] != [o["option_id"] for o in e_["options"]
-                                         if o["within_authority"] and o["option_id"] != "ask_owner"]:
-        fail("ai_tools/choose_escalation_option.json", "Claude is offered only the within_authority options, never ask_owner")
+    if ce["input_enum"]["option_id"] != [o["option_id"] for o in e_["options"]]:
+        fail("ai_tools/choose_escalation_option.json", "Claude sees every evaluated option with its authority flag")
     w_ = store["shapes/warning_cap_unreachable.json"]
     if w_["data"]["unavoidable_kw"] <= w_["data"]["target_kw"]:
         fail("shapes/warning_cap_unreachable.json", "cap_unreachable: unavoidable_kw above the target")

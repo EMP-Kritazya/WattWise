@@ -164,6 +164,9 @@ const live_escalation = table(
     chosen_option_id: t.option(t.string()),
     resolved_by: t.option(t.string()),
     rationale: t.option(t.string()),
+    claude_attempts_json: t.string(),
+    explanation: t.string(),
+    explanation_source: t.string(),
   }
 );
 
@@ -610,10 +613,28 @@ export const publish_escalation = spacetimedb.reducer({ escalation_json: t.strin
   requireRuntime(ctx);
   const w = 'publish_escalation';
   const o = parseObject(escalation_json, w);
+  const status = str(o, 'status', w);
+  if (!['open', 'resolved', 'expired_default', 'obsolete'].includes(status)) throw new SenderError(`${w}.status: invalid escalation status`);
+  const resolvedBy = optStr(o, 'resolved_by', w);
+  if (resolvedBy !== undefined && resolvedBy !== 'claude' && resolvedBy !== 'default') throw new SenderError(`${w}.resolved_by: claude | default | null`);
+  const source = str(o, 'explanation_source', w);
+  if (source !== 'ai' && source !== 'template') throw new SenderError(`${w}.explanation_source: ai | template`);
+  const attemptsJson = jsonCol(o, 'claude_attempts_json', w);
+  const attempts = JSON.parse(attemptsJson);
+  if (!Array.isArray(attempts)) throw new SenderError(`${w}.claude_attempts_json: expected an array`);
+  for (const attempt of attempts) {
+    if (!attempt || typeof attempt !== 'object' || Array.isArray(attempt)) throw new SenderError(`${w}.claude_attempts_json: expected attempt objects`);
+    str(attempt, 'ts', w);
+    str(attempt, 'option_id', w);
+    const accepted = bool(attempt, 'accepted', w);
+    const reason = optStr(attempt, 'reason', w);
+    optStr(attempt, 'rationale', w);
+    if (accepted ? reason !== undefined : !['outside_authority', 'after_deadline'].includes(reason ?? '')) throw new SenderError(`${w}.claude_attempts_json: invalid verdict reason`);
+  }
   const row = {
     escalation_id: str(o, 'escalation_id', w),
     lane: lane(o, w),
-    status: str(o, 'status', w),
+    status,
     block_start: str(o, 'block_start', w),
     updated_ts: str(o, 'updated_ts', w),
     problem_json: jsonCol(o, 'problem_json', w),
@@ -622,8 +643,11 @@ export const publish_escalation = spacetimedb.reducer({ escalation_json: t.strin
     active_option_id: optStr(o, 'active_option_id', w),
     deadline_sim_ts: str(o, 'deadline_sim_ts', w),
     chosen_option_id: optStr(o, 'chosen_option_id', w),
-    resolved_by: optStr(o, 'resolved_by', w),
+    resolved_by: resolvedBy,
     rationale: optStr(o, 'rationale', w),
+    claude_attempts_json: attemptsJson,
+    explanation: str(o, 'explanation', w),
+    explanation_source: source,
   };
   if (ctx.db.live_escalation.escalation_id.find(row.escalation_id)) ctx.db.live_escalation.escalation_id.update(row);
   else ctx.db.live_escalation.insert(row);

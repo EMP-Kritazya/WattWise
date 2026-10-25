@@ -127,7 +127,6 @@ REST: list[tuple[str, str, Optional[Check], Check]] = [
     ("POST", "/api/context/crowd-effect", v(api.CrowdEffectRequest), v(api.Ok)),
     ("POST", "/api/context", v(shapes.PartialContext), v(api.Ok)),
     ("GET", "/api/escalations", None, v(list[shapes.Escalation])),
-    ("POST", "/api/escalations/", v(api.EscalationResolveRequest), v(shapes.Escalation)),
     ("POST", "/api/agent-log", v(shapes.AgentLog), v(api.Ok)),
     ("GET", "/api/health", None, v(api.Health)),
 ]
@@ -168,7 +167,6 @@ TOOLS: dict[str, Check] = {
     "get_forecast": lambda o: forecast8(o["output"]),
     "get_kitchen_state": lambda o: snapshot(o["output"]),
     "propose_customer_event": at("output", shapes.Proposal),
-    "propose_escalation_choice": at("output", shapes.Proposal),
     "propose_importance_change": at("output", shapes.Proposal),
     "propose_peak_cap_change": at("output", shapes.Proposal),
     "propose_undo": at("output", shapes.Proposal),

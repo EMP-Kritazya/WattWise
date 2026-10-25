@@ -308,6 +308,7 @@ Always 0 ≤ `power_kw` ≤ `rated_kw`.
 - **Q5, Agent Network:** the contract's agent names don't include `owner`, yet UI.md's graph has Claude and the engine "as nodes". Should owner messages (escalation answers) appear on the graph at all?
 - **Q6, Missing docs:** CLAUDE.md still points to `docs/TIMELINE.md` and `docs/DECISIONS.md`, which were removed. Where do gates and merge order live now?
 - **Q7, Branch name:** ASHIRWAD.md says to branch from `architecture-separation`, which doesn't exist on GitHub. Is `main` at `0dc6a34` the intended base?
+- **Q8, Eval artifact:** the Evaluation Lab (`/eval`, `docs/Claude_EVAL.md` §11) reads a proposed `EvalArtifact` shape (`src/types/eval.ts`, marked STUB) from an illustrative placeholder (`src/mocks/evalStub.ts`). Will the eval runner publish this shape, or a different one? And how will it reach the browser: a static artifact file shipped with the build, or a REST endpoint?
 
 ## 8. Merging with Suyog later (not now)
 Nothing is merged in this phase. When Suyog's backend is ready and the team decides to integrate:
