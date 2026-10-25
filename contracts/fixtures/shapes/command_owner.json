@@ -1,10 +1,10 @@
 {
-  "command_id": "c_0021",
+  "command_id": "c_0038",
   "lane": "with",
   "ts": "2026-07-18T02:30:00Z",
   "device_id": "water_heater_1",
   "action": "reduce",
   "value": 10,
-  "decision_id": null,
+  "decision_id": "d_0035",
   "issued_by": "owner"
 }

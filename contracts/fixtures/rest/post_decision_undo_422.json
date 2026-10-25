@@ -1,0 +1,9 @@
+{
+  "method": "POST",
+  "path": "/api/decisions/d_0007/undo",
+  "status": 422,
+  "request": null,
+  "response": {
+    "detail": "d_0007: only an executed reduce or delay whose command is still in force can be undone"
+  }
+}

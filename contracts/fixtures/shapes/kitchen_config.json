@@ -103,5 +103,6 @@
     "may_go_below_min_power": false
   },
   "tariff_id": "demo_tariff_v1",
+  "run_days": 1,
   "seed": 42
 }

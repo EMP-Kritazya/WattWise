@@ -16,7 +16,7 @@
     "power_pct": 100,
     "source": "simulated",
     "physical": {
-      "box_temp_c": 2.0
+      "box_temp_c": 3.2
     }
   }
 }

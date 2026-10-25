@@ -5,10 +5,10 @@
     "command": {
       "command_id": "c_0001",
       "lane": "with",
-      "ts": "2026-07-18T01:05:00Z",
-      "device_id": "dishwasher_1",
-      "action": "delay",
-      "value": 50,
+      "ts": "2026-07-18T00:35:00Z",
+      "device_id": "water_heater_1",
+      "action": "reduce",
+      "value": 40,
       "decision_id": "d_0001",
       "issued_by": "engine"
     },

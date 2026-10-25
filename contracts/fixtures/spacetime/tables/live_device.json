@@ -81,7 +81,7 @@
     "rated_kw": 1.6,
     "power_pct": 0,
     "source": "simulated",
-    "physical_json": "{\"ice_level_pct\":45,\"job_remaining_min\":0}"
+    "physical_json": "{\"ice_level_pct\":55,\"job_remaining_min\":0}"
   },
   {
     "key": "without:fryer_1",
@@ -132,12 +132,12 @@
     "type_id": "dishwasher",
     "name": "Dishwasher 1",
     "importance": "deferrable",
-    "state": "off",
-    "power_kw": 0.0,
+    "state": "running_job",
+    "power_kw": 6.0,
     "rated_kw": 6.0,
-    "power_pct": 0,
+    "power_pct": 100,
     "source": "simulated",
-    "physical_json": "{\"dirty_racks\":7,\"job_remaining_min\":0}"
+    "physical_json": "{\"dirty_racks\":0,\"job_remaining_min\":27}"
   },
   {
     "key": "without:water_heater_1",
@@ -174,12 +174,12 @@
     "type_id": "hvac",
     "name": "HVAC 1",
     "importance": "flexible",
-    "state": "on",
-    "power_kw": 9.76,
+    "state": "reduced",
+    "power_kw": 4.8,
     "rated_kw": 12.0,
-    "power_pct": 81,
+    "power_pct": 40,
     "source": "simulated",
-    "physical_json": "{\"indoor_temp_c\":25.6}"
+    "physical_json": "{\"indoor_temp_c\":23.6}"
   },
   {
     "key": "with:hvac_2",
@@ -189,11 +189,11 @@
     "name": "HVAC 2",
     "importance": "flexible",
     "state": "reduced",
-    "power_kw": 5.4,
+    "power_kw": 4.8,
     "rated_kw": 12.0,
-    "power_pct": 45,
+    "power_pct": 40,
     "source": "simulated",
-    "physical_json": "{\"indoor_temp_c\":25.6}"
+    "physical_json": "{\"indoor_temp_c\":23.6}"
   },
   {
     "key": "with:walk_in_cooler_1",
@@ -207,7 +207,7 @@
     "rated_kw": 3.5,
     "power_pct": 100,
     "source": "simulated",
-    "physical_json": "{\"box_temp_c\":2.0}"
+    "physical_json": "{\"box_temp_c\":3.2}"
   },
   {
     "key": "with:reach_in_fridge_1",
@@ -249,7 +249,7 @@
     "rated_kw": 1.6,
     "power_pct": 0,
     "source": "simulated",
-    "physical_json": "{\"ice_level_pct\":45,\"job_remaining_min\":0}"
+    "physical_json": "{\"ice_level_pct\":55,\"job_remaining_min\":0}"
   },
   {
     "key": "with:fryer_1",
@@ -305,7 +305,7 @@
     "rated_kw": 6.0,
     "power_pct": 100,
     "source": "simulated",
-    "physical_json": "{\"dirty_racks\":0,\"job_remaining_min\":20}"
+    "physical_json": "{\"dirty_racks\":2,\"job_remaining_min\":0}"
   },
   {
     "key": "with:water_heater_1",
@@ -314,12 +314,12 @@
     "type_id": "water_heater",
     "name": "Water heater 1",
     "importance": "flexible",
-    "state": "reduced",
-    "power_kw": 1.8,
+    "state": "on",
+    "power_kw": 4.5,
     "rated_kw": 4.5,
-    "power_pct": 40,
+    "power_pct": 100,
     "source": "simulated",
-    "physical_json": "{\"box_temp_c\":54.0}"
+    "physical_json": "{\"box_temp_c\":60.6}"
   },
   {
     "key": "with:lights_1",

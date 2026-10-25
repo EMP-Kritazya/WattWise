@@ -1,52 +1,107 @@
 # contracts/fixtures — shared fake data
 
-**FAKE DATA — not measured, not live.** Every number comes from a toy simulation plus a scripted "engine" in
-`generate.py`. Engine internals are TBD (docs/design/ENGINE.md), so these are illustrative values, not engine output.
-Backtest and bill numbers here are invented and must never be shown as savings (`backtest-auditor` rule).
+**FAKE DATA — not measured, not live.** Every number comes from `generate.py`: a toy simulation of the Demo Café (customers +
+appliance physics, standing in for `frontend/src/sim`) and a toy rule-following controller for the `with` lane (standing in for
+the engine, whose internals are TBD). They are illustrative values, not engine output. Bill and backtest numbers are invented and
+must never be shown as savings (`backtest-auditor` rule).
 
-Owner: Kritazya. Changes go by PR. Built by the `fixture-builder` subagent from `docs/CONTRACTS.md` (prose; there are no
-`backend/contracts/` models yet). Every former gap now has a demo decision in CONTRACTS.md (`/Main_Gaps.md`); see `GAPS.md`.
+Owner: Kritazya. Changes go by PR. Built by the `fixture-builder` subagent from `docs/CONTRACTS.md`, validated against the
+Pydantic models in `backend/contracts/`. Readings the fixtures had to choose are in `GAPS.md`.
 
 ## Regenerate and check
 ```
-python3 contracts/fixtures/generate.py      # seed 42, stdlib only, identical bytes on every run
-python3 contracts/fixtures/check.py         # shapes, enums, invariants, cross-refs, determinism; non-zero on failure
+python3 contracts/fixtures/generate.py                    # seed 42, stdlib only, identical bytes on every run (~7 s)
+python3 contracts/fixtures/check.py                       # everything below + determinism + Pydantic via backend/.venv (~25 s)
+python3 contracts/fixtures/generate.py --days 7 --out /tmp/run7   # every tick of a 1..7-day run (not committed)
+cd backend && .venv/bin/python -m contracts.check_fixtures --verbose   # the shape-only validator
 ```
-Never hand-edit a JSON file: change `generate.py`, regenerate, run `check.py`.
+Never hand-edit a JSON file: change `generate.py`, regenerate, run `check.py`. `CHECK_QUICK=1` skips the Pydantic and
+regeneration passes for local iteration only.
 
-## The scenario (Demo Café, `scenario/demo_cafe/`)
-Friday 17 July 2026, 17:30 to 19:30 America/Los_Angeles (UTC in data, start `2026-07-18T00:30:00Z`), 120 ticks of 1 sim
-minute, both lanes, `peak_mode: "cap"` at 40 kW (Meter `target_kw` = 40). Tariff `demo_tariff_v1` (`shapes/tariff.json`,
-label `illustrative`): the whole window is in the 16:00–21:00 peak period, so every Meter price is $0.38/kWh and both demand
-charges ($20/kW max + $8/kW peak-period) apply. Context grid prices are only a market signal and never bill anything.
-Recorded context (hot evening, high grid prices, Giants game from `demo_events`, crowd `medium`) is posted before tick 1
-and refreshed at tick 61. A judge surge (+40 customers, 60 min) is requested at tick 30 and delivered once in `sim_tick` 31
-(`s_0001`). Routine `with`-lane decisions happen only on ticks where `tick_id % 5 == 0`. Escalation `e_0001` opens at tick 60
-(deadline = ts + 15 min, capped at block_start − 5 min). The scenario runs outside demo mode, so the clock slows to 1×
-(`slowed_reason: "escalation"`) instead of pausing. Claude chooses `extend_delay_dishwasher` (rule breaks `past_deadline` 20 min +
-`over_max_delay` 15 min, both within authority); its new Command is issued at tick 61 and delivered at 62. The `without` lane
-reaches a 49.2 kW block; every closed `with` block stays at or under 40 kW. All HVAC units share one dining-room temperature.
-`scenario.json` has the timeline, the tariff and the fake starting stats; `index.json` lists the streams and every id.
+## One run, three views
+Tick *n* is the simulated minute starting at `2026-07-18T00:30:00Z + (n − 1) min` (Friday 17 July 2026, 17:30
+America/Los_Angeles; UTC in data). The same physical run (same seed, same ids) feeds:
+- **the evening scenario** (`scenario/demo_cafe/`, and the top-level `hub_protocol/`, `facade/`, `spacetime/`, `ws/` streams):
+  ticks 1..120, 17:30–19:30, `run_days: 1`, every tick published;
+- **the multi-day scenario** (`scenario/demo_cafe_multiday/`): segments of the run with `run_days: 2`, through day 2's close;
+- **`generate.py --days N`**: every tick of an N-day run (N ≤ 7), for engine edge tests. `--days 2` equals the committed
+  multi-day segments line for line (`check.py` verifies it).
 
-## Files
+## The evening (Demo Café, `scenario/demo_cafe/`)
+`peak_mode: "cap"` at 40 kW (Meter `target_kw` 40), tariff `demo_tariff_v1` (`illustrative`): the window is in the
+16:00–21:00 peak period, so energy is $0.38/kWh and both demand charges ($20/kW month max, $8/kW peak-period max) apply.
+- **Warm-up:** both lanes start from `history/warmup_demo_cafe.json` (`month_to_date: null`), so the first Meter continues the
+  month the engine metered from the July history blocks: month peak 42.54 kW (Saturday 11 July party night), 247.8 kWh today
+  before 17:30. `check.py` recomputes it from the history.
+- **Context:** recorded (hot evening, high grid prices, Giants game from `demo_events`, crowd `medium`) posted at tick 1 and
+  refreshed at tick 61; later posts every 300 sim min (`scenario.json.context_post_ticks`). `sim_tick.inputs` copies the context
+  in force, which copies `history/daily_inputs.json`.
+- **Surge:** `request_surge(40, 60)` at tick 30, delivered once in `sim_tick` 31 (`s_0001`).
+- **Engine moves** (`with` lane, decision ticks only, `reason_code: stay_under_cap` / `catch_up`): holds of the ice machine
+  and dishwasher, reductions of HVAC, water heater and walk-in, each ≤ 30 min, 30-min cooldown, restored at the limit.
+- **Escalation `e_0001`** opens at tick 50 (18:20) for the 18:45 block (forecast 48.0 kW after every in-rules move). Options:
+  `accept_overrun` (8.0 kW over, outside authority), `deep_reduce_hvac` (keep both HVAC units reduced past 30 min, outside),
+  `extend_delay_dishwasher` (hold 10 min past `max_delay_min`, cap overrun 2.0 kW, within authority, rank 1) + `ask_owner`.
+  The fallback (rank 1) is applied **in the same step** (`d_0010`, `escalation_fallback`, delivered in tick 51); Claude
+  answers between ticks 50 and 51, choosing the same option → `resolved`, no extra command. The clock never slows.
+- **Owner click:** after tick 118 the owner presses "start dishwasher" while it runs in both lanes: `owner_command` on both
+  lanes (without first), `owner_override` decisions `d_0019`/`d_0020` in step 119, both acks `ok: false, job_running` in tick 120.
+- **Result at 19:30:** without lane month peak 47.8 kW (a new July peak), with lane 42.54 kW (unchanged; its only block over
+  40 kW is the escalation's 18:45 block at 41.6 kW, inside the accepted 2.0 kW); saved today $149.12, peak avoided 5.26 kW.
+  Tick 120 issues two restores that are delivered in tick 121, outside the evening files.
+
+## The multi-day run (`scenario/demo_cafe_multiday/`, `run_days: 2`)
+| Segment | Ticks | Phase | Published |
+|---|---|---|---|
+| Fri 21:30 → 22:00 close | 241–270 | `service`, day 1 | every tick |
+| Fri 22:00 → Sat 10:00 | 271–990 | `overnight` (`fast_forward: true`, `is_open: false`) | hub + step stream every tick; `rows_stream`, ws `tick`/`comparison`/`clock` and `clock_stream` once per closed 15-min block |
+| Sat 10:00 → 13:30 (open, lunch, `s_0002` +35 at 12:15) | 991–1200 | `service`, day 2 | every tick |
+| *gap* | 1201–1695 | — | omitted to keep the size down (they are in `--days 2`) |
+| Sat 21:45 → 22:00 close | 1696–1710 | `service`, day 2 | every tick |
+| after 22:00 | — | `closed`, `paused_reason: run_complete`, `playing: false` | final clock |
+Local midnight is tick 391: `energy_kwh_today` / `cost_usd_today` restart from that minute; month counters continue. Overnight
+the kitchen draws refrigeration, ice machine and water-heater standby, 10 % night lighting, cooking off 15 min after close and
+preheating 30 min before open, HVAC setback (+4 °C). `day_index` goes 1 → 2 at the 10:00 open. The streams start with the clock
+and the context in force at tick 240; commands across the gap are not visible. Files: `server_to_hub.jsonl`,
+`hub_to_server.jsonl`, `step_stream.jsonl`, `rows_stream.jsonl` (publish_ticks payloads), `ws_stream.jsonl`,
+`clock_stream.jsonl` (`set_clock` args), `scenario.json`, `index.json` (segments, ids, midnight and open ticks).
+
+## History (`history/`, G59)
+- `warmup_demo_cafe.json` — a `WarmUpHistory` (`fixture_synthetic` / `simulated`, `dataset_id: fixture_synthetic_demo_cafe_v1`,
+  `scale: 1.0`, `day_offset: 0`, `month_to_date: null`): 15-min `avg_kw` (3 decimals) for each of the 12 devices, 2026-05-17
+  00:00 → 2026-07-17 17:30 local (71,112 blocks, sorted by time then roster order, every block ends ≤ `end`). It is the same toy
+  simulation running uncontrolled: open 10:00–22:00, lunch and dinner rush, weekends busier, a June heat wave, one event night
+  (Fri 26 June, Giants game), three booked parties, refrigeration cycling all night, lights 10 % when closed. Monthly peaks: May
+  41.99, June 44.14, July (to the 17th) 42.54 kW; the Friday `minimize` target from the 4 previous Fridays is 39.7 kW.
+- `daily_inputs.json` — per local day (2026-05-17 … 2026-07-23 = history + 7 live days): hourly outdoor temperature and grid
+  price, price stress, `crowd_effect`, events, scheduled surges (with `surge_id` on live days), plus the customer profile and
+  weekday factors. Fixture-only (no contract shape). `check.py` verifies every `sim_tick.inputs` and context post against it.
+- `rest/get_backtest.json` (+ `facade/run_backtest.json`, `shapes/backtest_result.json`, Convex `backtest_results`): fake
+  `BacktestResult` for 2026-06 and 2026-07 (July partial, to the 17th 17:30) — the history billed on `demo_tariff_v1`
+  (`without`, equal to a raw re-bill), a fixed timer for jobs, and a toy replay plant for `with` (energy conserved, 0 rule
+  violations). Dataset label: "Simulated fixture data … not ComStock, not a measured bill". Never present it as savings.
+
+## Files and who loads them
 | Folder | What | Consumed by |
 |---|---|---|
-| `shapes/` | One example per §1 shape. Variants: kitchen_config cap + `kitchen_config_minimize`; `tariff`; hub_report/tick_state with + without; command (engine) + `command_owner`; command_ack ok / clamped (`ok: true`, `out_of_range`) / rejected (`ok: false`, `job_running`); escalation open / resolved_by claude / awaiting_owner / expired_default; one Proposal per kind (`proposal_pending` / `proposal_confirmed` = importance, plus `proposal_<kind>`); device + device_measured. Escalation variants other than "resolved" are alternative outcomes of `e_0001`, not part of the stream. | everyone (generated types, tests) |
-| `hub_protocol/` | §8 messages, one file per type (+ `sim_tick_replay.json` with `replay: true`), plus `server_to_hub.jsonl` (hub_welcome, sim_build, 120 sim_ticks with `replay: false`) and `hub_to_server.jsonl` (hub_hello, 120 hub_reports; each lane's HubReport carries its own `acks`) | Ashirwad: `src/mocks/mockHubServer.ts` plays `server_to_hub.jsonl`; the sim's determinism test compares against `hub_to_server.jsonl` · Suyog: `fakes/fake_hub_client.py` answers each `sim_tick` with the matching line of `hub_to_server.jsonl` · Kritazya: HubReports as engine input |
-| `rest/` | One file per §2 endpoint: `{method, path, status, request, response}` (+ `_422` / `_404` error examples, `{detail}` bodies) | Ashirwad: `src/mocks` REST handlers (match method + path) · Suyog: API tests |
-| `ws/` | One file per `/ws` message type + `stream.jsonl` (clock, context, agent_log, then per tick: tick without, tick with, comparison, decisions, escalations; slowed / restored clock around the escalation) | Ashirwad: `/ws` fallback mock · Suyog: API tests |
-| `facade/` | §3 calls as `{call, args, returns}` (`raises` on `set_importance_rule_error`, `set_peak_cap_rule_error`) + `step_stream.jsonl`: per tick and lane `{args: {minutes, hub_report}, returns: TickState}` | Suyog: `fakes/fake_kitchen.py` (look up `step` by `hub_report.lane` + `tick_id`; other calls return `returns`) · Kritazya: engine tests |
-| `ai_tools/` | §4 tools `{tool, input, output}`: every read tool, `explain_decision`, every `propose_*` (output Proposal whose payload = input without `summary`), and the two bounded tools (`input_enum` lists the allowed values) | Suyog: `agent/tools.py` tests |
-| `spacetime/` | `tables/<table>.json` rows (field names exactly as §5; `live_device.key` = `<lane>:<device_id>`, single-row tables `id: 0`, `live_tick.forecast_kw_json` keeps the latest forecast with `forecast_ts`), `reducers/<reducer>.json` `{reducer, args}` (the HTTP JSON args array), `rows_stream.jsonl` = the `publish_ticks` payload per tick (object form; the reducer arg is its JSON string) | Ashirwad: mock live hook replays `rows_stream.jsonl` and seeds the other tables · Kritazya: `fakes/fake_live.py`, `spacetime/seed.ts` |
-| `convex/` | `tables/<table>.json` documents (no `_id` / `_creationTime`), `functions/<fn>.json` `{function, type, args, returns}` for every §6 function | Suyog: `store/` memory fallback seed, Convex tests |
-| `agents/` | §7 request/response models (`region: "caiso_np15"`), `agent_log.jsonl` (kinds request/response/post), `context_post.json` (the periodic POST /api/context) | Suyog: agents `--recorded` mode |
-| `scenario/demo_cafe/` | `scenario.json`, `index.json` | everyone |
+| `shapes/` | One example per §1 shape. Variants: kitchen_config cap + `_minimize`; hub_report/tick_state with + without (tick 50 / the escalation tick); command (engine) + `command_owner` (standalone owner reduce 10 %) with `decision_owner_override`; acks ok / clamped (`out_of_range`) / rejected (`job_running`, from the stream); escalation open / resolved_claude / awaiting_owner / expired_default / obsolete (alternative outcomes of `e_0001`; only `resolved` happens in the stream); `warning_cap_unreachable` (illustrative: what a 30 kW cap would trigger at 18:20); `warm_up_history` (the last block of the history); one Proposal per kind | everyone (generated types, tests) |
+| `history/` | Fake 2-month warm-up + daily inputs (above) | Suyog: runtime `warm_up(history)` until ComStock · Kritazya: engine warm-up, forecaster, backtest · Ashirwad: Proof screen |
+| `hub_protocol/` | §8 messages, one file per type (+ `sim_tick_replay`, `sim_tick_overnight`), `server_to_hub.jsonl` (hub_welcome, sim_build, 120 sim_ticks), `hub_to_server.jsonl` (hub_hello, 120 hub_reports) | Ashirwad: `src/mocks/mockHubServer.ts` plays `server_to_hub.jsonl` · Suyog: `fakes/fake_hub_client.py` answers each `sim_tick` with the matching `hub_to_server` line · Kritazya: HubReports as engine input |
+| `rest/` | One file per §2 endpoint `{method, path, status, request, response}` + `_422`/`_404` examples (incl. `post_sim_control_next_day`, `post_sim_control_422`, `post_decision_undo_422`) | Ashirwad: `src/mocks` REST handlers · Suyog: API tests |
+| `ws/` | One file per `/ws` message + `stream.jsonl` (clock, context, agent_log, then per tick: ticks, comparison, decisions, escalations, Claude's answer) | Ashirwad: `/ws` fallback mock · Suyog: API tests |
+| `facade/` | §3 calls `{call, args, returns}` (`raises` on the rule-error files); `warm_up.json` embeds the full history; `snapshot.json` has every §3 key (with lane after tick 120); `step_stream.jsonl` per tick and lane `{args: {minutes, hub_report}, returns: TickState}` | Suyog: `fakes/fake_kitchen.py` (look up `step` by lane + tick_id) · Kritazya: engine tests |
+| `ai_tools/` | §4 tools `{tool, input, output}`; the two bounded tools list `input_enum` | Suyog: `agent/tools.py` tests |
+| `spacetime/` | `tables/<table>.json`, `reducers/<reducer>.json` (`set_clock` 9 args), `rows_stream.jsonl` (publish_ticks per tick) | Ashirwad: mock live hook · Kritazya: `fakes/fake_live.py`, `spacetime/seed.ts` |
+| `convex/` | `tables/<table>.json`, `functions/<fn>.json` | Suyog: `store/` memory seed, Convex tests |
+| `agents/` | §7 request/response models, `agent_log.jsonl`, `context_post.json` | Suyog: agents `--recorded` |
+| `scenario/` | `demo_cafe/` (evening: `scenario.json` timeline + `index.json` ids) · `demo_cafe_multiday/` (above) | everyone |
 | `MANIFEST.json` | file → contract section → consumers → seam | everyone |
 
 ## Conventions
-snake_case; units in names; ISO 8601 UTC with `Z`; ids `<type_id>_<n>`, `d_0001`, `c_0001`, `e_0001`, `p_0001`,
-`s_0001`, `k_01`, `run_0001`, `chat_0001`. Labels: devices/hub `simulated` (one `measured` device in `shapes/` only),
-context `recorded`, tariff `illustrative`, explanations `template`. Catalog power values are placeholders
-(`source_note: "PLACEHOLDER"`); catalog `params` follow §1 per power model (the cycling duty values are what the toy physics implies).
-Forecasts are the scripted plan re-simulated with what was known at that tick (no peeking at the surge before it was
-requested); they stand in for the real forecaster.
+snake_case; units in names; ISO 8601 UTC with `Z`; ids `<type_id>_<n>`, `d_0001`, `c_0001`, `e_0001`, `p_0001`, `s_0001`,
+`k_01`, `run_0001`, `chat_0001` (one shared counter per type across lanes; standalone examples use ids after the last id of the
+multi-day run). Labels: devices/hub `simulated` (one `measured` device in `shapes/` only), context `recorded`, tariff
+`illustrative`, history `simulated`, explanations `template`. The catalog is Ashirwad's `backend/data/equipment_catalog.json`
+(embedded verbatim in `generate.py`; its `source_note`s state the demo assumptions behind each rated value).
+Forecasts are the toy plan re-simulated from the lane's current state with what was known at that tick (no peeking at a surge
+before it was requested).

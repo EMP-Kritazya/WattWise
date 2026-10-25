@@ -1,13 +1,13 @@
 {
   "lane": "without",
-  "ts": "2026-07-18T01:30:00Z",
+  "ts": "2026-07-18T01:20:00Z",
   "hub": {
     "hub_id": "sim_hub",
     "lane": "without",
-    "tick_id": 60,
-    "ts": "2026-07-18T01:30:00Z",
-    "total_kw": 52.86,
-    "customers_per_hour": 113,
+    "tick_id": 50,
+    "ts": "2026-07-18T01:20:00Z",
+    "total_kw": 45.64,
+    "customers_per_hour": 107,
     "devices": [
       {
         "device_id": "hvac_1",
@@ -15,7 +15,7 @@
         "name": "HVAC 1",
         "importance": "flexible",
         "state": "on",
-        "power_kw": 8.08,
+        "power_kw": 8.02,
         "rated_kw": 12.0,
         "power_pct": 67,
         "source": "simulated",
@@ -29,7 +29,7 @@
         "name": "HVAC 2",
         "importance": "flexible",
         "state": "on",
-        "power_kw": 8.08,
+        "power_kw": 8.02,
         "rated_kw": 12.0,
         "power_pct": 67,
         "source": "simulated",
@@ -48,7 +48,7 @@
         "power_pct": 100,
         "source": "simulated",
         "physical": {
-          "box_temp_c": 2.3
+          "box_temp_c": 3.2
         }
       },
       {
@@ -62,7 +62,7 @@
         "power_pct": 100,
         "source": "simulated",
         "physical": {
-          "box_temp_c": 2.7
+          "box_temp_c": 4.0
         }
       },
       {
@@ -76,7 +76,7 @@
         "power_pct": 100,
         "source": "simulated",
         "physical": {
-          "box_temp_c": -19.4
+          "box_temp_c": -18.2
         }
       },
       {
@@ -84,14 +84,14 @@
         "type_id": "ice_machine",
         "name": "Ice machine 1",
         "importance": "deferrable",
-        "state": "running_job",
-        "power_kw": 1.6,
+        "state": "off",
+        "power_kw": 0.0,
         "rated_kw": 1.6,
-        "power_pct": 100,
+        "power_pct": 0,
         "source": "simulated",
         "physical": {
-          "ice_level_pct": 64,
-          "job_remaining_min": 6
+          "ice_level_pct": 32,
+          "job_remaining_min": 0
         }
       },
       {
@@ -100,12 +100,12 @@
         "name": "Fryer 1",
         "importance": "always_on",
         "state": "on",
-        "power_kw": 7.48,
+        "power_kw": 6.96,
         "rated_kw": 14.0,
-        "power_pct": 53,
+        "power_pct": 50,
         "source": "simulated",
         "physical": {
-          "orders_in_progress": 23
+          "orders_in_progress": 21
         }
       },
       {
@@ -114,12 +114,12 @@
         "name": "Oven 1",
         "importance": "always_on",
         "state": "on",
-        "power_kw": 4.76,
+        "power_kw": 4.52,
         "rated_kw": 10.0,
-        "power_pct": 48,
+        "power_pct": 45,
         "source": "simulated",
         "physical": {
-          "orders_in_progress": 23
+          "orders_in_progress": 21
         }
       },
       {
@@ -128,12 +128,12 @@
         "name": "Grill 1",
         "importance": "always_on",
         "state": "on",
-        "power_kw": 4.26,
+        "power_kw": 4.02,
         "rated_kw": 8.0,
-        "power_pct": 53,
+        "power_pct": 50,
         "source": "simulated",
         "physical": {
-          "orders_in_progress": 23
+          "orders_in_progress": 21
         }
       },
       {
@@ -147,8 +147,8 @@
         "power_pct": 100,
         "source": "simulated",
         "physical": {
-          "dirty_racks": 2,
-          "job_remaining_min": 7
+          "dirty_racks": 1,
+          "job_remaining_min": 15
         }
       },
       {
@@ -157,12 +157,12 @@
         "name": "Water heater 1",
         "importance": "flexible",
         "state": "on",
-        "power_kw": 4.5,
+        "power_kw": 0.0,
         "rated_kw": 4.5,
-        "power_pct": 100,
+        "power_pct": 0,
         "source": "simulated",
         "physical": {
-          "box_temp_c": 60.1
+          "box_temp_c": 63.2
         }
       },
       {
@@ -181,32 +181,35 @@
     "source": "simulated"
   },
   "meter": {
-    "ts": "2026-07-18T01:30:00Z",
-    "total_kw": 52.86,
-    "block_avg_kw": 49.19,
+    "ts": "2026-07-18T01:20:00Z",
+    "total_kw": 45.64,
+    "block_avg_kw": 48.55,
     "block_start": "2026-07-18T01:15:00Z",
-    "month_peak_kw": 49.19,
+    "month_peak_kw": 43.86,
+    "on_peak_month_peak_kw": 43.86,
     "peak_mode": "cap",
     "peak_cap_kw": 40.0,
     "target_kw": 40.0,
-    "energy_kwh_today": 326.143,
+    "energy_kwh_today": 279.506,
+    "energy_kwh_month": 5774.469,
     "price_usd_per_kwh_now": 0.38,
-    "cost_usd_today": 87.95,
-    "cost_usd_month": 1922.5
+    "cost_usd_today": 111.21,
+    "cost_usd_month": 2835.93
   },
-  "customers_per_hour": 113,
+  "customers_per_hour": 107,
   "new_decisions": [],
   "new_commands": [],
   "new_escalations": [],
+  "warnings": [],
   "indoor_temp_c": 22.5,
   "forecast_kw": [
-    44.9,
-    41.9,
+    47.7,
+    45.1,
+    42.4,
     34.9,
-    33.6,
+    34.8,
     40.2,
-    40.0,
-    34.7,
-    32.1
+    38.7,
+    33.5
   ]
 }

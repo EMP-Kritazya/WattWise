@@ -9,7 +9,7 @@
 - Keep only the state future decisions need (rolling 4-week block history, month-to-date, active commands, ledger, open
   escalations, recent decisions, id counters). Full readings and decision logs live outside the engine (SpacetimeDB, Convex, backtest output).
 
-> **Status:** engine decisions are made (Main_Gaps.md section C and I). Shapes are in CONTRACTS.md; this file is how the
+> **Status:** engine decisions are made (Main_Gaps.md sections C, I, J and K). Shapes are in CONTRACTS.md; this file is how the
 > engine works inside. **Not in this build:** indoor-temperature (HVAC thermal) model, weather in the forecast, a learned
 > customer forecast, engine state surviving a backend restart (section 14).
 
@@ -23,8 +23,10 @@ Escalation is the only path to Claude: the engine emits an Escalation, the runti
 All local times (days, months, tariff windows, `must_finish_by`, opening hours) are in `tariff.timezone`.
 
 ## 0. Lanes, ids and warm-up
-- `Kitchen.build_lanes(config, tariff, seed)` → `{"without": Kitchen, "with": Kitchen}` sharing one id allocator.
-  (`Kitchen(config, tariff, control, seed, ids=None)` still works for tests; `ids=None` gives the lane its own allocator.)
+- `Kitchen.build_lanes(config, tariff, catalog, seed)` → `{"without": Kitchen, "with": Kitchen}` sharing one id allocator.
+  (`Kitchen(config, tariff, catalog, control, seed, ids=None)` still works for tests; `ids=None` gives the lane its own allocator.)
+  `catalog` = list[EquipmentType] passed in by the runtime (the same `equipment_catalog.json` the simulation gets in `sim_build`);
+  the engine takes each device's `category`, `power_model`, `rated_kw` and `params` (e.g. `cycle_min`) from it and keeps no copy.
 - **Ids:** one monotonically increasing counter per id type, shared by both lanes: `d_0001` (Decision), `c_0001` (Command),
   `e_0001` (Escalation); zero-padded to 4 digits, wider when needed (`d_10000`). Never reset during a run; a new kitchen starts at 1.
   Determinism comes from a fixed order: every tick the runtime steps `without`, then `with`, and calls any id-creating facade
@@ -34,15 +36,17 @@ All local times (days, months, tariff windows, `must_finish_by`, opening hours) 
   `backend/data/warmup.py` from NREL ComStock (scaled to the kitchen, label `calibrated_model`; see DATA_AND_PROOF.md), plus
   optional `month_to_date`. Every block must end at or before the start (`block_start + 15 min ≤ start`) or `warm_up` raises
   `ValueError` (no peeking). `month_to_date: null` → the engine meters the history blocks from the 1st of the month up to the
-  start on the tariff, so the run begins with realistic month-to-date peaks and cost. A non-null `month_to_date` (the runtime
-  restoring it from the SpacetimeDB `live_tick` row of the same month) is used as-is.
-- **Fake history until ComStock:** `contracts/fixtures/history/warmup_demo_cafe.json` is a `WarmUpHistory` with
+  start on the tariff, so the run begins with realistic month-to-date peaks and cost. A non-null `month_to_date` is used as-is;
+  it is reserved for resuming after a backend restart, which this build doesn't do, so the runtime always passes null (a `reset`
+  or a new kitchen restarts from the warm-up; reading the old `live_tick` row back would double-count).
+- **Fake history until ComStock:** `contracts/fixtures/history/warmup_demo_cafe.json` (next `fixture-builder` run) is a `WarmUpHistory` with
   `source: "fixture_synthetic"`, `label: "simulated"`, covering about 2 months before the start. The engine treats it exactly like
   the real one: the forecaster and the `minimize` target read only the last 4 weeks; month to date is metered from the current
   month's blocks only. So the engine built on fakes runs the same code path as on real data.
 - **Multi-day runs:** a run is `run_days` service days with every closed-hours minute ticked too (CONTRACTS.md section 8, Day
-  lifecycle). The engine has no notion of phases: overnight ticks are metered and decided like any other tick (local day and
-  month boundaries in section 1 already handle midnight and the 1st). Closed-hours load is mostly always_on, so it rarely acts.
+  lifecycle). The engine has no notion of phases: overnight ticks are metered and replanned like any other tick (local day and
+  month boundaries in section 1 already handle midnight and the 1st). Outside `operating_hours` it starts no reductions and no
+  holds (section 5), so overnight it meters, forecasts and, only if a block is still over the target, escalates.
 - **No warm-up file** (or `warm_up` never called): the forecaster uses live history only (section 3 fallbacks), the `minimize`
   target falls back to the month peak so far, and month-to-date starts at zero. The engine never blocks on it.
 
@@ -101,7 +105,8 @@ minimize mode: target_kw = highest closed-block avg kW over the 4 most recent sa
                (history, no peeking); fixed for the whole local day; a hard limit exactly like a cap.
                No history for those days → month_peak_kw so far; nothing closed yet this month → no reductions until a block closes.
 any mode:      if unavoidable_kw of a block > target_kw → TickState warning cap_unreachable
-               {unavoidable_kw, peak_cap_kw, target_kw}, plan that block against unavoidable_kw, and escalate (section 6).
+               {unavoidable_kw, peak_cap_kw, target_kw} (once per block, on the decision tick it first appears), plan that
+               block against unavoidable_kw, and escalate (section 6).
 ```
 The `without` lane computes the same `target_kw` for display and never acts on it.
 
@@ -128,7 +133,8 @@ Delaying goes first (no comfort impact). Ties are broken by tariff price, then c
   waiting job it replaces the hold. The hub releases the job by itself when the hold ends, so the deadline never depends on
   engine timing. The engine re-sends `delay` (replace) to move the release, or `start` to release early when room appears.
 - Bounds: total hold, counted from the first delay the hub applied, ≤ `max_delay_min`; release + `cycle_min` ≤ effective
-  deadline = `min(must_finish_by, close)` local today. A job that can't satisfy both is not delayable.
+  deadline = `min(must_finish_by, close)` local today. A job that can't satisfy both is not delayable. Holds start only during
+  `operating_hours`.
 - Hold expires with no job triggered → nothing to do.
 
 **Reductions (flexible).**
@@ -138,7 +144,7 @@ Delaying goes first (no comfort impact). Ties are broken by tariff price, then c
   t + 5k with `k = floor(max_reduce_min / 5)`, or earlier when no longer needed. A new value replaces the old one; the reduced
   time keeps counting from the first reduce.
 - Cooldown: after a restore the device is not reduced again for `max_reduce_min`. No new reduce starts in the last
-  `max_reduce_min` before close, so catch-up happens while open.
+  `max_reduce_min` before close or while closed, so catch-up happens while open.
 
 **Effect of a decision** (`Decision.effect`), computed marginally in plan order so one replan's savings add up without double counting:
 ```
@@ -155,7 +161,7 @@ cost_delta_usd = optimized_cost_usd − baseline_cost_usd ;  saving_usd = −cos
 
 ## 6. Escalation (`engine/escalation.py`)
 **Open** on a decision tick when a block starting within the next 30 sim minutes (the block in progress included) is still over
-`target_kw` after every in-rules move. At most one **active** escalation (`open` or `awaiting_owner`) per lane per `block_start`.
+`target_kw` after every in-rules move (`problem.forecast_peak_kw` = that forecast, `excess_kw` = it − target). At most one **active** escalation (`open` or `awaiting_owner`) per lane per `block_start`.
 
 **Options** (on the residual problem):
 - `accept_overrun` (always): no actions; the peak the in-rules plan leaves.
@@ -188,17 +194,18 @@ any option: the ranking is the engine's recommendation, not a filter.
 **Fallback = `default_option_id`** = rank 1 if it is within authority, else `ask_owner` (nothing extra is applied, which is
 physically the overrun). The fallback's Commands are issued **in the same step** the escalation opens (Decisions
 `escalation_fallback`), and `active_option_id` = the fallback (`null` for `ask_owner`). The clock keeps its speed; the runtime asks
-Claude asynchronously.
+Claude once, asynchronously, when the escalation opens (later updates are published, not re-asked).
 
 **Update in place.** On each decision tick an active escalation is re-evaluated: `problem` (forecast, excess), options,
-projections, ranks and `updated_ts` change; `escalation_id`, `deadline_sim_ts` and `active_option_id` do not. The engine never
+projections, ranks and `updated_ts` change; `escalation_id`, `deadline_sim_ts`, `default_option_id` and `active_option_id` do not. The engine never
 switches the active option on its own and never reverses executed commands.
 - **Obsolete:** the in-rules plan alone (ignoring the active option's rule-breaking commands) now holds the target for that block
   → status `obsolete` (terminal). Already executed commands stay and end at their own planned time.
 - Risk returns after an escalation closed → a new escalation for that block.
 
 **Deadline** = `max(ts + 5 min, min(ts + 15 min, block_start − 5 min))`. Still `open` or `awaiting_owner` at the deadline →
-`expired_default`, the fallback stays in force. Problem block ended while active → `expired_default`.
+`expired_default` (`resolved_by: "default"`; `chosen_option_id` keeps Claude's pick, if any), the fallback stays in force. Decision
+ticks fall on 5-minute marks, so the deadline is never after the problem block ends. `obsolete` keeps `resolved_by: null`.
 
 **Resolve** `resolve_escalation(id, option_id, resolved_by, rationale)` (revalidated against the latest state):
 - `option_id` not in the current options → `RuleError`. Escalation already closed (`resolved`, `expired_default`, `obsolete`) →
@@ -207,7 +214,7 @@ switches the active option on its own and never reverses executed commands.
   rationale. Within authority and before the deadline → `resolved`; if it differs from the active option, the next step issues the
   Commands that move devices from the active option to the chosen one (Decisions `escalation_choice`). Whether an option is
   *preferable* is Claude's judgment (owner preferences, context); the engine only checks what code can check: safe, authorized, timely.
-- `owner`: any current option until the problem block ends → `resolved`, `resolved_by: "owner"`.
+- `owner`: any current option before the deadline → `resolved`, `resolved_by: "owner"` (a Proposal for it expires at the deadline).
 - Replay/backtest: nobody answers; the fallback runs and the escalation ends `expired_default`.
 
 `TickState.new_escalations` carries every escalation opened **or changed** in that step (the full object, keyed by id).
@@ -222,7 +229,8 @@ switches the active option on its own and never reverses executed commands.
 - `owner_command(device_id, action, value)` → Command `issued_by: "owner"` plus a Decision `owner_override` (the Command's
   `decision_id`), returned in the next step's `new_commands`. Owners may command any device. The engine leaves that device alone
   for 30 sim min. The runtime calls it on both lanes (`without` first), so both kitchens get the same manual input (fair comparison).
-- `undo(decision_id)`: only for an `executed` decision whose action is `reduce` or `delay` (any reason) → else `RuleError`.
+- `undo(decision_id)`: only for an `executed` decision whose action is `reduce` or `delay` (any reason) and whose command is still
+  in force (in `active_commands`) → else `RuleError` (API 422). So undo needs no decision history beyond the active commands.
   `reduce` → `restore`; `delay` → `start` if the job is `waiting`, else `delay` value 0 (clears the hold). The reverting Command is
   `issued_by: "owner"` with `decision_id` = the undone decision; that decision becomes `undone`; device protected 30 sim min;
   owed energy already accrued stays in the ledger. `with` lane only.
@@ -230,6 +238,8 @@ switches the active option on its own and never reverses executed commands.
 ## 8. Rules check (`engine/rules.py`)
 - Validates limits (`set_importance`) and every move. `flexible`: `0 < min_power_pct ≤ 100`, `max_reduce_min > 0`.
   `deferrable`: `max_delay_min ≥ 0`, `must_finish_by` "HH:MM". Refrigeration set to flexible needs `min_power_pct ≥ 50`.
+  Refrigeration may be `deferrable` only if its power model is `job` (the ice machine: a hold delays an ice batch, it never
+  warms food); a `cycling` refrigeration device (walk-in, reach-in, freezer) set to `deferrable` → `RuleError` (a hold would be 0 %).
 - Engine moves: `always_on` never commanded; `reduce` value ≥ `min_power_pct`; holds inside `max_delay_min` and the effective deadline.
 - A move that breaks a limit only happens through an Escalation; food safety never.
 - Every equipment type's `default_limits` in `equipment_catalog.json` passes these rules (tested).
@@ -277,8 +287,8 @@ No side effects, no I/O; returns copies. The runtime and AI use the `with` lane.
 
 ## 14. Not in this build (cut, revisit later)
 HVAC thermal model and `max_indoor_temp_change_c` · weather in the forecast · learned customer forecast · engine state
-(ledger, counters, active commands) surviving a backend restart; a restart is a new run. Month-to-date can be restored from
-SpacetimeDB `live_tick` (section 0).
+(ledger, counters, active commands) surviving a backend restart; a restart is a new run. Month to date is published in
+SpacetimeDB `live_tick`; reading it back after a restart belongs to that later feature (section 0).
 
 ## 15. Hand-computed tests (`backend/tests/engine/`) — must exist and pass
 **Meter:** constant 40 kW for 60 min at 1-min steps → 40 kWh; four blocks of 40 kW; peak 40 kW.
@@ -308,14 +318,16 @@ past deadline 10 min → 0.5 · `deep_reduce_hvac` 10 pct below min → outside.
 its Commands in the same step's `new_commands` with reason `escalation_fallback`.
 **Update / obsolete:** the same block worsening → same `escalation_id`, new `problem`, `updated_ts`; the in-rules plan alone
 holding it later → `obsolete`, no command reversed. A second risk in the same block after closure → new id.
-**Resolve revalidation:** Claude's within-authority pick after the deadline → escalation returned unchanged (`expired_default`);
-unknown option id → `RuleError`.
+**Resolve revalidation:** Claude's within-authority pick, or an owner pick, after the deadline → escalation returned unchanged
+(`expired_default`, `resolved_by: "default"`); unknown option id → `RuleError`.
 **Deadline rule:** opened 12:00 for a 12:15 block → deadline 12:10; for the block in progress → `ts + 5`.
 **Food safety:** no option ever takes a refrigeration device below 50 %.
 **Context:** crowd effect `medium` → multiplier exactly 1.25 on demand_driven forecast only; no context → identical run.
 **Always-on:** no engine Command ever targets an always_on device (assert over a full simulated day).
 **Ids:** both lanes share counters; the same tick stream gives the same ids every run.
-**Undo:** reduce → restore; delay on a waiting job → start; on an idle hold → delay 0; undo of a restore → `RuleError`.
+**Undo:** reduce → restore; delay on a waiting job → start; on an idle hold → delay 0; undo of a restore, or of a reduce already
+restored → `RuleError`.
+**Closed hours:** no reduce or hold starts outside `operating_hours`; `cap_unreachable` appears once per block, not every tick.
 **Pure reads:** `snapshot()` and `what_if()` leave the next `step()` output byte-identical; `what_if` outside the horizon → `RuleError`.
 **No-peeking:** history view raises if anything reads a block ending after now; `warm_up` with a block ending after the start
 raises; a full replay day must not raise.

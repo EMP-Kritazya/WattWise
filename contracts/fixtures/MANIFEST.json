@@ -329,7 +329,7 @@
     "seam": "S4"
   },
   "facade/compare_lanes.json": {
-    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "contract_section": "§3 Engine facade",
     "consumers": [
       "Suyog (fakes/fake_kitchen.py)",
       "Kritazya (engine tests)"
@@ -337,7 +337,7 @@
     "seam": "S2"
   },
   "facade/forecast.json": {
-    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "contract_section": "§3 Engine facade",
     "consumers": [
       "Suyog (fakes/fake_kitchen.py)",
       "Kritazya (engine tests)"
@@ -345,7 +345,7 @@
     "seam": "S2"
   },
   "facade/ingest_reading.json": {
-    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "contract_section": "§3 Engine facade",
     "consumers": [
       "Suyog (fakes/fake_kitchen.py)",
       "Kritazya (engine tests)"
@@ -353,7 +353,7 @@
     "seam": "S2"
   },
   "facade/kitchen.json": {
-    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "contract_section": "§3 Engine facade",
     "consumers": [
       "Suyog (fakes/fake_kitchen.py)",
       "Kritazya (engine tests)"
@@ -361,7 +361,7 @@
     "seam": "S2"
   },
   "facade/open_escalations.json": {
-    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "contract_section": "§3 Engine facade",
     "consumers": [
       "Suyog (fakes/fake_kitchen.py)",
       "Kritazya (engine tests)"
@@ -369,7 +369,7 @@
     "seam": "S2"
   },
   "facade/owner_command.json": {
-    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "contract_section": "§3 Engine facade",
     "consumers": [
       "Suyog (fakes/fake_kitchen.py)",
       "Kritazya (engine tests)"
@@ -377,7 +377,7 @@
     "seam": "S2"
   },
   "facade/resolve_escalation.json": {
-    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "contract_section": "§3 Engine facade",
     "consumers": [
       "Suyog (fakes/fake_kitchen.py)",
       "Kritazya (engine tests)"
@@ -385,7 +385,7 @@
     "seam": "S2"
   },
   "facade/run_backtest.json": {
-    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "contract_section": "§3 Engine facade",
     "consumers": [
       "Suyog (fakes/fake_kitchen.py)",
       "Kritazya (engine tests)"
@@ -393,7 +393,7 @@
     "seam": "S2"
   },
   "facade/set_authority.json": {
-    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "contract_section": "§3 Engine facade",
     "consumers": [
       "Suyog (fakes/fake_kitchen.py)",
       "Kritazya (engine tests)"
@@ -401,7 +401,7 @@
     "seam": "S2"
   },
   "facade/set_context.json": {
-    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "contract_section": "§3 Engine facade",
     "consumers": [
       "Suyog (fakes/fake_kitchen.py)",
       "Kritazya (engine tests)"
@@ -409,7 +409,7 @@
     "seam": "S2"
   },
   "facade/set_importance.json": {
-    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "contract_section": "§3 Engine facade",
     "consumers": [
       "Suyog (fakes/fake_kitchen.py)",
       "Kritazya (engine tests)"
@@ -417,7 +417,7 @@
     "seam": "S2"
   },
   "facade/set_importance_rule_error.json": {
-    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "contract_section": "§3 Engine facade",
     "consumers": [
       "Suyog (fakes/fake_kitchen.py)",
       "Kritazya (engine tests)"
@@ -425,7 +425,7 @@
     "seam": "S2"
   },
   "facade/set_peak_cap.json": {
-    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "contract_section": "§3 Engine facade",
     "consumers": [
       "Suyog (fakes/fake_kitchen.py)",
       "Kritazya (engine tests)"
@@ -433,7 +433,7 @@
     "seam": "S2"
   },
   "facade/set_peak_cap_rule_error.json": {
-    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "contract_section": "§3 Engine facade",
     "consumers": [
       "Suyog (fakes/fake_kitchen.py)",
       "Kritazya (engine tests)"
@@ -441,7 +441,7 @@
     "seam": "S2"
   },
   "facade/set_preferences.json": {
-    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "contract_section": "§3 Engine facade",
     "consumers": [
       "Suyog (fakes/fake_kitchen.py)",
       "Kritazya (engine tests)"
@@ -449,7 +449,7 @@
     "seam": "S2"
   },
   "facade/snapshot.json": {
-    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "contract_section": "§3 Engine facade",
     "consumers": [
       "Suyog (fakes/fake_kitchen.py)",
       "Kritazya (engine tests)"
@@ -457,7 +457,7 @@
     "seam": "S2"
   },
   "facade/step_stream.jsonl": {
-    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "contract_section": "§3 Engine facade",
     "consumers": [
       "Suyog (fakes/fake_kitchen.py)",
       "Kritazya (engine tests)"
@@ -465,7 +465,7 @@
     "seam": "S2"
   },
   "facade/undo.json": {
-    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "contract_section": "§3 Engine facade",
     "consumers": [
       "Suyog (fakes/fake_kitchen.py)",
       "Kritazya (engine tests)"
@@ -473,7 +473,7 @@
     "seam": "S2"
   },
   "facade/warm_up.json": {
-    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "contract_section": "§3 Engine facade",
     "consumers": [
       "Suyog (fakes/fake_kitchen.py)",
       "Kritazya (engine tests)"
@@ -481,7 +481,7 @@
     "seam": "S2"
   },
   "facade/what_if.json": {
-    "contract_section": "§3 Engine facade (PROVISIONAL)",
+    "contract_section": "§3 Engine facade",
     "consumers": [
       "Suyog (fakes/fake_kitchen.py)",
       "Kritazya (engine tests)"
@@ -494,6 +494,24 @@
       "everyone"
     ],
     "seam": "-"
+  },
+  "history/daily_inputs.json": {
+    "contract_section": "§1 WarmUpHistory + daily inputs (G59)",
+    "consumers": [
+      "Kritazya (engine warm_up, backtest)",
+      "Suyog (runtime warm-up)",
+      "Ashirwad (Proof screen)"
+    ],
+    "seam": "S2"
+  },
+  "history/warmup_demo_cafe.json": {
+    "contract_section": "§1 WarmUpHistory + daily inputs (G59)",
+    "consumers": [
+      "Kritazya (engine warm_up, backtest)",
+      "Suyog (runtime warm-up)",
+      "Ashirwad (Proof screen)"
+    ],
+    "seam": "S2"
   },
   "hub_protocol/hub_hello.json": {
     "contract_section": "§8 Hub protocol",
@@ -566,6 +584,15 @@
     "seam": "S6"
   },
   "hub_protocol/sim_tick.json": {
+    "contract_section": "§8 Hub protocol",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "S6"
+  },
+  "hub_protocol/sim_tick_overnight.json": {
     "contract_section": "§8 Hub protocol",
     "consumers": [
       "Ashirwad",
@@ -703,6 +730,14 @@
     ],
     "seam": "S1"
   },
+  "rest/post_decision_undo_422.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
   "rest/post_device_command.json": {
     "contract_section": "§2 REST",
     "consumers": [
@@ -760,6 +795,22 @@
     "seam": "S1"
   },
   "rest/post_sim_control.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/post_sim_control_422.json": {
+    "contract_section": "§2 REST",
+    "consumers": [
+      "Ashirwad (src/mocks REST handlers)",
+      "Suyog (API tests)"
+    ],
+    "seam": "S1"
+  },
+  "rest/post_sim_control_next_day.json": {
     "contract_section": "§2 REST",
     "consumers": [
       "Ashirwad (src/mocks REST handlers)",
@@ -840,6 +891,78 @@
       "Ashirwad"
     ],
     "seam": "all"
+  },
+  "scenario/demo_cafe_multiday/clock_stream.jsonl": {
+    "contract_section": "§8 Day lifecycle (multi-day run, G56-G58)",
+    "consumers": [
+      "Ashirwad (mock clock walks the phases)",
+      "Suyog (runtime day lifecycle tests)",
+      "Kritazya (engine across midnight)"
+    ],
+    "seam": "S1 S3 S6"
+  },
+  "scenario/demo_cafe_multiday/hub_to_server.jsonl": {
+    "contract_section": "§8 Day lifecycle (multi-day run, G56-G58)",
+    "consumers": [
+      "Ashirwad (mock clock walks the phases)",
+      "Suyog (runtime day lifecycle tests)",
+      "Kritazya (engine across midnight)"
+    ],
+    "seam": "S1 S3 S6"
+  },
+  "scenario/demo_cafe_multiday/index.json": {
+    "contract_section": "§8 Day lifecycle (multi-day run, G56-G58)",
+    "consumers": [
+      "Ashirwad (mock clock walks the phases)",
+      "Suyog (runtime day lifecycle tests)",
+      "Kritazya (engine across midnight)"
+    ],
+    "seam": "S1 S3 S6"
+  },
+  "scenario/demo_cafe_multiday/rows_stream.jsonl": {
+    "contract_section": "§8 Day lifecycle (multi-day run, G56-G58)",
+    "consumers": [
+      "Ashirwad (mock clock walks the phases)",
+      "Suyog (runtime day lifecycle tests)",
+      "Kritazya (engine across midnight)"
+    ],
+    "seam": "S1 S3 S6"
+  },
+  "scenario/demo_cafe_multiday/scenario.json": {
+    "contract_section": "§8 Day lifecycle (multi-day run, G56-G58)",
+    "consumers": [
+      "Ashirwad (mock clock walks the phases)",
+      "Suyog (runtime day lifecycle tests)",
+      "Kritazya (engine across midnight)"
+    ],
+    "seam": "S1 S3 S6"
+  },
+  "scenario/demo_cafe_multiday/server_to_hub.jsonl": {
+    "contract_section": "§8 Day lifecycle (multi-day run, G56-G58)",
+    "consumers": [
+      "Ashirwad (mock clock walks the phases)",
+      "Suyog (runtime day lifecycle tests)",
+      "Kritazya (engine across midnight)"
+    ],
+    "seam": "S1 S3 S6"
+  },
+  "scenario/demo_cafe_multiday/step_stream.jsonl": {
+    "contract_section": "§8 Day lifecycle (multi-day run, G56-G58)",
+    "consumers": [
+      "Ashirwad (mock clock walks the phases)",
+      "Suyog (runtime day lifecycle tests)",
+      "Kritazya (engine across midnight)"
+    ],
+    "seam": "S1 S3 S6"
+  },
+  "scenario/demo_cafe_multiday/ws_stream.jsonl": {
+    "contract_section": "§8 Day lifecycle (multi-day run, G56-G58)",
+    "consumers": [
+      "Ashirwad (mock clock walks the phases)",
+      "Suyog (runtime day lifecycle tests)",
+      "Kritazya (engine across midnight)"
+    ],
+    "seam": "S1 S3 S6"
   },
   "shapes/agent_log.json": {
     "contract_section": "§1 Shared shapes",
@@ -940,6 +1063,15 @@
     ],
     "seam": "all"
   },
+  "shapes/decision_owner_override.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
   "shapes/device.json": {
     "contract_section": "§1 Shared shapes",
     "consumers": [
@@ -977,6 +1109,15 @@
     "seam": "all"
   },
   "shapes/escalation_expired_default.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/escalation_obsolete.json": {
     "contract_section": "§1 Shared shapes",
     "consumers": [
       "Ashirwad",
@@ -1148,6 +1289,24 @@
     "seam": "all"
   },
   "shapes/tick_state_without.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/warm_up_history.json": {
+    "contract_section": "§1 Shared shapes",
+    "consumers": [
+      "Ashirwad",
+      "Suyog",
+      "Kritazya"
+    ],
+    "seam": "all"
+  },
+  "shapes/warning_cap_unreachable.json": {
     "contract_section": "§1 Shared shapes",
     "consumers": [
       "Ashirwad",

@@ -4,11 +4,12 @@
     "device_id": "walk_in_cooler_1",
     "action": "reduce",
     "value": 50,
-    "at": "2026-07-18T01:50:00Z"
+    "at": "2026-07-18T01:50:00Z",
+    "lane": "with"
   },
   "output": {
-    "peak_before_kw": 40.0,
-    "peak_after_kw": 40.0,
-    "saving_usd": 0.0
+    "peak_before_kw": 43.2,
+    "peak_after_kw": 42.9,
+    "saving_usd": 8.42
   }
 }

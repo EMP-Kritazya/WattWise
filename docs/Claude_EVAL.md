@@ -2,6 +2,10 @@
 
 You are working in the WattWise repository. **Your task is to author a comprehensive, implementation-ready `EVAL.md` specification** for evaluating the WattWise restaurant energy optimization engine and its HVAC planning model. Do **not** implement the framework yet unless I explicitly ask. The document should be detailed enough that another coding agent can implement it independently with minimal questions, and that a hackathon judge can understand what was evaluated and why.
 
+> **Already decided (2026-10-24; ENGINE.md, CONTRACTS.md, Main_Gaps.md):** `reduce` % is of `rated_kw`; this build has no HVAC
+> thermal model (`max_indoor_temp_change_c` is null), so the HVAC-model parts are a later phase; escalations apply a harm-ranked
+> fallback at once and Claude may switch it. Treat these as settled, not `DECISION REQUIRED`.
+
 ## 0. Read the repository before writing
 
 First inspect `ENGINE.md`, `CONTRACTS.md`, `KRITAZYA.md`, `DEMO.md`, equipment catalog, relevant backend engine modules, hub protocol fixtures, simulation code, existing tests, and any existing eval/backtest or data ingestion code. Identify what exists, what is proposed, and what is TBD. **Do not invent implemented functions, files, schemas, data sources, or performance results.** Use the repository's actual paths and contract field names. When a design choice is not settled, propose a default, explain its rationale, and mark it `DECISION REQUIRED` rather than silently treating it as agreed. Respect the engine's no-I/O, no-wall-clock, no-Claude-call boundary.

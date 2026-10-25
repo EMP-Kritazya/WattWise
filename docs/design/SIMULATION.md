@@ -66,8 +66,8 @@ flexible with `min_power_pct: 50` (food-safety floor), `hvac` flexible with 40, 
 | Importance | Commands the engine may send | Appliance behaviour |
 |---|---|---|
 | `always_on` | none (the engine never commands them; owner clicks only) | – |
-| `flexible` | `reduce` (value = power %), `restore` | Runs at the given % of its normal draw; physics continues (temperature drifts), catch-up after `restore` |
-| `deferrable` | `delay` (value = minutes), `start` | A queued job waits (state `waiting`) and starts when told or when the delay ends; a running job cannot be delayed (`ack.reason: job_running`) |
+| `flexible` | `reduce` (value = power %), `restore` | Draws at most `value% × rated_kw` (a device already below that is unaffected); physics continues (temperature drifts), catch-up after `restore` |
+| `deferrable` | `delay` (value = minutes), `start` | A delay holds the next job (idle) or the queued job (`waiting`); the job starts on `start` or by itself when the hold ends; `delay` 0 clears the hold; a running job cannot be delayed (`ack.reason: job_running`) |
 The rules (limits, food-safety floor, deadlines) are enforced by the engine before a Command is sent; appliances only enforce physics.
 
 ## Customers
@@ -104,10 +104,11 @@ React state per tick (update the view once per 15 sim minutes). Physics and repo
   hub reached through Convex (`docs/design/CONVEX_AND_ESP32.md`); its readings are merged by the runtime as `measured`.
 
 ## Warm-up history
-How the engine gets its first weeks of history is an engine decision, **TBD (Kritazya)**. The simulation must not assume it.
+The engine warms up from 4 weeks of history (`WarmUpHistory`: NREL ComStock, or the fixture history until then; ENGINE.md
+section 0). The simulation starts cold from `sim_build` and never sees that history.
 
 ## Tests (`frontend/src/sim/__tests__`, Vitest)
 Same seed + same tick stream → identical HubReports (byte equal) · `total_kw` = sum of devices · power never negative or above
-rated · each Command gets exactly one ack · a reduce to 40 % gives 40 % of the normal draw for that minute · a delayed job
+rated · each Command gets exactly one ack · a reduce to 40 % caps the draw at 40 % of `rated_kw` for that minute · `delay` 0 clears a hold · a delayed job
 starts no earlier than its delay · the fixture tick stream (`contracts/fixtures/hub_protocol/`) produces reports that pass the
 fixture checker's shape checks.

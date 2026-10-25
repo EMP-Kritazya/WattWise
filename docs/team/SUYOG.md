@@ -46,15 +46,24 @@ periodically, and the Concierge is the owner's chat door in ASI:One. **Convex** 
 
 **B. Clock + run loop** — design: `docs/design/API.md`
 - [ ] `runtime/hub_link.py`: one sim host only (`host_taken` for the second), `sim_build` on kitchen build, `sim_tick` / `hub_report` handshake, `hub_waiting` (2 s) and `sim_host_offline` pauses, reconnect re-sends `sim_build`
-- [ ] `runtime/loop.py`: 1 sim min per tick, speeds 1× / 30× / 120× / 600×, surges (REST + SpacetimeDB requests) into the next `sim_tick`, physical inputs from context, `step(1, hub_report)` per lane, engine Commands + owner commands queued for tick *n + 1*, `compare_lanes`, live publish, store buffer
+- [ ] `runtime/loop.py`: 1 sim min per tick, speeds 1× / 30× / 120× / 600×, surges (REST + SpacetimeDB requests) into the next `sim_tick`, physical inputs from context, `step(1, hub_report)` per lane (`without` then `with`: shared id counters), TickState `warnings` → ws `warning`, engine Commands + owner commands queued for tick *n + 1*, `compare_lanes`, live publish, store buffer
 - [ ] Viewer `/ws` messages and `LIVE_TRANSPORT=ws` fallback (everything over `/ws`)
 
 **C. Claude** — design: `docs/design/API.md` (Escalations, AI agent), `docs/design/AGENTS.md` (Claude)
 - [ ] `agent/tools.py` (CONTRACTS.md §4) as thin wrappers over the facade; `agent/templates.py` fallbacks; chat streaming (`chat_delta`, `chat_done`)
-- [ ] `runtime/escalations.py`: send open escalations to Claude with options + context + preferences + authority; enum-constrained `choose_escalation_option`; `resolve_escalation(..., "claude", rationale)`; Proposal when `awaiting_owner`; 8 s timeout → leave for the engine's default; demo mode pauses the clock
+- [ ] `runtime/escalations.py`: send open escalations to Claude with options + context + preferences + authority; enum-constrained `choose_escalation_option`; `resolve_escalation(..., "claude", rationale)`; Proposal when `awaiting_owner`; the engine already applied its fallback when the escalation opened; ask Claude once per escalation (updates are published, not re-asked); 8 s timeout → the fallback stays; never pause or slow the clock
 - [ ] Proposals + owner confirmation (UI Confirm, ASI:One button, `confirm` / `yes` matched by code)
 - [ ] ~~Clock slowdown while an escalation is open~~ **dropped** (Main_Gaps Q1): the clock never slows; the engine's fallback applies at once
-- [ ] Day lifecycle in `runtime/loop.py` (API.md "Day lifecycle", CONTRACTS.md §8): `run_days`, ClockState `day_index` / `run_days` / `phase`, overnight ticks at max speed with `fast_forward: true` + `is_open: false`, block-rate publishing overnight, `paused_reason: run_complete`, `sim/control` action `next_day`; warm-up from `fixtures/history/warmup_demo_cafe.json` until ComStock
+- [ ] Day lifecycle in `runtime/loop.py` (API.md "Day lifecycle", CONTRACTS.md §8): `run_days`, ClockState `day_index` / `run_days` / `phase`, overnight ticks at max speed with `fast_forward: true` + `is_open: false`, block-rate publishing overnight, `paused_reason: run_complete`, `sim/control` action `next_day`; warm-up from `fixtures/history/warmup_demo_cafe.json` (next `fixture-builder` run) until ComStock
+
+**C2. Contract migration (from Kritazya, 2026-10-24)**
+- [ ] `Kitchen.build_lanes` + `warm_up(history)` with `month_to_date: null`; id-creating calls (`owner_command`, `undo`, `resolve_escalation`) in lane order `without` → `with`
+- [ ] Manual clicks → `owner_command` on both lanes; REST returns the `with` lane's Command
+- [ ] Escalations: publish every change (upsert); ask Claude once; handle "returned unchanged" / RuleError; owner resolves only before the deadline (the Proposal expires then)
+- [ ] `undo` → 422 when the decision's command is no longer in force; `explain_decision` reads `recent_decisions`, else Convex
+- [ ] `what_if` tool input `lane?` (default `with`); `forecast(120)` only
+- [ ] ClockState without `slowed_reason`; `paused_reason` adds `manual` and `run_complete`; drop `ESCALATION_SPEED`
+- [ ] SpacetimeDB payloads: `live_tick` `on_peak_month_peak_kw` + `energy_kwh_month`; `live_escalation` new columns; `live_clock` `day_index`, `run_days`, `phase`
 
 **D. Fetch.ai** — design: `docs/design/AGENTS.md`
 - [ ] Weather + Grid agents (live + `--recorded`), Events (tier 2); Concierge periodic context loop every `CONTEXT_INTERVAL_S` (600 s) → `POST /api/context` unchanged; agent log → `POST /api/agent-log`
@@ -73,10 +82,10 @@ periodically, and the Concierge is the owner's chat door in ASI:One. **Convex** 
 | What you must send the hub | `hub_protocol/server_to_hub.jsonl`, `sim_build.json`, `sim_tick.json`, `sim_control.json`, `hub_welcome_*.json` | Test that your `sim_tick` stream equals this for the scenario (commands at *n + 1*, surge at tick 31) |
 | SpacetimeDB (Kritazya's live client) | `spacetime/reducers/*.json` (exact reducer args), `spacetime/rows_stream.jsonl` | Until the real client exists, call a recording double in your tests and assert payloads equal these; run dev with `LIVE_TRANSPORT=ws` |
 | REST + `/ws` | `rest/*.json` (incl. 404 / 422), `ws/*.json`, `ws/stream.jsonl` | API tests compare responses and the message stream |
-| Claude tools | `ai_tools/*.json` (`{tool, input, output}`, `input_enum`), `shapes/escalation_*.json` (open, resolved, awaiting_owner, expired_default) | Tool tests; escalation flow tests with Claude mocked |
+| Claude tools | `ai_tools/*.json` (`{tool, input, output}`, `input_enum`), `shapes/escalation_*.json` (open, resolved, awaiting_owner, expired_default; obsolete after the next `fixture-builder` run) | Tool tests; escalation flow tests with Claude mocked |
 | Fetch agents | `agents/*_request.json`, `*_response.json`, `context_post.json`, `agent_log.jsonl` | `--recorded` mode and context-loop tests |
 | Convex | `convex/tables/*.json`, `convex/functions/*.json` | Memory store seed, function tests |
-| The scenario | `scenario/demo_cafe/scenario.json`, `index.json`, `README.md`, `GAPS.md` | Escalation `e_0001` at tick 60, Claude's choice `extend_delay_dishwasher`, delivered tick 62 |
+| The scenario | `scenario/demo_cafe/scenario.json`, `index.json`, `README.md`, `GAPS.md` | Escalation `e_0001` opens at tick 50 with its fallback (dishwasher hold) applied in that step; Claude confirms the same option within authority (no `escalation_choice`); owner "start dishwasher" after tick 118 rejected `job_running`. Multi-day: `scenario/demo_cafe_multiday/` |
 
 ## 6. Big-picture docs (read, don't edit)
 `docs/ARCHITECTURE.md` · `docs/CONTRACTS.md` §2 REST + `/ws`, §3 facade, §4 AI tools, §6 Convex, §7 agent messages, §8 hub

@@ -7,7 +7,7 @@
       "lane": "without",
       "tick_id": 36,
       "ts": "2026-07-18T01:06:00Z",
-      "total_kw": 38.34,
+      "total_kw": 44.34,
       "customers_per_hour": 103,
       "devices": [
         {
@@ -91,7 +91,7 @@
           "power_pct": 0,
           "source": "simulated",
           "physical": {
-            "ice_level_pct": 32,
+            "ice_level_pct": 42,
             "job_remaining_min": 0
           }
         },
@@ -142,14 +142,14 @@
           "type_id": "dishwasher",
           "name": "Dishwasher 1",
           "importance": "deferrable",
-          "state": "off",
-          "power_kw": 0.0,
+          "state": "running_job",
+          "power_kw": 6.0,
           "rated_kw": 6.0,
-          "power_pct": 0,
+          "power_pct": 100,
           "source": "simulated",
           "physical": {
-            "dirty_racks": 7,
-            "job_remaining_min": 0
+            "dirty_racks": 0,
+            "job_remaining_min": 29
           }
         },
         {
@@ -186,7 +186,7 @@
       "lane": "with",
       "tick_id": 36,
       "ts": "2026-07-18T01:06:00Z",
-      "total_kw": 38.34,
+      "total_kw": 36.99,
       "customers_per_hour": 103,
       "devices": [
         {
@@ -195,12 +195,12 @@
           "name": "HVAC 1",
           "importance": "flexible",
           "state": "on",
-          "power_kw": 7.97,
+          "power_kw": 8.04,
           "rated_kw": 12.0,
-          "power_pct": 66,
+          "power_pct": 67,
           "source": "simulated",
           "physical": {
-            "indoor_temp_c": 22.5
+            "indoor_temp_c": 22.6
           }
         },
         {
@@ -208,13 +208,13 @@
           "type_id": "hvac",
           "name": "HVAC 2",
           "importance": "flexible",
-          "state": "on",
-          "power_kw": 7.97,
+          "state": "reduced",
+          "power_kw": 4.8,
           "rated_kw": 12.0,
-          "power_pct": 66,
+          "power_pct": 40,
           "source": "simulated",
           "physical": {
-            "indoor_temp_c": 22.5
+            "indoor_temp_c": 22.6
           }
         },
         {
@@ -222,13 +222,13 @@
           "type_id": "walk_in_cooler",
           "name": "Walk-in cooler 1",
           "importance": "flexible",
-          "state": "on",
-          "power_kw": 0.0,
+          "state": "reduced",
+          "power_kw": 1.75,
           "rated_kw": 3.5,
-          "power_pct": 0,
+          "power_pct": 50,
           "source": "simulated",
           "physical": {
-            "box_temp_c": 3.0
+            "box_temp_c": 3.9
           }
         },
         {
@@ -264,13 +264,13 @@
           "type_id": "ice_machine",
           "name": "Ice machine 1",
           "importance": "deferrable",
-          "state": "off",
+          "state": "waiting",
           "power_kw": 0.0,
           "rated_kw": 1.6,
           "power_pct": 0,
           "source": "simulated",
           "physical": {
-            "ice_level_pct": 32,
+            "ice_level_pct": 42,
             "job_remaining_min": 0
           }
         },
@@ -327,7 +327,7 @@
           "power_pct": 0,
           "source": "simulated",
           "physical": {
-            "dirty_racks": 7,
+            "dirty_racks": 8,
             "job_remaining_min": 0
           }
         },
@@ -342,7 +342,7 @@
           "power_pct": 100,
           "source": "simulated",
           "physical": {
-            "box_temp_c": 61.8
+            "box_temp_c": 60.0
           }
         },
         {
@@ -359,10 +359,10 @@
       ],
       "acks": [
         {
-          "command_id": "c_0001",
+          "command_id": "c_0007",
           "lane": "with",
           "ok": true,
-          "applied_value": 50,
+          "applied_value": null,
           "reason": null
         }
       ],

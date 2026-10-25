@@ -1,22 +1,42 @@
 [
   {
     "period": "2026-07",
-    "energy_kwh": 21840.0,
-    "energy_cost_usd": 4210.55,
+    "energy_kwh": 5821.395,
+    "energy_cost_usd": 1625.75,
     "demand_charges": [
       {
         "name": "max_demand",
-        "peak_kw": 46.0,
-        "cost_usd": 920.0
+        "peak_kw": 47.8,
+        "cost_usd": 956.0
       },
       {
         "name": "peak_demand",
-        "peak_kw": 46.0,
-        "cost_usd": 368.0
+        "peak_kw": 47.8,
+        "cost_usd": 382.4
       }
     ],
-    "total_usd": 5498.55,
+    "total_usd": 2964.15,
     "tariff_id": "demo_tariff_v1",
     "lane": "without"
+  },
+  {
+    "period": "2026-07",
+    "energy_kwh": 5816.876,
+    "energy_cost_usd": 1623.92,
+    "demand_charges": [
+      {
+        "name": "max_demand",
+        "peak_kw": 42.54,
+        "cost_usd": 850.8
+      },
+      {
+        "name": "peak_demand",
+        "peak_kw": 42.54,
+        "cost_usd": 340.32
+      }
+    ],
+    "total_usd": 2815.04,
+    "tariff_id": "demo_tariff_v1",
+    "lane": "with"
   }
 ]

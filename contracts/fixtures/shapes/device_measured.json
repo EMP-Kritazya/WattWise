@@ -9,7 +9,7 @@
   "power_pct": 97,
   "source": "measured",
   "physical": {
-    "dirty_racks": 0,
-    "job_remaining_min": 25
+    "dirty_racks": 1,
+    "job_remaining_min": 5
   }
 }

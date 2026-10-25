@@ -1,0 +1,89 @@
+{
+  "label": "FAKE DATA - not measured, not live",
+  "run_days": 2,
+  "ticks_in_run": 1710,
+  "ticks_in_files": 975,
+  "segments": [
+    {
+      "from_tick": 241,
+      "to_tick": 270,
+      "ticks": 30,
+      "phase": "service",
+      "day_index": 1,
+      "from_local": "Fri 17 Jul 21:30",
+      "to_local": "Fri 17 Jul 22:00",
+      "is_open": true,
+      "fast_forward": false,
+      "published": "every tick"
+    },
+    {
+      "from_tick": 271,
+      "to_tick": 990,
+      "ticks": 720,
+      "phase": "overnight",
+      "day_index": 1,
+      "from_local": "Fri 17 Jul 22:00",
+      "to_local": "Sat 18 Jul 10:00",
+      "is_open": false,
+      "fast_forward": true,
+      "published": "once per closed 15-min block (publish_ticks, set_clock, ws tick/comparison/clock)"
+    },
+    {
+      "from_tick": 991,
+      "to_tick": 1200,
+      "ticks": 210,
+      "phase": "service",
+      "day_index": 2,
+      "from_local": "Sat 18 Jul 10:00",
+      "to_local": "Sat 18 Jul 13:30",
+      "is_open": true,
+      "fast_forward": false,
+      "published": "every tick"
+    },
+    {
+      "gap": true,
+      "from_tick": 1201,
+      "to_tick": 1695,
+      "note": "omitted to keep the files small; the run continues (same physics, same ids) and the omitted ticks are in `generate.py --days 2`"
+    },
+    {
+      "from_tick": 1696,
+      "to_tick": 1710,
+      "ticks": 15,
+      "phase": "service",
+      "day_index": 2,
+      "from_local": "Sat 18 Jul 21:45",
+      "to_local": "Sat 18 Jul 22:00",
+      "is_open": true,
+      "fast_forward": false,
+      "published": "every tick"
+    },
+    {
+      "phase": "closed",
+      "after_tick": 1710,
+      "paused_reason": "run_complete",
+      "note": "clock stops after the last day's close; POST /api/sim/control {action: next_day} adds a day"
+    }
+  ],
+  "server_to_hub": "scenario/demo_cafe_multiday/server_to_hub.jsonl",
+  "hub_to_server": "scenario/demo_cafe_multiday/hub_to_server.jsonl",
+  "engine_steps": "scenario/demo_cafe_multiday/step_stream.jsonl",
+  "spacetime_publish_ticks": "scenario/demo_cafe_multiday/rows_stream.jsonl",
+  "spacetime_set_clock": "scenario/demo_cafe_multiday/clock_stream.jsonl",
+  "viewer_ws": "scenario/demo_cafe_multiday/ws_stream.jsonl",
+  "decision_ids": [
+    "d_0023",
+    "d_0024",
+    "d_0025",
+    "d_0026",
+    "d_0027",
+    "d_0028",
+    "d_0029",
+    "d_0030",
+    "d_0031"
+  ],
+  "escalation_ids": [],
+  "midnight_tick": 391,
+  "day2_open_tick": 991,
+  "full_run": "python3 contracts/fixtures/generate.py --days 2 --out <dir> writes every tick of this run"
+}

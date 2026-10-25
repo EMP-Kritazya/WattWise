@@ -28,12 +28,14 @@ it never decides and never computes numbers.
 
 ## Kitchen lifecycle
 1. `POST /api/kitchen` with KitchenConfig → build both lanes with `Kitchen.build_lanes`, call `warm_up(history)` once per lane
-   (WarmUpHistory: `data.warmup.build_warmup(...)`, or `contracts/fixtures/history/warmup_demo_cafe.json` until the ComStock
-   extract exists; missing → skip), send `sim_build` to the sim host, `reset_all` on SpacetimeDB, save the config to Convex `kitchens`.
+   (WarmUpHistory with `month_to_date: null`: `data.warmup.build_warmup(...)`, or `contracts/fixtures/history/warmup_demo_cafe.json`
+   (next `fixture-builder` run) until the ComStock extract exists; missing → skip), send `sim_build` to the sim host, `reset_all` on SpacetimeDB, save the config to Convex `kitchens`.
 2. `POST /api/sim/control {play, speed}` → start the clock. No sim host connected → stays paused with `sim_host_offline`.
    The run lasts `config.run_days` service days (Day lifecycle below).
 3. Settings changes (importance, peak cap) are applied to **both** lanes' configs only where it matters:
    importance and cap affect only the `with` lane's decisions; the `without` lane ignores them.
+4. Manual device clicks (`POST /api/devices/{id}/command`) → `owner_command` on both lanes, `without` first (the same manual input
+   in both kitchens); the response is the `with` lane's Command. Undo, authority and preferences → `with` lane only.
 
 ## Run loop (asyncio task)
 ```
@@ -48,7 +50,8 @@ every real tick (0.5 s × 120 / speed; one tick = 1 sim minute):
     for lane in (without, with):
         states[lane.control] = lane.step(1, report.reports[lane.control])   # engine replans every 5 sim min
         for d in states[lane.control].new_decisions: handle_decision(d)
-        for e in states[lane.control].new_escalations: escalations.submit(e)   # async; never blocks
+        for e in states[lane.control].new_escalations: escalations.submit(e)   # publish; ask Claude once on open; never blocks
+        for w in states[lane.control].warnings: push_warning(w)              # cap_unreachable → ws / live
     pending_commands = states["without"].new_commands + states["with"].new_commands   # includes owner commands
     comparison = compare_lanes(states["without"], states["with"])
     bridge.forward(states["with"].new_commands)   # only commands for ESP32-mapped devices
@@ -80,12 +83,15 @@ every real tick (0.5 s × 120 / speed; one tick = 1 sim minute):
   `effect.saving_usd ≥ 1` (configurable). When the AI replies, push an updated `decision` message (`explanation_source: "ai"`).
 
 ## Escalations (`runtime/escalations.py`)
-1. New escalation → publish it (SpacetimeDB `live_escalation`, Convex `escalations`, `/ws escalation`).
-2. Ask Claude with: options (engine numbers), context summary, owner preferences, authority. Claude must call
-   `choose_escalation_option(option_id, rationale)`; the id is an enum of the offered ids.
-3. `kitchen.resolve_escalation(id, option_id, "claude", rationale)`. If the engine returns `awaiting_owner`, create a Proposal
-   (`kind: resolve_escalation`) shown in the UI and ASI:One.
-4. Claude timeout (8 real s) or error → do nothing; the engine applies the default at the deadline. Log it.
+1. Every escalation in `new_escalations` (opened or changed) → publish it (SpacetimeDB `live_escalation` upsert, `/ws escalation`);
+   Convex `escalations` gets the final state. The engine already applied its fallback (`active_option_id`) when it opened.
+2. Only when it **opens**: ask Claude once with the ranked options (engine numbers, `harm_score`, `rank`, `within_authority`, the
+   fallback in force), context summary, owner preferences, authority. Claude must call
+   `choose_escalation_option(option_id, rationale)`; the id is an enum of the offered ids. Updates are published, not re-asked.
+3. `kitchen.resolve_escalation(id, option_id, "claude", rationale)`. `awaiting_owner` → create a Proposal (`kind: resolve_escalation`)
+   shown in the UI and ASI:One. Returned unchanged (already `resolved`, `expired_default` or `obsolete`) or `RuleError` (option no
+   longer offered) → log it; the Concierge tells the owner what is in force (`active_option_id`) and why.
+4. Claude timeout (8 real s) or error → nothing to do: the fallback stays. Log it.
 - Max **one** AI call in flight; if the queue is longer than 3, older items keep their template text.
 
 ## AI agent
@@ -96,7 +102,8 @@ System prompt essentials:
 - Only state numbers that appear in tool results. If you need a number, call a tool.
 - You cannot control devices. To change importance, the cap, your authority, undo a decision or add a customer event,
   call a `propose_*` tool; it applies only after the owner confirms.
-- In an escalation, choose the option that best fits the context and the owner's preferences; explain in one sentence
+- In an escalation, the engine has already applied its fallback (`active_option_id`, the best-ranked option within your
+  authority). Keep it or choose the option that better fits the context and the owner's preferences; explain in one sentence
   using the option's numbers. Prefer options within your authority; choose `ask_owner` when the trade-off is the owner's to make.
 - When explaining a decision, say what changed, why (reason_code + forecast), and the effect from the tool.
 

@@ -1,9 +1,11 @@
 {
   "type": "clock",
   "playing": true,
-  "speed": 1,
-  "sim_ts": "2026-07-18T01:30:00Z",
-  "tick_id": 60,
+  "speed": 120,
+  "sim_ts": "2026-07-18T01:20:00Z",
+  "tick_id": 50,
   "paused_reason": null,
-  "slowed_reason": "escalation"
+  "day_index": 1,
+  "run_days": 1,
+  "phase": "service"
 }

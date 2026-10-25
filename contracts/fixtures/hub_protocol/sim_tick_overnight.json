@@ -1,0 +1,15 @@
+{
+  "type": "sim_tick",
+  "tick_id": 300,
+  "sim_ts": "2026-07-18T05:29:00Z",
+  "minutes": 1,
+  "surges": [],
+  "inputs": {
+    "outdoor_temp_c": 22.9,
+    "crowd_multiplier": 1.25,
+    "is_open": false
+  },
+  "commands": [],
+  "replay": false,
+  "fast_forward": true
+}

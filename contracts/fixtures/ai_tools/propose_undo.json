@@ -1,17 +1,17 @@
 {
   "tool": "propose_undo",
   "input": {
-    "decision_id": "d_0001",
-    "summary": "Undo the dishwasher delay"
+    "decision_id": "d_0014",
+    "summary": "Undo: Reduced HVAC 2 to 40 % to stay under the cap (43.2 → 40.8 kW)"
   },
   "output": {
     "proposal_id": "p_0004",
     "ts": "2026-07-18T02:30:00Z",
     "kind": "undo_decision",
     "payload": {
-      "decision_id": "d_0001"
+      "decision_id": "d_0014"
     },
-    "summary": "Undo the dishwasher delay",
+    "summary": "Undo: Reduced HVAC 2 to 40 % to stay under the cap (43.2 → 40.8 kW)",
     "status": "pending",
     "created_by": "ai",
     "confirmed_via": null,

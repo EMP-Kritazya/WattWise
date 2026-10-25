@@ -1,0 +1,11 @@
+{
+  "method": "POST",
+  "path": "/api/sim/control",
+  "status": 422,
+  "request": {
+    "action": "next_day"
+  },
+  "response": {
+    "detail": "next_day only while paused_reason is run_complete"
+  }
+}

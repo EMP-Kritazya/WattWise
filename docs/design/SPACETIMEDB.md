@@ -8,7 +8,7 @@ SpacetimeDB is what ticks: every viewer and judge sees and plays in the same kit
 2. **Runtime writes state; viewers write requests.** State tables are written only by the runtime identity (checked against
    the identity stored at `init`). Viewers may call public **request** reducers (`request_surge`) whose rows the runtime consumes.
    This is the "many users writing at once" the SpacetimeDB track asks for.
-3. **Batch per tick.** One `publish_ticks` call per real tick for both lanes. Never one call per device.
+3. **Batch per tick.** One `publish_ticks` call per real tick for both lanes (overnight: once per closed 15-min block). Never one call per device.
 4. **Bounded tables.** Current state + short history (tick_history 180 sim min per lane, feed 50, escalations 20, agent log 300).
    Durable history belongs in Convex.
 5. **Schema on day one.** Automatic migrations allow adding tables but block most changes to existing ones; agree the schema in
@@ -17,8 +17,8 @@ SpacetimeDB is what ticks: every viewer and judge sees and plays in the same kit
 7. **Design for the screens' queries:** keys and indexes by lane and time, newest first.
 8. **Fallback exists.** `LIVE_TRANSPORT=ws` sends the same messages over FastAPI `/ws`; the UI hook switches automatically.
 9. **Month to date lives here too.** For now everything runs in simulation (no physical ESP32), and the `live_tick` row per lane
-   is the month-to-date store (month peaks, energy and cost so far). On a rebuild in the same month the runtime reads it back and
-   passes it to the engine as `WarmUpHistory.month_to_date`; otherwise month-to-date comes from the ComStock warm-up.
+   is the month-to-date store (month peaks, energy and cost so far). The engine seeds it from the ComStock warm-up; it is not read back
+   in this build (`WarmUpHistory.month_to_date` stays null; `reset_all` clears it with the other tables).
 10. **The UI's only live source.** Every screen in every tab (sim host included) draws from these tables: kitchen floor from
    `live_device` (state, power, physical gauges), energy and cost from `live_tick`, charts from `tick_history`. The browser
    simulation never writes here; it reports to FastAPI over `/ws/hub` and the runtime publishes.

@@ -11,7 +11,8 @@ every screen sees it live.
 ## 1. Your job in one paragraph
 You build the **engine**: pure Python that takes each lane's HubReport (the hub's current state) every tick, meters energy and
 cost on a real tariff, forecasts, and every 5th tick decides Commands inside the owner's rules; when no such move holds the
-peak goal it escalates with 2–3 evaluated alternatives + `ask_owner` and validates whatever Claude or the owner picks. You build
+peak goal it escalates: it applies the best-ranked option within the owner's authority at once, offers up to 3 evaluated
+alternatives + `ask_owner`, and revalidates whatever Claude or the owner picks. You build
 **SpacetimeDB** (module + Python live client), the UI's live source for charts and engine results. You keep the **contracts and
 fixtures** that let the other two build without you, and the **backtest** that proves savings on ComStock data + a URDB tariff.
 
@@ -21,7 +22,7 @@ fixtures** that let the other two build without you, and the **backtest** that p
 | `backend/engine/`, `backend/backtest/`, `backend/data/` (except `equipment_catalog.json`) | `backend/api/`, `backend/runtime/`, `backend/agent/`, `backend/store/`, `backend/fakes/fake_kitchen.py`, `backend/fakes/fake_hub_client.py` |
 | `backend/contracts/`, `contracts/` (schema + `fixtures/` via `fixture-builder`) | `agents/`, `convex/`, `firmware/` |
 | `backend/live/`, `backend/fakes/fake_live.py`, `spacetime/` | `frontend/`, `backend/data/equipment_catalog.json` |
-| `backend/tests/{engine,backtest,live}/`, `infra/` Container Apps | Docs: only `CONTRACTS.md`, `design/ENGINE.md`, `design/SPACETIMEDB.md`, `design/DATA_AND_PROOF.md`, `design/AZURE.md` and this file |
+| `backend/tests/{engine,backtest,live}/`, `infra/` Container Apps | Docs: `CONTRACTS.md`, `Main_Gaps.md`, `design/ENGINE.md`, `design/SPACETIMEDB.md`, `design/DATA_AND_PROOF.md`, `design/AZURE.md`, this file; other docs only to keep them in sync with a contract change, announced to the team |
 
 ## 3. Rules for this phase (independent development)
 1. **Build only against the fake data** in `contracts/fixtures/` (section 5) for everything you don't own. The engine never
@@ -42,7 +43,7 @@ fixtures** that let the other two build without you, and the **backtest** that p
 - [ ] Verify the HTTP reducer call from Python on the installed version (record the result in `docs/design/SPACETIMEDB.md`)
 - [ ] `backend/live/spacetime_client.py` (publish_ticks, publish_feed, set_clock, publish_context, publish_escalation, log_agent, read/consume surges), never blocking; `fakes/fake_live.py`; payloads equal `fixtures/spacetime/reducers/*.json`
 
-**C. Engine** — design: `docs/design/ENGINE.md` (draft; internals are yours to decide)
+**C. Engine** — design: `docs/design/ENGINE.md` (decided 2026-10-24; open: Main_Gaps Q4, Q5)
 - [x] Decide and document (ENGINE.md, CONTRACTS.md, Main_Gaps.md C + I): warm-up = ComStock `WarmUpHistory` · `minimize` target = highest peak of the previous 4 same weekdays · power-only planning model (no HVAC thermal model this build) · escalate when a block within 30 min can't be held; fallback applied at once; harm ranking
 - [ ] Run `contract-sync` then `fixture-builder` for the 2026-10-24 contract changes (Meter, TickState warnings, Escalation, Command, ClockState, WarmUpHistory, SpacetimeDB columns) and send the team notice
 - [ ] Multi-day runs + fake history (Main_Gaps J, G56–G60): `contract-sync` → `fixture-builder` (`history/`, `scenario/demo_cafe_multiday/`, `generate.py --days N`) → team notice
@@ -52,7 +53,7 @@ fixtures** that let the other two build without you, and the **backtest** that p
 - [ ] Context (`set_context`), forecaster, decider, rules (limits are hard: e.g. `must_finish_by`), ledger, undo, `what_if`, `compare_lanes`
 - [ ] Escalation: options, projections, `within_authority`, harm ranking, fallback at open, update in place / `obsolete`, `resolve_escalation` revalidation, deadline → `expired_default`
 - [ ] `backend/data/warmup.py` + `build_warmup`: ComStock → `WarmUpHistory` for the Demo Café (scale, day_offset, recipe)
-- [ ] All ENGINE.md §7 hand-computed tests; run `engine-math-verifier`
+- [ ] All ENGINE.md §15 hand-computed tests; run `engine-math-verifier`
 
 **D. Data + proof** — design: `docs/design/DATA_AND_PROOF.md`
 - [ ] Pick the ComStock building + county and the URDB tariff (same region); loader, distribution recipe, replay (no peeking), `run_backtest` (without / timer / with × 12 months), checks, sensitivity; run `backtest-auditor`
@@ -68,6 +69,7 @@ fixtures** that let the other two build without you, and the **backtest** that p
 | Context the engine receives | `shapes/context.json`, `agents/context_post.json` |
 | SpacetimeDB rows + reducer args | `spacetime/tables/*.json`, `spacetime/reducers/*.json`, `spacetime/rows_stream.jsonl` |
 | Scenario + open questions | `scenario/demo_cafe/`, `README.md`, `GAPS.md` |
+| Warm-up history + multi-day streams | `history/warmup_demo_cafe.json`, `scenario/demo_cafe_multiday/`, `generate.py --days N` (next `fixture-builder` run) |
 
 ## 6. Big-picture docs
 `docs/ARCHITECTURE.md` · `docs/CONTRACTS.md` (all; you own it) · `docs/design/ENGINE.md` · `SPACETIMEDB.md` · `DATA_AND_PROOF.md` ·

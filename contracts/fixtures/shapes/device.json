@@ -4,11 +4,11 @@
   "name": "HVAC 1",
   "importance": "flexible",
   "state": "reduced",
-  "power_kw": 5.28,
+  "power_kw": 4.8,
   "rated_kw": 12.0,
-  "power_pct": 44,
+  "power_pct": 40,
   "source": "simulated",
   "physical": {
-    "indoor_temp_c": 22.6
+    "indoor_temp_c": 22.9
   }
 }

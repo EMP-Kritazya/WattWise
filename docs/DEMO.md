@@ -27,7 +27,7 @@ Kritazya pitches and takes the Proof questions. Everyone can answer any question
 | 0:00 to 0:15 | **Pain** | Last month's bill: one 15-minute lunch spike set most of the demand charge. | Anthropic, Microsoft |
 | 0:15 to 0:35 | **Senses** | Agent Network: Weather, Grid and Events agents report to the Concierge — hot evening, prices high, Giants game 1.8 km away (crowd: medium). | Fetch.ai |
 | 0:35 to 1:05 | **Judges play** | Judge taps +40 customers on their own phone; same kitchen everywhere. Engine delays the dishwasher, trims HVAC. Without lane breaks the cap; With lane bends under it. | SpacetimeDB |
-| 1:05 to 1:30 | **Judgment** | Escalation card: no in-rules fix left. Options with engine numbers → Claude chooses within the owner's authority and says why. On the phone, the owner asks ASI:One "what did you decide about tonight?" | Anthropic, Fetch.ai |
+| 1:05 to 1:30 | **Judgment** | Escalation card: no in-rules fix left. The engine applies its safest option at once; Claude reviews the ranked options (engine numbers), keeps or switches within the owner's authority, and says why. On the phone, the owner asks ASI:One "what did you decide about tonight?" | Anthropic, Fetch.ai |
 | 1:30 to 1:50 | **Proof** | 12 months of DOE-calibrated restaurant data on a real tariff, no peeking: Without [$A] · Timer [$B] · With [$C]; worst case [$D]. Running on Azure; the ESP32 fan obeys the same commands through Convex. | Microsoft, Convex, Technical |
 | 1:50 to 2:00 | **Close** | "WattWise: stop paying for peaks you never saw coming." | |
 Fill brackets only with numbers on screen, cleared by `backtest-auditor`.
@@ -44,7 +44,7 @@ Fill brackets only with numbers on screen, cleared by `backtest-auditor`.
 ## Likely questions
 - Does the AI make the decisions? The engine makes every routine decision and computes every number. Only when no in-rules move
   can hold the cap does Claude choose among the engine's options, inside limits the owner set; beyond them the owner decides,
-  and if nobody answers a safe default applies. The kitchen runs the same with the AI off.
+  and if nobody answers, the safe fallback the engine applied at once simply stays. The kitchen runs the same with the AI off.
 - Why several agents? Each owns one live source (weather, prices, events); the Concierge orchestrates them and talks to the owner.
 - Does the backtest see the future? No. Rows are fed one at a time; a test enforces it.
 - Is this real data? Calibrated DOE restaurant models (NREL ComStock) on a real named tariff. January is partial (warm-up).

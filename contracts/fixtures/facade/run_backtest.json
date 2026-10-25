@@ -2,6 +2,7 @@
   "call": "run_backtest",
   "args": {
     "months": [
+      "2026-06",
       "2026-07"
     ],
     "assumptions_id": "base",
@@ -9,64 +10,133 @@
   },
   "returns": [
     {
-      "dataset": "DOE-calibrated restaurant profile (NREL ComStock)",
+      "dataset": "Simulated fixture data (contracts/fixtures/history, fixture_synthetic): not ComStock, not a measured bill",
+      "month": "2026-06",
+      "policies": {
+        "without": {
+          "period": "2026-06",
+          "energy_kwh": 10725.646,
+          "energy_cost_usd": 2986.7,
+          "demand_charges": [
+            {
+              "name": "max_demand",
+              "peak_kw": 44.136,
+              "cost_usd": 882.72
+            },
+            {
+              "name": "peak_demand",
+              "peak_kw": 41.129,
+              "cost_usd": 329.03
+            }
+          ],
+          "total_usd": 4198.45,
+          "tariff_id": "demo_tariff_v1"
+        },
+        "timer": {
+          "period": "2026-06",
+          "energy_kwh": 10725.646,
+          "energy_cost_usd": 2985.54,
+          "demand_charges": [
+            {
+              "name": "max_demand",
+              "peak_kw": 44.136,
+              "cost_usd": 882.72
+            },
+            {
+              "name": "peak_demand",
+              "peak_kw": 41.342,
+              "cost_usd": 330.74
+            }
+          ],
+          "total_usd": 4199.0,
+          "tariff_id": "demo_tariff_v1"
+        },
+        "with": {
+          "period": "2026-06",
+          "energy_kwh": 10725.646,
+          "energy_cost_usd": 2986.7,
+          "demand_charges": [
+            {
+              "name": "max_demand",
+              "peak_kw": 39.0,
+              "cost_usd": 780.0
+            },
+            {
+              "name": "peak_demand",
+              "peak_kw": 39.0,
+              "cost_usd": 312.0
+            }
+          ],
+          "total_usd": 4078.7,
+          "tariff_id": "demo_tariff_v1"
+        }
+      },
+      "checks": {
+        "baseline_matches_raw": true,
+        "energy_conserved": true,
+        "rule_violations": 0
+      },
+      "assumptions_id": "base"
+    },
+    {
+      "dataset": "Simulated fixture data (contracts/fixtures/history, fixture_synthetic): not ComStock, not a measured bill",
       "month": "2026-07",
       "policies": {
         "without": {
           "period": "2026-07",
-          "energy_kwh": 21840.0,
-          "energy_cost_usd": 4210.55,
+          "energy_kwh": 5742.777,
+          "energy_cost_usd": 1595.84,
           "demand_charges": [
             {
               "name": "max_demand",
-              "peak_kw": 46.0,
-              "cost_usd": 920.0
+              "peak_kw": 42.537,
+              "cost_usd": 850.74
             },
             {
               "name": "peak_demand",
-              "peak_kw": 46.0,
-              "cost_usd": 368.0
+              "peak_kw": 42.537,
+              "cost_usd": 340.3
             }
           ],
-          "total_usd": 5498.55,
+          "total_usd": 2786.88,
           "tariff_id": "demo_tariff_v1"
         },
         "timer": {
           "period": "2026-07",
-          "energy_kwh": 21840.0,
-          "energy_cost_usd": 4206.1,
+          "energy_kwh": 5742.777,
+          "energy_cost_usd": 1595.19,
           "demand_charges": [
             {
               "name": "max_demand",
-              "peak_kw": 44.0,
-              "cost_usd": 880.0
+              "peak_kw": 42.43,
+              "cost_usd": 848.6
             },
             {
               "name": "peak_demand",
-              "peak_kw": 44.0,
-              "cost_usd": 352.0
+              "peak_kw": 42.43,
+              "cost_usd": 339.44
             }
           ],
-          "total_usd": 5438.1,
+          "total_usd": 2783.23,
           "tariff_id": "demo_tariff_v1"
         },
         "with": {
           "period": "2026-07",
-          "energy_kwh": 21840.0,
-          "energy_cost_usd": 4198.2,
+          "energy_kwh": 5742.777,
+          "energy_cost_usd": 1595.84,
           "demand_charges": [
             {
               "name": "max_demand",
-              "peak_kw": 40.0,
-              "cost_usd": 800.0
+              "peak_kw": 39.0,
+              "cost_usd": 780.0
             },
             {
               "name": "peak_demand",
-              "peak_kw": 40.0,
-              "cost_usd": 320.0
+              "peak_kw": 39.0,
+              "cost_usd": 312.0
             }
           ],
-          "total_usd": 5318.2,
+          "total_usd": 2687.84,
           "tariff_id": "demo_tariff_v1"
         }
       },

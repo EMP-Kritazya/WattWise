@@ -1,0 +1,309 @@
+{
+  "name": "Demo Café",
+  "label": "FAKE DATA - not measured, not live",
+  "seed": 42,
+  "timezone": "America/Los_Angeles",
+  "start_sim_ts": "2026-07-18T00:30:00Z",
+  "start_local": "2026-07-17 17:30 (Friday)",
+  "minutes_per_tick": 1,
+  "speed": 120,
+  "peak_cap_kw": 40.0,
+  "kitchen_id": "k_01",
+  "tariff": {
+    "tariff_id": "demo_tariff_v1",
+    "name": "WattWise demo commercial rate",
+    "label": "illustrative",
+    "currency": "USD",
+    "timezone": "America/Los_Angeles",
+    "energy": [
+      {
+        "name": "off_peak",
+        "start": "00:00",
+        "end": "16:00",
+        "usd_per_kwh": 0.22
+      },
+      {
+        "name": "peak",
+        "start": "16:00",
+        "end": "21:00",
+        "usd_per_kwh": 0.38
+      },
+      {
+        "name": "off_peak",
+        "start": "21:00",
+        "end": "24:00",
+        "usd_per_kwh": 0.22
+      }
+    ],
+    "demand": [
+      {
+        "name": "max_demand",
+        "window": null,
+        "usd_per_kw": 20.0
+      },
+      {
+        "name": "peak_demand",
+        "window": {
+          "start": "16:00",
+          "end": "21:00"
+        },
+        "usd_per_kw": 8.0
+      }
+    ]
+  },
+  "warm_up": {
+    "history": "history/warmup_demo_cafe.json",
+    "month_to_date": null,
+    "starting_meter_from_history": {
+      "energy_kwh_today": 247.814,
+      "energy_kwh_month": 5742.777,
+      "month_peak_kw": 42.54,
+      "on_peak_month_peak_kw": 42.54,
+      "energy_cost_usd_today": 62.16,
+      "energy_cost_usd_month": 1595.84
+    }
+  },
+  "context_post_ticks": [
+    1,
+    61,
+    361,
+    661,
+    961,
+    1261,
+    1561
+  ],
+  "initial_conditions": {
+    "dishwasher_dirty_racks": 5.8,
+    "ice_level_pct": 62.0
+  },
+  "config": {
+    "name": "Demo Café",
+    "equipment": [
+      {
+        "type_id": "hvac",
+        "count": 2,
+        "importance": "flexible",
+        "limits": {
+          "min_power_pct": 40,
+          "max_reduce_min": 30
+        }
+      },
+      {
+        "type_id": "walk_in_cooler",
+        "count": 1,
+        "importance": "flexible",
+        "limits": {
+          "min_power_pct": 50,
+          "max_reduce_min": 30
+        }
+      },
+      {
+        "type_id": "reach_in_fridge",
+        "count": 1,
+        "importance": "always_on",
+        "limits": {}
+      },
+      {
+        "type_id": "freezer",
+        "count": 1,
+        "importance": "always_on",
+        "limits": {}
+      },
+      {
+        "type_id": "ice_machine",
+        "count": 1,
+        "importance": "deferrable",
+        "limits": {
+          "max_delay_min": 60,
+          "must_finish_by": "22:00"
+        }
+      },
+      {
+        "type_id": "fryer",
+        "count": 1,
+        "importance": "always_on",
+        "limits": {}
+      },
+      {
+        "type_id": "oven",
+        "count": 1,
+        "importance": "always_on",
+        "limits": {}
+      },
+      {
+        "type_id": "grill",
+        "count": 1,
+        "importance": "always_on",
+        "limits": {}
+      },
+      {
+        "type_id": "dishwasher",
+        "count": 1,
+        "importance": "deferrable",
+        "limits": {
+          "max_delay_min": 60,
+          "must_finish_by": "19:30"
+        }
+      },
+      {
+        "type_id": "water_heater",
+        "count": 1,
+        "importance": "flexible",
+        "limits": {
+          "min_power_pct": 40,
+          "max_reduce_min": 30
+        }
+      },
+      {
+        "type_id": "lights",
+        "count": 1,
+        "importance": "always_on",
+        "limits": {}
+      }
+    ],
+    "peak_mode": "cap",
+    "peak_cap_kw": 40.0,
+    "operating_hours": {
+      "open": "10:00",
+      "close": "22:00"
+    },
+    "location": {
+      "lat": 37.8,
+      "lon": -122.44,
+      "label": "Marina, San Francisco"
+    },
+    "owner_preferences": "Keep the dining room comfortable during dinner service.",
+    "authority": {
+      "enabled": true,
+      "max_cap_overrun_kw": 3.0,
+      "max_extra_delay_min": 20,
+      "max_extra_reduce_min": 15,
+      "may_go_below_min_power": false
+    },
+    "tariff_id": "demo_tariff_v1",
+    "run_days": 2,
+    "seed": 42
+  },
+  "ticks": 1710,
+  "run_days": 2,
+  "segments": [
+    {
+      "from_tick": 241,
+      "to_tick": 270,
+      "ticks": 30,
+      "phase": "service",
+      "day_index": 1,
+      "from_local": "Fri 17 Jul 21:30",
+      "to_local": "Fri 17 Jul 22:00",
+      "is_open": true,
+      "fast_forward": false,
+      "published": "every tick"
+    },
+    {
+      "from_tick": 271,
+      "to_tick": 990,
+      "ticks": 720,
+      "phase": "overnight",
+      "day_index": 1,
+      "from_local": "Fri 17 Jul 22:00",
+      "to_local": "Sat 18 Jul 10:00",
+      "is_open": false,
+      "fast_forward": true,
+      "published": "once per closed 15-min block (publish_ticks, set_clock, ws tick/comparison/clock)"
+    },
+    {
+      "from_tick": 991,
+      "to_tick": 1200,
+      "ticks": 210,
+      "phase": "service",
+      "day_index": 2,
+      "from_local": "Sat 18 Jul 10:00",
+      "to_local": "Sat 18 Jul 13:30",
+      "is_open": true,
+      "fast_forward": false,
+      "published": "every tick"
+    },
+    {
+      "gap": true,
+      "from_tick": 1201,
+      "to_tick": 1695,
+      "note": "omitted to keep the files small; the run continues (same physics, same ids) and the omitted ticks are in `generate.py --days 2`"
+    },
+    {
+      "from_tick": 1696,
+      "to_tick": 1710,
+      "ticks": 15,
+      "phase": "service",
+      "day_index": 2,
+      "from_local": "Sat 18 Jul 21:45",
+      "to_local": "Sat 18 Jul 22:00",
+      "is_open": true,
+      "fast_forward": false,
+      "published": "every tick"
+    },
+    {
+      "phase": "closed",
+      "after_tick": 1710,
+      "paused_reason": "run_complete",
+      "note": "clock stops after the last day's close; POST /api/sim/control {action: next_day} adds a day"
+    }
+  ],
+  "timeline": [
+    {
+      "tick": 361,
+      "what": "recorded context posted (Context ts 2026-07-18T06:30:00Z), crowd_effect medium"
+    },
+    {
+      "tick": 661,
+      "what": "recorded context posted (Context ts 2026-07-18T11:30:00Z), crowd_effect none"
+    },
+    {
+      "tick": 961,
+      "what": "recorded context posted (Context ts 2026-07-18T16:30:00Z), crowd_effect none"
+    },
+    {
+      "tick": 1080,
+      "what": "d_0023 with walk_in_cooler_1 reduce 50 (stay_under_cap)"
+    },
+    {
+      "tick": 1095,
+      "what": "d_0024 with water_heater_1 reduce 60 (stay_under_cap)"
+    },
+    {
+      "tick": 1110,
+      "what": "d_0025 with walk_in_cooler_1 restore (catch_up)"
+    },
+    {
+      "tick": 1125,
+      "what": "d_0026 with water_heater_1 restore (catch_up)"
+    },
+    {
+      "tick": 1125,
+      "what": "d_0027 with dishwasher_1 delay 60 (stay_under_cap)"
+    },
+    {
+      "tick": 1126,
+      "what": "sim_tick carries surge s_0002 (+35 customers for 45 min)"
+    },
+    {
+      "tick": 1140,
+      "what": "d_0028 with ice_machine_1 delay 60 (stay_under_cap)"
+    },
+    {
+      "tick": 1140,
+      "what": "d_0029 with walk_in_cooler_1 reduce 50 (stay_under_cap)"
+    },
+    {
+      "tick": 1170,
+      "what": "d_0030 with walk_in_cooler_1 restore (catch_up)"
+    },
+    {
+      "tick": 1175,
+      "what": "d_0031 with hvac_1 reduce 40 (stay_under_cap)"
+    },
+    {
+      "tick": 1710,
+      "what": "day 2 closes at 22:00: clock stops, phase closed, paused_reason run_complete"
+    }
+  ]
+}

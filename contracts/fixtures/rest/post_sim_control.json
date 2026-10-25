@@ -12,6 +12,8 @@
     "sim_ts": "2026-07-18T00:30:00Z",
     "tick_id": 0,
     "paused_reason": null,
-    "slowed_reason": null
+    "day_index": 1,
+    "run_days": 1,
+    "phase": "service"
   }
 }

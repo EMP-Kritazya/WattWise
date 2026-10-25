@@ -3,7 +3,7 @@
   "lane": "without",
   "tick_id": 50,
   "ts": "2026-07-18T01:20:00Z",
-  "total_kw": 47.24,
+  "total_kw": 45.64,
   "customers_per_hour": 107,
   "devices": [
     {
@@ -81,14 +81,14 @@
       "type_id": "ice_machine",
       "name": "Ice machine 1",
       "importance": "deferrable",
-      "state": "running_job",
-      "power_kw": 1.6,
+      "state": "off",
+      "power_kw": 0.0,
       "rated_kw": 1.6,
-      "power_pct": 100,
+      "power_pct": 0,
       "source": "simulated",
       "physical": {
-        "ice_level_pct": 36,
-        "job_remaining_min": 16
+        "ice_level_pct": 32,
+        "job_remaining_min": 0
       }
     },
     {
@@ -145,7 +145,7 @@
       "source": "simulated",
       "physical": {
         "dirty_racks": 1,
-        "job_remaining_min": 17
+        "job_remaining_min": 15
       }
     },
     {

@@ -54,7 +54,7 @@ Rules for the live use:
   `python -m data.build_warmup` (also in the backend image build). Missing file → the engine runs without warm-up; nothing blocks.
 - **Honesty.** Warm-up and month-to-date are a calibrated model of a restaurant, never "your past bill"; the live tick-by-tick load is
   `simulated`.
-- **Until the ComStock extract exists:** the fixture builder's fake 2-month history (`contracts/fixtures/history/`, 2026-05-17 →
+- **Until the ComStock extract exists:** the fixture builder's fake 2-month history (`contracts/fixtures/history/`, from its next run; 2026-05-17 →
   2026-07-17 17:30 local, `source: fixture_synthetic`, `label: simulated`) stands in, in the same `WarmUpHistory` shape. Its
   fake June/July `BacktestResult` (`rest/get_backtest.json`) is for building the Proof screen only; it is never shown as savings.
 
@@ -91,10 +91,10 @@ Shares and windows are **assumptions**: keep them in `backtest/assumptions.yaml`
 |---|---|
 | `without` | Every device exactly as in the data |
 | `timer` | Best fixed daily schedule for deferrable jobs, chosen on the **previous** month (a fair, strong baseline). January has no previous month, so its timer is fitted on the warm-up weeks |
-| `with` | The WattWise engine; escalations resolved by the **default** (no Claude), so results are reproducible and conservative |
+| `with` | The WattWise engine; escalations end with the engine's **fallback** (no Claude), so results are reproducible and conservative |
 
 Context in replay: historical weather (Open-Meteo archive) and prices (CAISO history) for the same dates, labeled
-`real_measured`; crowd effect `none`. Optional, cut item: one replayed week with Claude resolving escalations, shown separately.
+`recorded` (historical archives); crowd effect `none`. Optional, cut item: one replayed week with Claude resolving escalations, shown separately.
 
 ## Checks (all must pass before a number is shown)
 | Check | Expected |

@@ -4,6 +4,7 @@
   "status": 200,
   "request": {
     "months": [
+      "2026-06",
       "2026-07"
     ],
     "assumptions_id": "base"

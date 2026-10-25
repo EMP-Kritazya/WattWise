@@ -5,10 +5,14 @@
   "spacetime_publish_ticks": "spacetime/rows_stream.jsonl",
   "viewer_ws": "ws/stream.jsonl",
   "agent_log": "agents/agent_log.jsonl",
+  "warm_up": "history/warmup_demo_cafe.json",
+  "daily_inputs": "history/daily_inputs.json",
   "escalation": {
     "open": "shapes/escalation_open.json",
-    "resolved": "shapes/escalation_resolved_claude.json"
+    "resolved": "shapes/escalation_resolved_claude.json",
+    "opened_tick": 50
   },
+  "owner_click_after_tick": 118,
   "decision_ids": [
     "d_0001",
     "d_0002",
@@ -25,29 +29,48 @@
     "d_0013",
     "d_0014",
     "d_0015",
-    "d_0016"
+    "d_0016",
+    "d_0017",
+    "d_0018",
+    "d_0019",
+    "d_0020",
+    "d_0021",
+    "d_0022"
   ],
   "command_ids": [
     "c_0001",
     "c_0002",
     "c_0003",
     "c_0004",
+    "c_0005",
+    "c_0006",
+    "c_0007",
     "c_0008",
     "c_0009",
-    "c_0010",
-    "c_0011",
-    "c_0012",
     "c_0013",
     "c_0014",
     "c_0015",
     "c_0016",
     "c_0017",
     "c_0018",
-    "c_0019"
+    "c_0019",
+    "c_0020",
+    "c_0021",
+    "c_0022",
+    "c_0023",
+    "c_0024",
+    "c_0025"
+  ],
+  "escalation_ids": [
+    "e_0001"
   ],
   "escalation_option_command_ids": [
-    "c_0005",
-    "c_0006",
-    "c_0007"
-  ]
+    "c_0010",
+    "c_0011",
+    "c_0012"
+  ],
+  "standalone_example_ids": {
+    "decision": "d_0035",
+    "command": "c_0038"
+  }
 }

@@ -32,8 +32,8 @@ One data hook hides the switch. Until the backend exists, `src/mocks` serves the
 - **Per device importance** (after counts are set, each unit is listed): segmented control
   `Always on | Flexible | Deferrable`, with its limits shown inline:
   flexible → min power % slider + max minutes; deferrable → max delay minutes + finish-by time.
-- **Peak goal**: segmented control `Minimize peak | Hard limit`. *Minimize* → no number, the engine keeps the month's peak as low as
-  the rules allow. *Hard limit* → slider/input in **kW**, helper line: "Your highest 15-minute average power. Demand charges are based on this."
+- **Peak goal**: segmented control `Minimize peak | Hard limit`. *Minimize* → no number; each day the engine holds the highest 15-minute
+  peak of the last 4 same weekdays as a hard limit (`live_tick.target_kw`). *Hard limit* → slider/input in **kW**, helper line: "Your highest 15-minute average power. Demand charges are based on this."
   Sends `peak_mode` + `peak_cap_kw` (CONTRACTS.md KitchenConfig).
 - Location (preset "Marina, San Francisco"), owner preferences (free text), operating hours, tariff (preset), seed (hidden in demo mode).
 - **Run for**: segmented control `1 day | 3 days | 1 week | 2 weeks` → `KitchenConfig.run_days` (1 · 3 · 7 · 14). Helper line:
@@ -60,16 +60,18 @@ chat drawer (slide-in). The toggle is a per-viewer preference (remembered locall
   (the ESP32 box) that shows total kW and pulses each tick — makes "everything reports to one box" visible.
   With `HARDWARE=esp32`, the Hub tile shows online/offline and mapped tiles carry a small "hardware" badge.
 - **Two-lane chart:** total kW over the last 3 sim hours, `Without WattWise` vs `With WattWise`, plus a horizontal
-  **peak cap** line and **month peak** line. Forecast for the next 2 h drawn dashed on the `with` lane.
+  **target** line (`target_kw`: the peak cap, or the day's target in minimize mode) and **month peak** line. Forecast for the next 2 h drawn dashed on the `with` lane.
 - **KPI row:** now kW, 15-min average, month peak (both lanes), cost today (both lanes), **saved today** and peak avoided
   (both from `LaneComparison`, never computed in the browser).
-- **Decision feed:** newest first. Each item: time, device, action, explanation, effect (kW and $), Undo button.
+- **Decision feed:** newest first. Each item: time, device, action, explanation, effect (kW and $), Undo button on executed reduce / delay items
+  (the API answers 422 once that command is no longer in force).
   AI-written explanations show a small "AI" tag; templates show none.
 - **Context strip:** outdoor temp now and next hours, price now + sparkline + stress, nearby events, crowd effect; each with its label.
-- **Escalation card:** problem (forecast peak vs cap), options with engine numbers and rule breaks, `within authority` badges.
-  States: *Claude is choosing…* → *Claude chose X: rationale* (or *Waiting for you* with option buttons when outside authority,
-  or *Default applied* at the deadline). The clock never pauses or slows for an escalation (the engine's fallback is already
-  applied; `active_option_id` shows what is in force).
+- **Escalation card:** problem (forecast peak vs target), options in `rank` order with engine numbers, rule breaks and
+  `within authority` badges, the option in force (`active_option_id`) highlighted. States: *Fallback applied: X, Claude is
+  reviewing…* → *Claude kept X* / *Claude switched to Y: rationale* (or *Waiting for you* with option buttons until the deadline
+  when outside authority) · *Deadline passed: X stays* (`expired_default`) · *Risk passed* (`obsolete`). One card per escalation id,
+  updated in place. The clock never pauses or slows for an escalation.
 - **Overnight** (`phase: overnight`): dim the floor and show a "Closed — fast-forwarding to 10:00" overlay with the sim clock;
   no per-tick animation (the hub re-renders once per 15 sim min; viewers get one row per 15-min block). Charts keep drawing the
   block rows so the night's always-on load is visible. Surge buttons are disabled (held until open).
@@ -77,7 +79,8 @@ chat drawer (slide-in). The toggle is a per-viewer preference (remembered locall
   and `live_comparison` (energy today, cost today, month peak per lane, saved today, peak avoided; no browser math), and a
   **`Continue +1 day`** button → `POST /api/sim/control {action: "next_day"}`. Play is disabled while closed.
 - **Warning banners:** `hub_offline`, `live_transport_down`, `store_down` show a short plain message.
-  `cap_unreachable` → "Your always-on equipment alone needs 44 kW. Raise the cap or change an importance."
+  `cap_unreachable` → "Even with every device at its minimum, the kitchen needs {unavoidable_kw} kW, above your {target_kw} kW
+  target. Raise the cap or change an importance." (numbers from the warning's `data`).
 
 ### 3. Agent Network
 Live graph: Concierge in the centre, Weather / Grid / Events agents around it, Claude and the WattWise engine as nodes.

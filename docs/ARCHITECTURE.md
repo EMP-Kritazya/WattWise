@@ -63,8 +63,9 @@
 5. **The engine does no I/O.** It gets HubReports and context as plain objects through the facade and returns TickStates.
    "The engine contacts Claude" means: the engine emits an Escalation; the runtime calls Claude and hands the chosen id back.
 6. **Claude only on escalation.** The engine handles every routine move within the owner's limits and preferences. Only
-   when no such move holds the cap does it offer 2–3 evaluated alternatives plus `ask_owner`; Claude picks one; the engine
-   validates it against `ClaudeAuthority`; beyond it → owner confirmation; no answer by the deadline → safe default.
+   when no such move holds the cap does it escalate: it ranks up to 3 evaluated alternatives plus `ask_owner`, applies the best
+   one within `ClaudeAuthority` at once (the fallback) and asks Claude once, who may switch to another option; the engine
+   revalidates it; beyond the authority → owner confirmation; no answer by the deadline → the fallback stays.
 7. **Context is periodic.** The Concierge fetches Weather, Grid and Events every `CONTEXT_INTERVAL_S` (default 600 real s)
    and on kitchen build, posts it unchanged, and the runtime passes the latest to the engine. The engine never waits for it.
 8. **Two truths, no overlap.** The hub is the truth of appliance state. The engine is the truth of every computed number
@@ -102,19 +103,19 @@ multiplier) also go to the simulation inside `sim_tick.inputs`. Claude classifie
 Every agent message is logged → SpacetimeDB `live_agent_log`.
 
 **3. Escalation (judgment).** Engine finds a block over the cap with no move inside the owner's limits and preferences →
-Escalation with 2–3 evaluated, harm-ranked alternatives + `ask_owner`, engine numbers for each, `within_authority` → the engine
+Escalation with up to 3 evaluated, harm-ranked alternatives + `ask_owner`, engine numbers for each, `within_authority` → the engine
 applies the safe fallback (best-ranked option within authority) **at once** → runtime asks Claude (context + preferences + ranked
 options) asynchronously → Claude returns an id → `resolve_escalation(...)` → engine revalidates on the latest state: within
 authority and in time → it switches with the next tick; outside → owner Proposal. No answer by the deadline → the fallback stays.
 The clock keeps running at its speed throughout.
 
 **4. Owner (control).** Dashboard REST or ASI:One chat → answers from engine tools → any change is a Proposal → owner confirms →
-code applies via the facade. Manual device clicks → `owner_command()` → Command in the next `sim_tick`.
+code applies via the facade. Manual device clicks → `owner_command()` on both lanes (same manual input, fair comparison) → Command in the next `sim_tick`.
 
 **5. Build.** `POST /api/kitchen` → runtime builds both engine lanes → sends `sim_build` (config, devices, seed, start time) to the
 sim host → the simulation creates both kitchens → `reset_all` + first publish to SpacetimeDB → play.
 Before the first tick each engine lane gets `warm_up(history)`: 4 weeks of per-device 15-min blocks built from NREL ComStock
-(scaled to the kitchen, label `calibrated_model`), so the forecast, the `minimize` target and month-to-date start realistic
+(scaled to the kitchen, label `calibrated_model`; the fixture history until that extract exists), so the forecast, the `minimize` target and month-to-date start realistic
 (DATA_AND_PROOF.md, "Real data in the live product").
 
 ## Hub swap (simulated hub → real ESP32)
@@ -125,7 +126,7 @@ through the same Convex functions, proving the drop-in without hardware. Every d
 
 ## Time
 The runtime owns the clock: `sim_tick` every `0.5 s × 120 / speed` (speeds 1×, 30×, 120× default, 600×). The engine and the
-simulation have no clock of their own. Paused while the hub is missing, or manually (presenter / owner); never for an escalation or approval.
+simulation have no clock of their own. Paused while the hub is missing, manually (presenter / owner), or when the run is complete; never for an escalation or approval.
 Escalation deadlines are in sim time; Claude's timeout is in real time. Backtest runs in Python at full speed without the browser.
 
 **Days.** Cold start = build both lanes and `warm_up` them with 4 weeks of history in one call (no ticks), then run

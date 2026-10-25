@@ -11,7 +11,7 @@ Keeps a restaurant's electricity peak under control without stopping service.
 - **Fetch.ai agents** bring live context: weather, grid prices, nearby events. Owners talk to the **Concierge** in **ASI:One**.
 - A **browser simulation** (one sim host tab) models the appliances and customers; every appliance reports to one **hub** (ESP32-style controller) that talks to FastAPI over a WebSocket.
 - FastAPI runs the clock (1 sim minute per tick, 120×). The **engine** computes every number from the hub's state and, every 5 simulated minutes, sends commands back through the hub inside the owner's rules.
-- When no in-rules move can hold the cap, the engine evaluates 2–3 alternatives and **Claude** chooses one; the engine validates it against the owner's authority; beyond it, the owner confirms.
+- When no in-rules move can hold the cap, the engine applies the safest option within the owner's limits at once and offers up to 3 evaluated alternatives; **Claude** may choose another, which the engine revalidates against the owner's authority; beyond it, the owner confirms.
 - Every screen updates live from **SpacetimeDB**: energy, current price and cost, every appliance's state.
 - Every viewer sees the same live kitchen through **SpacetimeDB**. Records and the ESP32 bridge live in **Convex**. It runs on **Microsoft Azure**.
 - Proof: a year of DOE-calibrated restaurant data replayed on a real tariff — without vs. timer vs. WattWise.
@@ -31,7 +31,6 @@ cd frontend && npm install && npm run dev
 | `DEMO_MODE` | `1` for the identical demo run |
 | `HUB_IMPL` | `browser` (default, the `/sim` tab) \| `fake` (fixture sim host, no browser) |
 | `CONTEXT_INTERVAL_S` | seconds between Fetch context refreshes (default 600) |
-| `ESCALATION_SPEED` | clock speed while Claude resolves an escalation outside demo mode (default 1) |
 | `LIVE_TRANSPORT` | `spacetime` (default) \| `ws` (offline fallback) |
 | `SPACETIMEDB_URL`, `SPACETIMEDB_DB`, `SPACETIMEDB_TOKEN` | SpacetimeDB (runtime identity) |
 | `STORE` | `convex` (default) \| `memory` |

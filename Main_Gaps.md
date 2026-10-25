@@ -17,28 +17,28 @@ Legend: **Decided by Kritazya** = your instruction · **Filled** = chosen here t
 | G02 | Tariff | **Decided by Kritazya.** One made-up, fixed tariff `demo_tariff_v1` (label `illustrative`), identical in every demo run: energy $0.22/kWh off-peak, $0.38/kWh peak 16:00–21:00 local; demand $20/kW monthly max + $8/kW peak-period (16:00–21:00) max. New `Tariff` shape; the engine bills with it | Real OpenEI URDB commercial rate for the restaurant's area (same region as the ComStock county) | ☐ |
 | G03 | Events source | **Decided by Kritazya.** Fixtures use one recorded sports event (`source: "demo_events"`, `label: "recorded"`); `source` is a free string | Suyog picks a real events API reachable from Fetch.ai (e.g. Ticketmaster Discovery) | ☐ |
 | G04 | Scenario start | **Decided by Kritazya.** Friday 17 July 2026, 17:30 local = `2026-07-18T00:30:00Z` | — | ✔ |
-| G05 | Warm-up / starting stats | **Decided by Kritazya (2026-10-24).** `warm_up(WarmUpHistory)`: 4 weeks of per-device 15-min blocks from NREL ComStock, scaled to the kitchen (`calibrated_model`); the engine meters the month's history days for month-to-date. On a rebuild in the same month, month-to-date comes back from the SpacetimeDB `live_tick` row. Scenario fake starting stats are replaced (fixtures to regenerate) | ComStock county + scale recorded in DATA_AND_PROOF.md | ✔ |
+| G05 | Warm-up / starting stats | **Decided by Kritazya (2026-10-24).** `warm_up(WarmUpHistory)`: 4 weeks of per-device 15-min blocks from NREL ComStock, scaled to the kitchen (`calibrated_model`); the engine meters the month's history days for month-to-date. Month to date is published in SpacetimeDB `live_tick`; `WarmUpHistory.month_to_date` stays null in this build (G65). Scenario fake starting stats are replaced (fixtures to regenerate) | ComStock county + scale recorded in DATA_AND_PROOF.md | ✔ |
 | G34 | Catalog `params` | **Filled.** Keys per power model: fixed `{}` · cycling `{duty_idle_pct, duty_busy_pct}` · thermal `{setpoint_c}` · demand_driven `{idle_kw, kw_per_order}` · job `{cycle_min}`. The top-level `EquipmentType.min_power_pct` is removed; `default_limits` is the only source | Calibrated values per type (Ashirwad, FSTC / ENERGY STAR) | ☐ |
 
 ## B. API and messages
 | ID | Topic | Demo decision | Final design | |
 |---|---|---|---|---|
-| G06 | Clock response | **Decided (2026-10-24).** `ClockState { playing, speed, sim_ts, tick_id, paused_reason }`; `slowed_reason` removed; `paused_reason` null \| manual \| hub_waiting \| sim_host_offline | — | ✔ |
+| G06 | Clock response | **Decided (2026-10-24).** `ClockState { playing, speed, sim_ts, tick_id, paused_reason }`; `slowed_reason` removed; `paused_reason` null \| manual \| hub_waiting \| sim_host_offline \| run_complete; plus `day_index`, `run_days`, `phase` (G57) | — | ✔ |
 | G07 | "→ ok" | **Filled.** `{ "ok": true }` | — | ✔ |
 | G08 | `GET /api/kitchen`, errors | **Filled.** `{ config, devices, tariff }`; errors `{ detail }` (422 RuleError, 404 unknown id) | — | ✔ |
 | G09 | Id formats | **Filled.** `run_0001`, `chat_0001`; `months` = list of `"YYYY-MM"` | — | ✔ |
 | G10 | Health values | **Filled.** `kitchen_impl` fake\|real · `live_transport` spacetime\|ws · `store` convex\|memory · `hardware` off\|sim_bridge\|esp32 · `sim_host` connected\|offline | — | ✔ |
 | G11 | `warning.data` | **Filled.** cap_unreachable `{unavoidable_kw, peak_cap_kw, target_kw}` · sim_host_offline `{last_tick_id}` · hub_offline `{device_id, hub_id}` · live_transport_down `{}` · store_down `{}` | — | ✔ |
 
-## C. Engine behaviour (all draft until the engine is designed)
+## C. Engine behaviour (decided 2026-10-24 unless marked ☐)
 | ID | Topic | Demo decision | Final design | |
 |---|---|---|---|---|
-| G12 | Option actions | **Filled.** Option `actions` are templates (`decision_id: null`). Applying an option issues **new** Commands with `escalation_choice` Decisions in the next step | — | ✔ |
+| G12 | Option actions | **Filled.** Option `actions` are templates (`decision_id: null`). The fallback's Commands are issued in the step the escalation opens (`escalation_fallback`); a later choice issues **new** Commands with `escalation_choice` Decisions in the next step | — | ✔ |
 | G13 | `rule_breaks.kind` | **Filled.** `cap_overrun` · `below_min_power` · `past_deadline` · `over_max_reduce` · `over_max_delay`; any option whose projected peak is over the target lists `cap_overrun` | — | ✔ |
 | G14 | `cost_delta_usd` baseline | **Decided by Kritazya.** `cost_delta_usd = optimized_cost_usd − baseline_cost_usd`, `saving_usd = −cost_delta_usd`. Options: baseline = in-rules plan holding the target exactly (so it is the option's extra cost). Decisions: baseline = the plan before this move | — | ✔ |
 | G15 | Default option | **Decided (proposed by Claude, agreed direction by Kritazya; confirm the tolerances).** Engine ranks options by `harm_score` = Σ rule-break amount ÷ the owner's tolerance for that kind (authority bounds), within authority first, then cost. Fallback = rank 1 if within authority, else `ask_owner`; applied the moment the escalation opens; Claude gets the ranked list and may pick any option | Add comfort to harm once an HVAC model exists | ✔ |
 | G16 | Option ids | **Filled.** By type: `deep_reduce_<type_id>`, `extend_delay_<type_id>`; actions list every affected device | — | ✔ |
-| G17 | `awaiting_owner`, deadline | **Decided by Kritazya.** Open when a block starting within 30 sim min can't be held in-rules. Deadline = `max(ts + 5, min(ts + 15, block_start − 5))` sim min. `awaiting_owner` keeps Claude's pick + rationale; the fallback stays meanwhile | — | ✔ |
+| G17 | `awaiting_owner`, deadline | **Decided by Kritazya.** Open when a block starting within 30 sim min can't be held in-rules. Deadline = `max(ts + 5, min(ts + 15, block_start − 5))` sim min. `awaiting_owner` keeps Claude's pick + rationale; the fallback stays meanwhile. The owner may pick any option before the deadline (G61) | — | ✔ |
 | G18 | Decision `escalated` status | **Filled.** Removed. Decision `status`: executed \| undone; the Escalation itself carries the hard case | — | ✔ |
 | G19 | Owner command timing | **Filled.** `owner_command()` is recorded by the engine and returned in the next step's `new_commands` (no separate queue); delivered in the following `sim_tick` | — | ✔ |
 | G20 | Delay semantics | **Filled.** `value` = minutes from when the hub applies it; on an idle job device it holds the next job (`waiting`); on a waiting job it replaces the hold; idle job devices report `off` | — | ✔ |
@@ -84,7 +84,7 @@ Legend: **Decided by Kritazya** = your instruction · **Filled** = chosen here t
 |---|---|---|---|
 | G38 | Engine warnings | TickState gets `warnings: [Warning]`; Warning = `{code, message, data}` (same as the ws message without `type`) | ✔ |
 | G39 | Escalation lifecycle | `obsolete` status; one active escalation per lane per block, updated in place (`updated_ts`); `active_option_id`; executed commands never auto-reversed | ✔ |
-| G40 | Reduce base | `reduce` value and `min_power_pct` are % of `rated_kw` (power cap). **Ashirwad:** SIMULATION.md still says "% of its normal draw" | ✔ |
+| G40 | Reduce base | `reduce` value and `min_power_pct` are % of `rated_kw` (power cap); SIMULATION.md and the hub follow it | ✔ |
 | G41 | Forecast horizon | `forecast(120)` fixed; block 0 = block in progress | ✔ |
 | G42 | Ids | One shared monotonically increasing counter per type across lanes; runtime steps `without` then `with`; `Kitchen.build_lanes` | ✔ |
 | G43 | `what_if.at` | Sim ts where the hypothetical starts, within the 2 h horizon; read-only; lane chosen by the caller (default `with`) | ✔ |
@@ -94,7 +94,7 @@ Legend: **Decided by Kritazya** = your instruction · **Filled** = chosen here t
 | G47 | Command lifecycle | Desired-state diff, no re-sends; restore by `floor(max_reduce_min/5)` decision ticks; cooldown = `max_reduce_min`; no new reduce in the last `max_reduce_min` before close | ✔ |
 | G48 | Acks | Clamped → active at applied value; rejected → not active, not retried this block; `unknown_device` → never again; no ack → not applied | ✔ |
 | G49 | Deadlines | Effective deadline = `min(must_finish_by, close)`; hold ≤ `max_delay_min` from the first applied delay | ✔ |
-| G50 | Undo | Only executed reduce/delay: reduce → restore; delay → start (waiting) or delay 0 (idle hold); Command `issued_by: owner`, `decision_id` = the undone decision | ✔ |
+| G50 | Undo | Only executed reduce/delay still in force (G66): reduce → restore; delay → start (waiting) or delay 0 (idle hold); Command `issued_by: owner`, `decision_id` = the undone decision | ✔ |
 | G51 | Savings attribution | Marginal in plan order; demand only above the month's already-paid per-charge peaks | ✔ |
 | G52 | Billing boundaries | Local day and calendar month in `tariff.timezone`; `cost_usd_today` includes demand charges added today | ✔ |
 | G53 | `without` lane | Meters and forecasts only; owner commands go to both lanes (fair comparison); `owner_command` records an `owner_override` Decision | ✔ |
@@ -110,11 +110,26 @@ Legend: **Decided by Kritazya** = your instruction · **Filled** = chosen here t
 | G59 | Fake history | `contracts/fixtures/history/`: ~2 months of per-device blocks (`fixture_synthetic`, `simulated`) + daily inputs; the engine uses the last 4 weeks, exactly as with ComStock | ✔ |
 | G60 | Reconnect cue | The hub answers the replayed tick whose `tick_id` = `hub_welcome.tick_id` (Ashirwad's Q3) | ✔ |
 
+## K. Doc sync (2026-10-24): behaviour pinned so every doc says the same thing
+| ID | Topic | Decision | |
+|---|---|---|---|
+| G61 | Owner window | The owner resolves an escalation before its deadline, like Claude; after it the escalation is `expired_default` and the Proposal expires | ✔ |
+| G62 | `cap_unreachable` cadence | Once per block, on the decision tick it first appears | ✔ |
+| G63 | Closed hours | No reductions or holds start outside `operating_hours`; overnight the engine meters, forecasts and may escalate | ✔ |
+| G64 | Asking Claude | Once per escalation, when it opens; updates are published (ws `escalation`, `live_escalation` upsert), not re-asked; a late or stale answer is returned unchanged / RuleError and the Concierge reports what is in force | ✔ |
+| G65 | Month-to-date restore | `WarmUpHistory.month_to_date` is null in this build; restoring from `live_tick` is for a later resume-after-restart (otherwise a reset would double-count) | ✔ |
+| G66 | Undo window | Only while the decision's command is in force (API 422 otherwise); `explain_decision` reads `recent_decisions`, else Convex `decisions` | ✔ |
+| G67 | Escalation bookkeeping | `problem.forecast_peak_kw` = forecast after in-rules moves (what `accept_overrun` leaves); `expired_default` sets `resolved_by: "default"`; `default_option_id` never changes after opening | ✔ |
+
 ## Open questions for Kritazya
 - **Q1 — clock slowdown during escalations.** Answered: dropped. Fallback at once, Claude async, manual pause only (G35).
 - **Q2 — where month-to-date stats live.** Answered: SpacetimeDB `live_tick` (everything runs in simulation for now); seeded from
-  the ComStock warm-up (G05).
+  the ComStock warm-up; not read back in this build (G05, G65).
+- **Q3 — commit and share.** Commit `architecture-separation` so Suyog and Ashirwad can branch from it?
 - **Q4 — `minimize` target below a peak already paid.** When this month's peak is already above the 4-week target, holding the
   lower target costs comfort and delays without lowering the `max_demand` charge (only the on-peak charge or future months
   benefit). Keep the hard 4-week target as decided, or use `max(4-week target, month_peak_kw)`?
-- **Q3 — commit and share.** Commit `architecture-separation` so Suyog and Ashirwad can branch from it?
+- **Q5 — where `run_backtest` lives.** It reads data files (I/O), so it can't live in the no-I/O engine, yet the facade exports it
+  as `from engine import run_backtest`. Recommended: implement it in `backend/backtest/runner.py` and have the API import
+  `from backtest import run_backtest` (a one-line facade change in CLAUDE.md, CONTRACTS.md §3 and SUYOG.md). Alternative: keep
+  the name and let `engine/__init__.py` re-export it lazily as the one documented exception to the boundary rule.

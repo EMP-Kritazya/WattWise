@@ -11,15 +11,16 @@
   },
   "commands": [
     {
-      "command_id": "c_0001",
+      "command_id": "c_0007",
       "lane": "with",
       "ts": "2026-07-18T01:05:00Z",
-      "device_id": "dishwasher_1",
-      "action": "delay",
-      "value": 50,
-      "decision_id": "d_0001",
+      "device_id": "water_heater_1",
+      "action": "restore",
+      "value": null,
+      "decision_id": "d_0007",
       "issued_by": "engine"
     }
   ],
-  "replay": true
+  "replay": true,
+  "fast_forward": false
 }

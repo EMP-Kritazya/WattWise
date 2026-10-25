@@ -1,0 +1,3507 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://wattwise.local/contracts/ws_messages.schema.json",
+  "title": "WattWise WebSocket messages",
+  "description": "GENERATED from backend/contracts (python -m contracts.export_schema); do not hand-edit. Source of truth: docs/CONTRACTS.md sections 1, 2 (/ws viewer socket) and 8 (/ws/hub hub protocol). Validate a /ws frame against #/$defs/ViewerMessage, a hub frame against #/$defs/HubToServerMessage, a server frame on /ws/hub against #/$defs/ServerToHubMessage. Cross-field rules (limits per importance, peak_mode vs peak_cap_kw, option ranks, phase vs paused_reason) are enforced by the Pydantic models only.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/ViewerMessage"
+    },
+    {
+      "$ref": "#/$defs/HubToServerMessage"
+    },
+    {
+      "$ref": "#/$defs/ServerToHubMessage"
+    }
+  ],
+  "$defs": {
+    "AgentLog": {
+      "additionalProperties": false,
+      "properties": {
+        "ts_real": {
+          "format": "date-time",
+          "title": "Ts Real",
+          "type": "string"
+        },
+        "from_agent": {
+          "enum": [
+            "concierge",
+            "weather",
+            "grid",
+            "events",
+            "claude",
+            "engine"
+          ],
+          "title": "From Agent",
+          "type": "string"
+        },
+        "to_agent": {
+          "enum": [
+            "concierge",
+            "weather",
+            "grid",
+            "events",
+            "claude",
+            "engine"
+          ],
+          "title": "To Agent",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "request",
+            "response",
+            "post",
+            "error"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ts_real",
+        "from_agent",
+        "to_agent",
+        "kind",
+        "summary"
+      ],
+      "title": "AgentLog",
+      "type": "object"
+    },
+    "AgentLogMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "agent_log",
+          "title": "Type",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/AgentLog"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "title": "AgentLogMessage",
+      "type": "object"
+    },
+    "AlwaysOnLimits": {
+      "additionalProperties": false,
+      "description": "`always_on`: no limits (`{}`).",
+      "properties": {},
+      "title": "AlwaysOnLimits",
+      "type": "object"
+    },
+    "AuthorityProposal": {
+      "additionalProperties": false,
+      "properties": {
+        "proposal_id": {
+          "title": "Proposal Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "confirmed",
+            "cancelled",
+            "expired"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "created_by": {
+          "const": "ai",
+          "title": "Created By",
+          "type": "string"
+        },
+        "confirmed_via": {
+          "anyOf": [
+            {
+              "enum": [
+                "ui",
+                "asi_one"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Confirmed Via"
+        },
+        "expires_at": {
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "kind": {
+          "const": "authority",
+          "title": "Kind",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/ClaudeAuthority"
+        }
+      },
+      "required": [
+        "proposal_id",
+        "ts",
+        "summary",
+        "status",
+        "created_by",
+        "confirmed_via",
+        "expires_at",
+        "kind",
+        "payload"
+      ],
+      "title": "AuthorityProposal",
+      "type": "object"
+    },
+    "BacktestProgressMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "backtest_progress",
+          "title": "Type",
+          "type": "string"
+        },
+        "run_id": {
+          "title": "Run Id",
+          "type": "string"
+        },
+        "month": {
+          "pattern": "^\\d{4}-(0[1-9]|1[0-2])$",
+          "title": "Month",
+          "type": "string"
+        },
+        "pct": {
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Pct",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "type",
+        "run_id",
+        "month",
+        "pct"
+      ],
+      "title": "BacktestProgressMessage",
+      "type": "object"
+    },
+    "CapUnreachableData": {
+      "additionalProperties": false,
+      "properties": {
+        "unavoidable_kw": {
+          "minimum": 0,
+          "title": "Unavoidable Kw",
+          "type": "number"
+        },
+        "peak_cap_kw": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Peak Cap Kw"
+        },
+        "target_kw": {
+          "title": "Target Kw",
+          "type": "number"
+        }
+      },
+      "required": [
+        "unavoidable_kw",
+        "peak_cap_kw",
+        "target_kw"
+      ],
+      "title": "CapUnreachableData",
+      "type": "object"
+    },
+    "CapUnreachableWarning": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": "cap_unreachable",
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/CapUnreachableData"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data"
+      ],
+      "title": "CapUnreachableWarning",
+      "type": "object"
+    },
+    "CapUnreachableWarningMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": "cap_unreachable",
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/CapUnreachableData"
+        },
+        "type": {
+          "const": "warning",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data",
+        "type"
+      ],
+      "title": "CapUnreachableWarningMessage",
+      "type": "object"
+    },
+    "ChatDeltaMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "chat_delta",
+          "title": "Type",
+          "type": "string"
+        },
+        "chat_id": {
+          "title": "Chat Id",
+          "type": "string"
+        },
+        "text": {
+          "title": "Text",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "chat_id",
+        "text"
+      ],
+      "title": "ChatDeltaMessage",
+      "type": "object"
+    },
+    "ChatDoneMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "chat_done",
+          "title": "Type",
+          "type": "string"
+        },
+        "chat_id": {
+          "title": "Chat Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "chat_id"
+      ],
+      "title": "ChatDoneMessage",
+      "type": "object"
+    },
+    "ClaudeAuthority": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "max_cap_overrun_kw": {
+          "minimum": 0,
+          "title": "Max Cap Overrun Kw",
+          "type": "number"
+        },
+        "max_extra_delay_min": {
+          "minimum": 0,
+          "title": "Max Extra Delay Min",
+          "type": "integer"
+        },
+        "max_extra_reduce_min": {
+          "minimum": 0,
+          "title": "Max Extra Reduce Min",
+          "type": "integer"
+        },
+        "may_go_below_min_power": {
+          "title": "May Go Below Min Power",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "max_cap_overrun_kw",
+        "max_extra_delay_min",
+        "max_extra_reduce_min",
+        "may_go_below_min_power"
+      ],
+      "title": "ClaudeAuthority",
+      "type": "object"
+    },
+    "ClockMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "playing": {
+          "title": "Playing",
+          "type": "boolean"
+        },
+        "speed": {
+          "exclusiveMinimum": 0,
+          "title": "Speed",
+          "type": "integer"
+        },
+        "sim_ts": {
+          "format": "date-time",
+          "title": "Sim Ts",
+          "type": "string"
+        },
+        "tick_id": {
+          "minimum": 0,
+          "title": "Tick Id",
+          "type": "integer"
+        },
+        "paused_reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "manual",
+                "hub_waiting",
+                "sim_host_offline",
+                "run_complete"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Paused Reason"
+        },
+        "day_index": {
+          "minimum": 1,
+          "title": "Day Index",
+          "type": "integer"
+        },
+        "run_days": {
+          "minimum": 1,
+          "title": "Run Days",
+          "type": "integer"
+        },
+        "phase": {
+          "enum": [
+            "service",
+            "overnight",
+            "closed"
+          ],
+          "title": "Phase",
+          "type": "string"
+        },
+        "type": {
+          "const": "clock",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "playing",
+        "speed",
+        "sim_ts",
+        "tick_id",
+        "paused_reason",
+        "day_index",
+        "run_days",
+        "phase",
+        "type"
+      ],
+      "title": "ClockMessage",
+      "type": "object"
+    },
+    "Command": {
+      "additionalProperties": false,
+      "properties": {
+        "command_id": {
+          "title": "Command Id",
+          "type": "string"
+        },
+        "lane": {
+          "enum": [
+            "without",
+            "with"
+          ],
+          "title": "Lane",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "device_id": {
+          "title": "Device Id",
+          "type": "string"
+        },
+        "action": {
+          "enum": [
+            "on",
+            "off",
+            "start",
+            "delay",
+            "reduce",
+            "restore"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        },
+        "decision_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Decision Id"
+        },
+        "issued_by": {
+          "enum": [
+            "engine",
+            "owner"
+          ],
+          "title": "Issued By",
+          "type": "string"
+        }
+      },
+      "required": [
+        "command_id",
+        "lane",
+        "ts",
+        "device_id",
+        "action",
+        "value",
+        "decision_id",
+        "issued_by"
+      ],
+      "title": "Command",
+      "type": "object"
+    },
+    "CommandAck": {
+      "additionalProperties": false,
+      "properties": {
+        "command_id": {
+          "title": "Command Id",
+          "type": "string"
+        },
+        "lane": {
+          "enum": [
+            "without",
+            "with"
+          ],
+          "title": "Lane",
+          "type": "string"
+        },
+        "ok": {
+          "title": "Ok",
+          "type": "boolean"
+        },
+        "applied_value": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Applied Value"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "out_of_range",
+                "job_running",
+                "already_off",
+                "unknown_device"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reason"
+        }
+      },
+      "required": [
+        "command_id",
+        "lane",
+        "ok",
+        "applied_value",
+        "reason"
+      ],
+      "title": "CommandAck",
+      "type": "object"
+    },
+    "ComparisonMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "comparison",
+          "title": "Type",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/LaneComparison"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "title": "ComparisonMessage",
+      "type": "object"
+    },
+    "Context": {
+      "additionalProperties": false,
+      "description": "Merged context. Sections are null until some agent has posted them (\"Partial posts merge\").",
+      "properties": {
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "weather": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WeatherContext"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "prices": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PricesContext"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "events": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EventsContext"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "crowd_effect": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CrowdEffect"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "ts"
+      ],
+      "title": "Context",
+      "type": "object"
+    },
+    "ContextMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "context",
+          "title": "Type",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/Context"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "title": "ContextMessage",
+      "type": "object"
+    },
+    "CrowdEffect": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "enum": [
+            "none",
+            "small",
+            "medium",
+            "large"
+          ],
+          "title": "Value",
+          "type": "string"
+        },
+        "set_by": {
+          "enum": [
+            "claude",
+            "owner",
+            "default"
+          ],
+          "title": "Set By",
+          "type": "string"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value",
+        "set_by",
+        "reason"
+      ],
+      "title": "CrowdEffect",
+      "type": "object"
+    },
+    "CustomerEventPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "customers": {
+          "minimum": 1,
+          "title": "Customers",
+          "type": "integer"
+        },
+        "duration_min": {
+          "minimum": 1,
+          "title": "Duration Min",
+          "type": "integer"
+        },
+        "start_sim_ts": {
+          "format": "date-time",
+          "title": "Start Sim Ts",
+          "type": "string"
+        }
+      },
+      "required": [
+        "customers",
+        "duration_min",
+        "start_sim_ts"
+      ],
+      "title": "CustomerEventPayload",
+      "type": "object"
+    },
+    "CustomerEventProposal": {
+      "additionalProperties": false,
+      "properties": {
+        "proposal_id": {
+          "title": "Proposal Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "confirmed",
+            "cancelled",
+            "expired"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "created_by": {
+          "const": "ai",
+          "title": "Created By",
+          "type": "string"
+        },
+        "confirmed_via": {
+          "anyOf": [
+            {
+              "enum": [
+                "ui",
+                "asi_one"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Confirmed Via"
+        },
+        "expires_at": {
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "kind": {
+          "const": "customer_event",
+          "title": "Kind",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/CustomerEventPayload"
+        }
+      },
+      "required": [
+        "proposal_id",
+        "ts",
+        "summary",
+        "status",
+        "created_by",
+        "confirmed_via",
+        "expires_at",
+        "kind",
+        "payload"
+      ],
+      "title": "CustomerEventProposal",
+      "type": "object"
+    },
+    "Decision": {
+      "additionalProperties": false,
+      "properties": {
+        "decision_id": {
+          "title": "Decision Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "device_id": {
+          "title": "Device Id",
+          "type": "string"
+        },
+        "action": {
+          "enum": [
+            "on",
+            "off",
+            "start",
+            "delay",
+            "reduce",
+            "restore"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Value"
+        },
+        "reason_code": {
+          "enum": [
+            "avoid_new_peak",
+            "stay_under_cap",
+            "release_into_valley",
+            "catch_up",
+            "owner_override",
+            "escalation_fallback",
+            "escalation_choice"
+          ],
+          "title": "Reason Code",
+          "type": "string"
+        },
+        "inside_rules": {
+          "title": "Inside Rules",
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "executed",
+            "undone"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "effect": {
+          "$ref": "#/$defs/Effect"
+        }
+      },
+      "required": [
+        "decision_id",
+        "ts",
+        "device_id",
+        "action",
+        "value",
+        "reason_code",
+        "inside_rules",
+        "status",
+        "effect"
+      ],
+      "title": "Decision",
+      "type": "object"
+    },
+    "DecisionMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "decision",
+          "title": "Type",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/Decision"
+        },
+        "explanation": {
+          "title": "Explanation",
+          "type": "string"
+        },
+        "explanation_source": {
+          "enum": [
+            "ai",
+            "template"
+          ],
+          "title": "Explanation Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "data",
+        "explanation",
+        "explanation_source"
+      ],
+      "title": "DecisionMessage",
+      "type": "object"
+    },
+    "DeferrableLimits": {
+      "additionalProperties": false,
+      "properties": {
+        "max_delay_min": {
+          "minimum": 0,
+          "title": "Max Delay Min",
+          "type": "integer"
+        },
+        "must_finish_by": {
+          "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$",
+          "title": "Must Finish By",
+          "type": "string"
+        }
+      },
+      "required": [
+        "max_delay_min",
+        "must_finish_by"
+      ],
+      "title": "DeferrableLimits",
+      "type": "object"
+    },
+    "Device": {
+      "additionalProperties": false,
+      "properties": {
+        "device_id": {
+          "title": "Device Id",
+          "type": "string"
+        },
+        "type_id": {
+          "title": "Type Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "importance": {
+          "enum": [
+            "always_on",
+            "flexible",
+            "deferrable"
+          ],
+          "title": "Importance",
+          "type": "string"
+        },
+        "state": {
+          "enum": [
+            "off",
+            "on",
+            "reduced",
+            "waiting",
+            "running_job"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "power_kw": {
+          "minimum": 0,
+          "title": "Power Kw",
+          "type": "number"
+        },
+        "rated_kw": {
+          "exclusiveMinimum": 0,
+          "title": "Rated Kw",
+          "type": "number"
+        },
+        "power_pct": {
+          "minimum": 0,
+          "title": "Power Pct",
+          "type": "integer"
+        },
+        "source": {
+          "enum": [
+            "simulated",
+            "measured"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "physical": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DevicePhysical"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "device_id",
+        "type_id",
+        "name",
+        "importance",
+        "state",
+        "power_kw",
+        "rated_kw",
+        "power_pct",
+        "source"
+      ],
+      "title": "Device",
+      "type": "object"
+    },
+    "DevicePhysical": {
+      "description": "Optional physical readings from the simulation. CONTRACTS.md: \"Unknown keys are ignored\" -> extra=\"ignore\".",
+      "properties": {
+        "indoor_temp_c": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Indoor Temp C"
+        },
+        "box_temp_c": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Box Temp C"
+        },
+        "dirty_racks": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Dirty Racks"
+        },
+        "ice_level_pct": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ice Level Pct"
+        },
+        "job_remaining_min": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Job Remaining Min"
+        },
+        "orders_in_progress": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Orders In Progress"
+        }
+      },
+      "title": "DevicePhysical",
+      "type": "object"
+    },
+    "Effect": {
+      "additionalProperties": false,
+      "description": "Decision.effect and the `what_if` return.",
+      "properties": {
+        "peak_before_kw": {
+          "title": "Peak Before Kw",
+          "type": "number"
+        },
+        "peak_after_kw": {
+          "title": "Peak After Kw",
+          "type": "number"
+        },
+        "saving_usd": {
+          "title": "Saving Usd",
+          "type": "number"
+        }
+      },
+      "required": [
+        "peak_before_kw",
+        "peak_after_kw",
+        "saving_usd"
+      ],
+      "title": "Effect",
+      "type": "object"
+    },
+    "EmptyData": {
+      "additionalProperties": false,
+      "description": "`{}`",
+      "properties": {},
+      "title": "EmptyData",
+      "type": "object"
+    },
+    "EquipmentEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "type_id": {
+          "title": "Type Id",
+          "type": "string"
+        },
+        "count": {
+          "minimum": 0,
+          "title": "Count",
+          "type": "integer"
+        },
+        "importance": {
+          "enum": [
+            "always_on",
+            "flexible",
+            "deferrable"
+          ],
+          "title": "Importance",
+          "type": "string"
+        },
+        "limits": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FlexibleLimits"
+            },
+            {
+              "$ref": "#/$defs/DeferrableLimits"
+            },
+            {
+              "$ref": "#/$defs/AlwaysOnLimits"
+            }
+          ],
+          "title": "Limits"
+        }
+      },
+      "required": [
+        "type_id",
+        "count",
+        "importance",
+        "limits"
+      ],
+      "title": "EquipmentEntry",
+      "type": "object"
+    },
+    "EquipmentType": {
+      "additionalProperties": false,
+      "properties": {
+        "type_id": {
+          "title": "Type Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "category": {
+          "enum": [
+            "cooling",
+            "refrigeration",
+            "cooking",
+            "water_heating",
+            "lighting",
+            "other"
+          ],
+          "title": "Category",
+          "type": "string"
+        },
+        "default_importance": {
+          "enum": [
+            "always_on",
+            "flexible",
+            "deferrable"
+          ],
+          "title": "Default Importance",
+          "type": "string"
+        },
+        "rated_kw": {
+          "exclusiveMinimum": 0,
+          "title": "Rated Kw",
+          "type": "number"
+        },
+        "power_model": {
+          "enum": [
+            "fixed",
+            "cycling",
+            "thermal",
+            "demand_driven",
+            "job"
+          ],
+          "title": "Power Model",
+          "type": "string"
+        },
+        "params": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Params",
+          "type": "object"
+        },
+        "default_limits": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FlexibleLimits"
+            },
+            {
+              "$ref": "#/$defs/DeferrableLimits"
+            },
+            {
+              "$ref": "#/$defs/AlwaysOnLimits"
+            }
+          ],
+          "title": "Default Limits"
+        },
+        "source_note": {
+          "title": "Source Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type_id",
+        "name",
+        "category",
+        "default_importance",
+        "rated_kw",
+        "power_model",
+        "params",
+        "default_limits",
+        "source_note"
+      ],
+      "title": "EquipmentType",
+      "type": "object"
+    },
+    "Escalation": {
+      "additionalProperties": false,
+      "properties": {
+        "escalation_id": {
+          "title": "Escalation Id",
+          "type": "string"
+        },
+        "lane": {
+          "enum": [
+            "without",
+            "with"
+          ],
+          "title": "Lane",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "updated_ts": {
+          "format": "date-time",
+          "title": "Updated Ts",
+          "type": "string"
+        },
+        "block_start": {
+          "format": "date-time",
+          "title": "Block Start",
+          "type": "string"
+        },
+        "problem": {
+          "$ref": "#/$defs/EscalationProblem"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/EscalationOption"
+          },
+          "maxItems": 4,
+          "minItems": 2,
+          "title": "Options",
+          "type": "array"
+        },
+        "default_option_id": {
+          "title": "Default Option Id",
+          "type": "string"
+        },
+        "active_option_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Active Option Id"
+        },
+        "deadline_sim_ts": {
+          "format": "date-time",
+          "title": "Deadline Sim Ts",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "open",
+            "resolved",
+            "awaiting_owner",
+            "expired_default",
+            "obsolete"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "resolved_by": {
+          "anyOf": [
+            {
+              "enum": [
+                "claude",
+                "owner",
+                "default"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Resolved By"
+        },
+        "chosen_option_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Chosen Option Id"
+        },
+        "rationale": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Rationale"
+        }
+      },
+      "required": [
+        "escalation_id",
+        "lane",
+        "ts",
+        "updated_ts",
+        "block_start",
+        "problem",
+        "options",
+        "default_option_id",
+        "active_option_id",
+        "deadline_sim_ts",
+        "status",
+        "resolved_by",
+        "chosen_option_id",
+        "rationale"
+      ],
+      "title": "Escalation",
+      "type": "object"
+    },
+    "EscalationMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "escalation",
+          "title": "Type",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/Escalation"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "title": "EscalationMessage",
+      "type": "object"
+    },
+    "EscalationOption": {
+      "additionalProperties": false,
+      "properties": {
+        "option_id": {
+          "pattern": "^(accept_overrun|ask_owner|deep_reduce_[a-z0-9_]+|extend_delay_[a-z0-9_]+)$",
+          "title": "Option Id",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "actions": {
+          "items": {
+            "$ref": "#/$defs/Command"
+          },
+          "title": "Actions",
+          "type": "array"
+        },
+        "projected": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OptionProjection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rule_breaks": {
+          "items": {
+            "$ref": "#/$defs/RuleBreak"
+          },
+          "title": "Rule Breaks",
+          "type": "array"
+        },
+        "within_authority": {
+          "title": "Within Authority",
+          "type": "boolean"
+        },
+        "harm_score": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Harm Score"
+        },
+        "rank": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Rank"
+        }
+      },
+      "required": [
+        "option_id",
+        "summary",
+        "actions",
+        "projected",
+        "rule_breaks",
+        "within_authority",
+        "harm_score",
+        "rank"
+      ],
+      "title": "EscalationOption",
+      "type": "object"
+    },
+    "EscalationProblem": {
+      "additionalProperties": false,
+      "properties": {
+        "forecast_peak_kw": {
+          "title": "Forecast Peak Kw",
+          "type": "number"
+        },
+        "target_kw": {
+          "title": "Target Kw",
+          "type": "number"
+        },
+        "excess_kw": {
+          "title": "Excess Kw",
+          "type": "number"
+        },
+        "reason": {
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "forecast_peak_kw",
+        "target_kw",
+        "excess_kw",
+        "reason"
+      ],
+      "title": "EscalationProblem",
+      "type": "object"
+    },
+    "EventItem": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "venue": {
+          "title": "Venue",
+          "type": "string"
+        },
+        "start": {
+          "format": "date-time",
+          "title": "Start",
+          "type": "string"
+        },
+        "distance_km": {
+          "minimum": 0,
+          "title": "Distance Km",
+          "type": "number"
+        },
+        "expected_attendance": {
+          "minimum": 0,
+          "title": "Expected Attendance",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "venue",
+        "start",
+        "distance_km",
+        "expected_attendance"
+      ],
+      "title": "EventItem",
+      "type": "object"
+    },
+    "EventsContext": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "enum": [
+            "live_api",
+            "recorded"
+          ],
+          "title": "Label",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "items": {
+          "items": {
+            "$ref": "#/$defs/EventItem"
+          },
+          "title": "Items",
+          "type": "array"
+        }
+      },
+      "required": [
+        "label",
+        "source",
+        "items"
+      ],
+      "title": "EventsContext",
+      "type": "object"
+    },
+    "FlexibleLimits": {
+      "additionalProperties": false,
+      "properties": {
+        "min_power_pct": {
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Min Power Pct",
+          "type": "integer"
+        },
+        "max_reduce_min": {
+          "minimum": 0,
+          "title": "Max Reduce Min",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "min_power_pct",
+        "max_reduce_min"
+      ],
+      "title": "FlexibleLimits",
+      "type": "object"
+    },
+    "HourlyPrice": {
+      "additionalProperties": false,
+      "properties": {
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "usd_per_kwh": {
+          "title": "Usd Per Kwh",
+          "type": "number"
+        }
+      },
+      "required": [
+        "ts",
+        "usd_per_kwh"
+      ],
+      "title": "HourlyPrice",
+      "type": "object"
+    },
+    "HourlyTemp": {
+      "additionalProperties": false,
+      "properties": {
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "temp_c": {
+          "title": "Temp C",
+          "type": "number"
+        }
+      },
+      "required": [
+        "ts",
+        "temp_c"
+      ],
+      "title": "HourlyTemp",
+      "type": "object"
+    },
+    "HubHello": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "hub_hello",
+          "title": "Type",
+          "type": "string"
+        },
+        "protocol": {
+          "const": 1,
+          "title": "Protocol",
+          "type": "integer"
+        },
+        "hub_id": {
+          "title": "Hub Id",
+          "type": "string"
+        },
+        "role": {
+          "const": "sim_host",
+          "title": "Role",
+          "type": "string"
+        },
+        "client": {
+          "title": "Client",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "protocol",
+        "hub_id",
+        "role",
+        "client"
+      ],
+      "title": "HubHello",
+      "type": "object"
+    },
+    "HubOfflineData": {
+      "additionalProperties": false,
+      "properties": {
+        "device_id": {
+          "title": "Device Id",
+          "type": "string"
+        },
+        "hub_id": {
+          "title": "Hub Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "device_id",
+        "hub_id"
+      ],
+      "title": "HubOfflineData",
+      "type": "object"
+    },
+    "HubOfflineWarning": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": "hub_offline",
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/HubOfflineData"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data"
+      ],
+      "title": "HubOfflineWarning",
+      "type": "object"
+    },
+    "HubOfflineWarningMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": "hub_offline",
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/HubOfflineData"
+        },
+        "type": {
+          "const": "warning",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data",
+        "type"
+      ],
+      "title": "HubOfflineWarningMessage",
+      "type": "object"
+    },
+    "HubReport": {
+      "additionalProperties": false,
+      "properties": {
+        "hub_id": {
+          "title": "Hub Id",
+          "type": "string"
+        },
+        "lane": {
+          "enum": [
+            "without",
+            "with"
+          ],
+          "title": "Lane",
+          "type": "string"
+        },
+        "tick_id": {
+          "minimum": 0,
+          "title": "Tick Id",
+          "type": "integer"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "total_kw": {
+          "minimum": 0,
+          "title": "Total Kw",
+          "type": "number"
+        },
+        "customers_per_hour": {
+          "minimum": 0,
+          "title": "Customers Per Hour",
+          "type": "integer"
+        },
+        "devices": {
+          "items": {
+            "$ref": "#/$defs/Device"
+          },
+          "title": "Devices",
+          "type": "array"
+        },
+        "acks": {
+          "items": {
+            "$ref": "#/$defs/CommandAck"
+          },
+          "title": "Acks",
+          "type": "array"
+        },
+        "source": {
+          "enum": [
+            "simulated",
+            "mixed"
+          ],
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "hub_id",
+        "lane",
+        "tick_id",
+        "ts",
+        "total_kw",
+        "customers_per_hour",
+        "devices",
+        "acks",
+        "source"
+      ],
+      "title": "HubReport",
+      "type": "object"
+    },
+    "HubReportMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "hub_report",
+          "title": "Type",
+          "type": "string"
+        },
+        "tick_id": {
+          "minimum": 0,
+          "title": "Tick Id",
+          "type": "integer"
+        },
+        "reports": {
+          "$ref": "#/$defs/LaneReports"
+        }
+      },
+      "required": [
+        "type",
+        "tick_id",
+        "reports"
+      ],
+      "title": "HubReportMessage",
+      "type": "object"
+    },
+    "HubToServerMessage": {
+      "description": "Any message the hub sends on `/ws/hub`.",
+      "discriminator": {
+        "mapping": {
+          "hub_hello": "#/$defs/HubHello",
+          "hub_report": "#/$defs/HubReportMessage"
+        },
+        "propertyName": "type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/HubHello"
+        },
+        {
+          "$ref": "#/$defs/HubReportMessage"
+        }
+      ],
+      "title": "HubToServerMessage"
+    },
+    "HubWelcome": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "hub_welcome",
+          "title": "Type",
+          "type": "string"
+        },
+        "accepted": {
+          "title": "Accepted",
+          "type": "boolean"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "const": "host_taken",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reason"
+        },
+        "tick_id": {
+          "minimum": 0,
+          "title": "Tick Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "type",
+        "accepted",
+        "reason",
+        "tick_id"
+      ],
+      "title": "HubWelcome",
+      "type": "object"
+    },
+    "ImportancePayload": {
+      "additionalProperties": false,
+      "properties": {
+        "device_id": {
+          "title": "Device Id",
+          "type": "string"
+        },
+        "importance": {
+          "enum": [
+            "always_on",
+            "flexible",
+            "deferrable"
+          ],
+          "title": "Importance",
+          "type": "string"
+        },
+        "limits": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FlexibleLimits"
+            },
+            {
+              "$ref": "#/$defs/DeferrableLimits"
+            },
+            {
+              "$ref": "#/$defs/AlwaysOnLimits"
+            }
+          ],
+          "title": "Limits"
+        }
+      },
+      "required": [
+        "device_id",
+        "importance",
+        "limits"
+      ],
+      "title": "ImportancePayload",
+      "type": "object"
+    },
+    "ImportanceProposal": {
+      "additionalProperties": false,
+      "properties": {
+        "proposal_id": {
+          "title": "Proposal Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "confirmed",
+            "cancelled",
+            "expired"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "created_by": {
+          "const": "ai",
+          "title": "Created By",
+          "type": "string"
+        },
+        "confirmed_via": {
+          "anyOf": [
+            {
+              "enum": [
+                "ui",
+                "asi_one"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Confirmed Via"
+        },
+        "expires_at": {
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "kind": {
+          "const": "importance",
+          "title": "Kind",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/ImportancePayload"
+        }
+      },
+      "required": [
+        "proposal_id",
+        "ts",
+        "summary",
+        "status",
+        "created_by",
+        "confirmed_via",
+        "expires_at",
+        "kind",
+        "payload"
+      ],
+      "title": "ImportanceProposal",
+      "type": "object"
+    },
+    "KitchenConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "equipment": {
+          "items": {
+            "$ref": "#/$defs/EquipmentEntry"
+          },
+          "title": "Equipment",
+          "type": "array"
+        },
+        "peak_mode": {
+          "enum": [
+            "cap",
+            "minimize"
+          ],
+          "title": "Peak Mode",
+          "type": "string"
+        },
+        "peak_cap_kw": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Peak Cap Kw"
+        },
+        "operating_hours": {
+          "$ref": "#/$defs/OperatingHours"
+        },
+        "location": {
+          "$ref": "#/$defs/Location"
+        },
+        "owner_preferences": {
+          "title": "Owner Preferences",
+          "type": "string"
+        },
+        "authority": {
+          "$ref": "#/$defs/ClaudeAuthority"
+        },
+        "tariff_id": {
+          "title": "Tariff Id",
+          "type": "string"
+        },
+        "run_days": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Run Days",
+          "type": "integer"
+        },
+        "seed": {
+          "title": "Seed",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name",
+        "equipment",
+        "peak_mode",
+        "peak_cap_kw",
+        "operating_hours",
+        "location",
+        "owner_preferences",
+        "authority",
+        "tariff_id",
+        "seed"
+      ],
+      "title": "KitchenConfig",
+      "type": "object"
+    },
+    "LaneComparison": {
+      "additionalProperties": false,
+      "properties": {
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "saved_today_usd": {
+          "title": "Saved Today Usd",
+          "type": "number"
+        },
+        "peak_avoided_kw": {
+          "title": "Peak Avoided Kw",
+          "type": "number"
+        },
+        "month_peak_without_kw": {
+          "minimum": 0,
+          "title": "Month Peak Without Kw",
+          "type": "number"
+        },
+        "month_peak_with_kw": {
+          "minimum": 0,
+          "title": "Month Peak With Kw",
+          "type": "number"
+        }
+      },
+      "required": [
+        "ts",
+        "saved_today_usd",
+        "peak_avoided_kw",
+        "month_peak_without_kw",
+        "month_peak_with_kw"
+      ],
+      "title": "LaneComparison",
+      "type": "object"
+    },
+    "LaneReports": {
+      "additionalProperties": false,
+      "properties": {
+        "without": {
+          "$ref": "#/$defs/HubReport"
+        },
+        "with": {
+          "$ref": "#/$defs/HubReport"
+        }
+      },
+      "required": [
+        "without",
+        "with"
+      ],
+      "title": "LaneReports",
+      "type": "object"
+    },
+    "LiveTransportDownWarning": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": "live_transport_down",
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/EmptyData"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data"
+      ],
+      "title": "LiveTransportDownWarning",
+      "type": "object"
+    },
+    "LiveTransportDownWarningMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": "live_transport_down",
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/EmptyData"
+        },
+        "type": {
+          "const": "warning",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data",
+        "type"
+      ],
+      "title": "LiveTransportDownWarningMessage",
+      "type": "object"
+    },
+    "Location": {
+      "additionalProperties": false,
+      "properties": {
+        "lat": {
+          "maximum": 90,
+          "minimum": -90,
+          "title": "Lat",
+          "type": "number"
+        },
+        "lon": {
+          "maximum": 180,
+          "minimum": -180,
+          "title": "Lon",
+          "type": "number"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "lat",
+        "lon",
+        "label"
+      ],
+      "title": "Location",
+      "type": "object"
+    },
+    "Meter": {
+      "additionalProperties": false,
+      "properties": {
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "total_kw": {
+          "minimum": 0,
+          "title": "Total Kw",
+          "type": "number"
+        },
+        "block_avg_kw": {
+          "minimum": 0,
+          "title": "Block Avg Kw",
+          "type": "number"
+        },
+        "block_start": {
+          "format": "date-time",
+          "title": "Block Start",
+          "type": "string"
+        },
+        "month_peak_kw": {
+          "minimum": 0,
+          "title": "Month Peak Kw",
+          "type": "number"
+        },
+        "on_peak_month_peak_kw": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "On Peak Month Peak Kw"
+        },
+        "peak_mode": {
+          "enum": [
+            "cap",
+            "minimize"
+          ],
+          "title": "Peak Mode",
+          "type": "string"
+        },
+        "peak_cap_kw": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Peak Cap Kw"
+        },
+        "target_kw": {
+          "title": "Target Kw",
+          "type": "number"
+        },
+        "energy_kwh_today": {
+          "minimum": 0,
+          "title": "Energy Kwh Today",
+          "type": "number"
+        },
+        "energy_kwh_month": {
+          "minimum": 0,
+          "title": "Energy Kwh Month",
+          "type": "number"
+        },
+        "price_usd_per_kwh_now": {
+          "title": "Price Usd Per Kwh Now",
+          "type": "number"
+        },
+        "cost_usd_today": {
+          "title": "Cost Usd Today",
+          "type": "number"
+        },
+        "cost_usd_month": {
+          "title": "Cost Usd Month",
+          "type": "number"
+        }
+      },
+      "required": [
+        "ts",
+        "total_kw",
+        "block_avg_kw",
+        "block_start",
+        "month_peak_kw",
+        "on_peak_month_peak_kw",
+        "peak_mode",
+        "peak_cap_kw",
+        "target_kw",
+        "energy_kwh_today",
+        "energy_kwh_month",
+        "price_usd_per_kwh_now",
+        "cost_usd_today",
+        "cost_usd_month"
+      ],
+      "title": "Meter",
+      "type": "object"
+    },
+    "OperatingHours": {
+      "additionalProperties": false,
+      "properties": {
+        "open": {
+          "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$",
+          "title": "Open",
+          "type": "string"
+        },
+        "close": {
+          "pattern": "^(([01]\\d|2[0-3]):[0-5]\\d|24:00)$",
+          "title": "Close",
+          "type": "string"
+        }
+      },
+      "required": [
+        "open",
+        "close"
+      ],
+      "title": "OperatingHours",
+      "type": "object"
+    },
+    "OptionProjection": {
+      "additionalProperties": false,
+      "properties": {
+        "peak_kw": {
+          "title": "Peak Kw",
+          "type": "number"
+        },
+        "cost_delta_usd": {
+          "title": "Cost Delta Usd",
+          "type": "number"
+        },
+        "max_indoor_temp_change_c": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Max Indoor Temp Change C"
+        }
+      },
+      "required": [
+        "peak_kw",
+        "cost_delta_usd",
+        "max_indoor_temp_change_c"
+      ],
+      "title": "OptionProjection",
+      "type": "object"
+    },
+    "PeakCapPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "peak_mode": {
+          "enum": [
+            "cap",
+            "minimize"
+          ],
+          "title": "Peak Mode",
+          "type": "string"
+        },
+        "peak_cap_kw": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Peak Cap Kw"
+        }
+      },
+      "required": [
+        "peak_mode",
+        "peak_cap_kw"
+      ],
+      "title": "PeakCapPayload",
+      "type": "object"
+    },
+    "PeakCapProposal": {
+      "additionalProperties": false,
+      "properties": {
+        "proposal_id": {
+          "title": "Proposal Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "confirmed",
+            "cancelled",
+            "expired"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "created_by": {
+          "const": "ai",
+          "title": "Created By",
+          "type": "string"
+        },
+        "confirmed_via": {
+          "anyOf": [
+            {
+              "enum": [
+                "ui",
+                "asi_one"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Confirmed Via"
+        },
+        "expires_at": {
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "kind": {
+          "const": "peak_cap",
+          "title": "Kind",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/PeakCapPayload"
+        }
+      },
+      "required": [
+        "proposal_id",
+        "ts",
+        "summary",
+        "status",
+        "created_by",
+        "confirmed_via",
+        "expires_at",
+        "kind",
+        "payload"
+      ],
+      "title": "PeakCapProposal",
+      "type": "object"
+    },
+    "PricesContext": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "enum": [
+            "live_api",
+            "recorded"
+          ],
+          "title": "Label",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "hourly": {
+          "items": {
+            "$ref": "#/$defs/HourlyPrice"
+          },
+          "title": "Hourly",
+          "type": "array"
+        },
+        "stress": {
+          "enum": [
+            "low",
+            "normal",
+            "high"
+          ],
+          "title": "Stress",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "source",
+        "hourly",
+        "stress"
+      ],
+      "title": "PricesContext",
+      "type": "object"
+    },
+    "ProposalMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "proposal",
+          "title": "Type",
+          "type": "string"
+        },
+        "data": {
+          "discriminator": {
+            "mapping": {
+              "authority": "#/$defs/AuthorityProposal",
+              "customer_event": "#/$defs/CustomerEventProposal",
+              "importance": "#/$defs/ImportanceProposal",
+              "peak_cap": "#/$defs/PeakCapProposal",
+              "resolve_escalation": "#/$defs/ResolveEscalationProposal",
+              "undo_decision": "#/$defs/UndoDecisionProposal"
+            },
+            "propertyName": "kind"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ImportanceProposal"
+            },
+            {
+              "$ref": "#/$defs/PeakCapProposal"
+            },
+            {
+              "$ref": "#/$defs/AuthorityProposal"
+            },
+            {
+              "$ref": "#/$defs/UndoDecisionProposal"
+            },
+            {
+              "$ref": "#/$defs/CustomerEventProposal"
+            },
+            {
+              "$ref": "#/$defs/ResolveEscalationProposal"
+            }
+          ],
+          "title": "Data"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "title": "ProposalMessage",
+      "type": "object"
+    },
+    "ResolveEscalationPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "escalation_id": {
+          "title": "Escalation Id",
+          "type": "string"
+        },
+        "option_id": {
+          "title": "Option Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "escalation_id",
+        "option_id"
+      ],
+      "title": "ResolveEscalationPayload",
+      "type": "object"
+    },
+    "ResolveEscalationProposal": {
+      "additionalProperties": false,
+      "properties": {
+        "proposal_id": {
+          "title": "Proposal Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "confirmed",
+            "cancelled",
+            "expired"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "created_by": {
+          "const": "ai",
+          "title": "Created By",
+          "type": "string"
+        },
+        "confirmed_via": {
+          "anyOf": [
+            {
+              "enum": [
+                "ui",
+                "asi_one"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Confirmed Via"
+        },
+        "expires_at": {
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "kind": {
+          "const": "resolve_escalation",
+          "title": "Kind",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/ResolveEscalationPayload"
+        }
+      },
+      "required": [
+        "proposal_id",
+        "ts",
+        "summary",
+        "status",
+        "created_by",
+        "confirmed_via",
+        "expires_at",
+        "kind",
+        "payload"
+      ],
+      "title": "ResolveEscalationProposal",
+      "type": "object"
+    },
+    "RuleBreak": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "cap_overrun",
+            "below_min_power",
+            "past_deadline",
+            "over_max_reduce",
+            "over_max_delay"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "device_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Device Id"
+        },
+        "amount": {
+          "title": "Amount",
+          "type": "number"
+        },
+        "unit": {
+          "enum": [
+            "kW",
+            "pct",
+            "min"
+          ],
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "amount",
+        "unit"
+      ],
+      "title": "RuleBreak",
+      "type": "object"
+    },
+    "ServerToHubMessage": {
+      "description": "Any message the server sends on `/ws/hub`.",
+      "discriminator": {
+        "mapping": {
+          "hub_welcome": "#/$defs/HubWelcome",
+          "sim_build": "#/$defs/SimBuild",
+          "sim_control": "#/$defs/SimControl",
+          "sim_tick": "#/$defs/SimTick"
+        },
+        "propertyName": "type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/HubWelcome"
+        },
+        {
+          "$ref": "#/$defs/SimBuild"
+        },
+        {
+          "$ref": "#/$defs/SimTick"
+        },
+        {
+          "$ref": "#/$defs/SimControl"
+        }
+      ],
+      "title": "ServerToHubMessage"
+    },
+    "SimBuild": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "sim_build",
+          "title": "Type",
+          "type": "string"
+        },
+        "kitchen_id": {
+          "title": "Kitchen Id",
+          "type": "string"
+        },
+        "config": {
+          "$ref": "#/$defs/KitchenConfig"
+        },
+        "catalog": {
+          "items": {
+            "$ref": "#/$defs/EquipmentType"
+          },
+          "title": "Catalog",
+          "type": "array"
+        },
+        "devices": {
+          "items": {
+            "$ref": "#/$defs/Device"
+          },
+          "title": "Devices",
+          "type": "array"
+        },
+        "seed": {
+          "title": "Seed",
+          "type": "integer"
+        },
+        "start_sim_ts": {
+          "format": "date-time",
+          "title": "Start Sim Ts",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "kitchen_id",
+        "config",
+        "catalog",
+        "devices",
+        "seed",
+        "start_sim_ts"
+      ],
+      "title": "SimBuild",
+      "type": "object"
+    },
+    "SimControl": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "sim_control",
+          "title": "Type",
+          "type": "string"
+        },
+        "action": {
+          "enum": [
+            "play",
+            "pause",
+            "reset"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "speed": {
+          "exclusiveMinimum": 0,
+          "title": "Speed",
+          "type": "integer"
+        },
+        "paused_reason": {
+          "anyOf": [
+            {
+              "enum": [
+                "manual",
+                "hub_waiting",
+                "sim_host_offline",
+                "run_complete"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Paused Reason"
+        }
+      },
+      "required": [
+        "type",
+        "action",
+        "speed",
+        "paused_reason"
+      ],
+      "title": "SimControl",
+      "type": "object"
+    },
+    "SimHostOfflineData": {
+      "additionalProperties": false,
+      "properties": {
+        "last_tick_id": {
+          "minimum": 0,
+          "title": "Last Tick Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "last_tick_id"
+      ],
+      "title": "SimHostOfflineData",
+      "type": "object"
+    },
+    "SimHostOfflineWarning": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": "sim_host_offline",
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/SimHostOfflineData"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data"
+      ],
+      "title": "SimHostOfflineWarning",
+      "type": "object"
+    },
+    "SimHostOfflineWarningMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": "sim_host_offline",
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/SimHostOfflineData"
+        },
+        "type": {
+          "const": "warning",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data",
+        "type"
+      ],
+      "title": "SimHostOfflineWarningMessage",
+      "type": "object"
+    },
+    "SimInputs": {
+      "additionalProperties": false,
+      "properties": {
+        "outdoor_temp_c": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Outdoor Temp C"
+        },
+        "crowd_multiplier": {
+          "exclusiveMinimum": 0,
+          "title": "Crowd Multiplier",
+          "type": "number"
+        },
+        "is_open": {
+          "title": "Is Open",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "outdoor_temp_c",
+        "crowd_multiplier",
+        "is_open"
+      ],
+      "title": "SimInputs",
+      "type": "object"
+    },
+    "SimTick": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "sim_tick",
+          "title": "Type",
+          "type": "string"
+        },
+        "tick_id": {
+          "minimum": 0,
+          "title": "Tick Id",
+          "type": "integer"
+        },
+        "sim_ts": {
+          "format": "date-time",
+          "title": "Sim Ts",
+          "type": "string"
+        },
+        "minutes": {
+          "minimum": 1,
+          "title": "Minutes",
+          "type": "integer"
+        },
+        "surges": {
+          "items": {
+            "$ref": "#/$defs/Surge"
+          },
+          "title": "Surges",
+          "type": "array"
+        },
+        "inputs": {
+          "$ref": "#/$defs/SimInputs"
+        },
+        "commands": {
+          "items": {
+            "$ref": "#/$defs/Command"
+          },
+          "title": "Commands",
+          "type": "array"
+        },
+        "replay": {
+          "title": "Replay",
+          "type": "boolean"
+        },
+        "fast_forward": {
+          "title": "Fast Forward",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "type",
+        "tick_id",
+        "sim_ts",
+        "minutes",
+        "surges",
+        "inputs",
+        "commands",
+        "replay",
+        "fast_forward"
+      ],
+      "title": "SimTick",
+      "type": "object"
+    },
+    "StoreDownWarning": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": "store_down",
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/EmptyData"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data"
+      ],
+      "title": "StoreDownWarning",
+      "type": "object"
+    },
+    "StoreDownWarningMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "const": "store_down",
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/EmptyData"
+        },
+        "type": {
+          "const": "warning",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "data",
+        "type"
+      ],
+      "title": "StoreDownWarningMessage",
+      "type": "object"
+    },
+    "Surge": {
+      "additionalProperties": false,
+      "properties": {
+        "surge_id": {
+          "title": "Surge Id",
+          "type": "string"
+        },
+        "customers": {
+          "minimum": 1,
+          "title": "Customers",
+          "type": "integer"
+        },
+        "duration_min": {
+          "minimum": 1,
+          "title": "Duration Min",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "surge_id",
+        "customers",
+        "duration_min"
+      ],
+      "title": "Surge",
+      "type": "object"
+    },
+    "TickMessage": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "tick",
+          "title": "Type",
+          "type": "string"
+        },
+        "data": {
+          "$ref": "#/$defs/TickState"
+        }
+      },
+      "required": [
+        "type",
+        "data"
+      ],
+      "title": "TickMessage",
+      "type": "object"
+    },
+    "TickState": {
+      "additionalProperties": false,
+      "properties": {
+        "lane": {
+          "enum": [
+            "without",
+            "with"
+          ],
+          "title": "Lane",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "hub": {
+          "$ref": "#/$defs/HubReport"
+        },
+        "meter": {
+          "$ref": "#/$defs/Meter"
+        },
+        "customers_per_hour": {
+          "minimum": 0,
+          "title": "Customers Per Hour",
+          "type": "integer"
+        },
+        "new_decisions": {
+          "items": {
+            "$ref": "#/$defs/Decision"
+          },
+          "title": "New Decisions",
+          "type": "array"
+        },
+        "new_commands": {
+          "items": {
+            "$ref": "#/$defs/Command"
+          },
+          "title": "New Commands",
+          "type": "array"
+        },
+        "new_escalations": {
+          "items": {
+            "$ref": "#/$defs/Escalation"
+          },
+          "title": "New Escalations",
+          "type": "array"
+        },
+        "warnings": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "cap_unreachable": "#/$defs/CapUnreachableWarning",
+                "hub_offline": "#/$defs/HubOfflineWarning",
+                "live_transport_down": "#/$defs/LiveTransportDownWarning",
+                "sim_host_offline": "#/$defs/SimHostOfflineWarning",
+                "store_down": "#/$defs/StoreDownWarning"
+              },
+              "propertyName": "code"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/CapUnreachableWarning"
+              },
+              {
+                "$ref": "#/$defs/SimHostOfflineWarning"
+              },
+              {
+                "$ref": "#/$defs/HubOfflineWarning"
+              },
+              {
+                "$ref": "#/$defs/LiveTransportDownWarning"
+              },
+              {
+                "$ref": "#/$defs/StoreDownWarning"
+              }
+            ]
+          },
+          "title": "Warnings",
+          "type": "array"
+        },
+        "indoor_temp_c": {
+          "title": "Indoor Temp C",
+          "type": "number"
+        },
+        "forecast_kw": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "maxItems": 8,
+              "minItems": 8,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Forecast Kw"
+        }
+      },
+      "required": [
+        "lane",
+        "ts",
+        "hub",
+        "meter",
+        "customers_per_hour",
+        "new_decisions",
+        "new_commands",
+        "new_escalations",
+        "warnings",
+        "indoor_temp_c",
+        "forecast_kw"
+      ],
+      "title": "TickState",
+      "type": "object"
+    },
+    "UndoDecisionPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "decision_id": {
+          "title": "Decision Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "decision_id"
+      ],
+      "title": "UndoDecisionPayload",
+      "type": "object"
+    },
+    "UndoDecisionProposal": {
+      "additionalProperties": false,
+      "properties": {
+        "proposal_id": {
+          "title": "Proposal Id",
+          "type": "string"
+        },
+        "ts": {
+          "format": "date-time",
+          "title": "Ts",
+          "type": "string"
+        },
+        "summary": {
+          "title": "Summary",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "pending",
+            "confirmed",
+            "cancelled",
+            "expired"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "created_by": {
+          "const": "ai",
+          "title": "Created By",
+          "type": "string"
+        },
+        "confirmed_via": {
+          "anyOf": [
+            {
+              "enum": [
+                "ui",
+                "asi_one"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Confirmed Via"
+        },
+        "expires_at": {
+          "format": "date-time",
+          "title": "Expires At",
+          "type": "string"
+        },
+        "kind": {
+          "const": "undo_decision",
+          "title": "Kind",
+          "type": "string"
+        },
+        "payload": {
+          "$ref": "#/$defs/UndoDecisionPayload"
+        }
+      },
+      "required": [
+        "proposal_id",
+        "ts",
+        "summary",
+        "status",
+        "created_by",
+        "confirmed_via",
+        "expires_at",
+        "kind",
+        "payload"
+      ],
+      "title": "UndoDecisionProposal",
+      "type": "object"
+    },
+    "ViewerMessage": {
+      "description": "Any message on `/ws` (server -> viewer). `ViewerMessage.model_validate_json(frame).root`.",
+      "discriminator": {
+        "mapping": {
+          "agent_log": "#/$defs/AgentLogMessage",
+          "backtest_progress": "#/$defs/BacktestProgressMessage",
+          "chat_delta": "#/$defs/ChatDeltaMessage",
+          "chat_done": "#/$defs/ChatDoneMessage",
+          "clock": "#/$defs/ClockMessage",
+          "comparison": "#/$defs/ComparisonMessage",
+          "context": "#/$defs/ContextMessage",
+          "decision": "#/$defs/DecisionMessage",
+          "escalation": "#/$defs/EscalationMessage",
+          "proposal": "#/$defs/ProposalMessage",
+          "tick": "#/$defs/TickMessage",
+          "warning": {
+            "discriminator": {
+              "mapping": {
+                "cap_unreachable": "#/$defs/CapUnreachableWarningMessage",
+                "hub_offline": "#/$defs/HubOfflineWarningMessage",
+                "live_transport_down": "#/$defs/LiveTransportDownWarningMessage",
+                "sim_host_offline": "#/$defs/SimHostOfflineWarningMessage",
+                "store_down": "#/$defs/StoreDownWarningMessage"
+              },
+              "propertyName": "code"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/CapUnreachableWarningMessage"
+              },
+              {
+                "$ref": "#/$defs/SimHostOfflineWarningMessage"
+              },
+              {
+                "$ref": "#/$defs/HubOfflineWarningMessage"
+              },
+              {
+                "$ref": "#/$defs/LiveTransportDownWarningMessage"
+              },
+              {
+                "$ref": "#/$defs/StoreDownWarningMessage"
+              }
+            ]
+          }
+        },
+        "propertyName": "type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/TickMessage"
+        },
+        {
+          "$ref": "#/$defs/DecisionMessage"
+        },
+        {
+          "$ref": "#/$defs/ClockMessage"
+        },
+        {
+          "discriminator": {
+            "mapping": {
+              "cap_unreachable": "#/$defs/CapUnreachableWarningMessage",
+              "hub_offline": "#/$defs/HubOfflineWarningMessage",
+              "live_transport_down": "#/$defs/LiveTransportDownWarningMessage",
+              "sim_host_offline": "#/$defs/SimHostOfflineWarningMessage",
+              "store_down": "#/$defs/StoreDownWarningMessage"
+            },
+            "propertyName": "code"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/CapUnreachableWarningMessage"
+            },
+            {
+              "$ref": "#/$defs/SimHostOfflineWarningMessage"
+            },
+            {
+              "$ref": "#/$defs/HubOfflineWarningMessage"
+            },
+            {
+              "$ref": "#/$defs/LiveTransportDownWarningMessage"
+            },
+            {
+              "$ref": "#/$defs/StoreDownWarningMessage"
+            }
+          ]
+        },
+        {
+          "$ref": "#/$defs/ChatDeltaMessage"
+        },
+        {
+          "$ref": "#/$defs/ChatDoneMessage"
+        },
+        {
+          "$ref": "#/$defs/BacktestProgressMessage"
+        },
+        {
+          "$ref": "#/$defs/ComparisonMessage"
+        },
+        {
+          "$ref": "#/$defs/ProposalMessage"
+        },
+        {
+          "$ref": "#/$defs/EscalationMessage"
+        },
+        {
+          "$ref": "#/$defs/ContextMessage"
+        },
+        {
+          "$ref": "#/$defs/AgentLogMessage"
+        }
+      ],
+      "title": "ViewerMessage"
+    },
+    "WeatherContext": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "enum": [
+            "live_api",
+            "recorded"
+          ],
+          "title": "Label",
+          "type": "string"
+        },
+        "source": {
+          "title": "Source",
+          "type": "string"
+        },
+        "hourly": {
+          "items": {
+            "$ref": "#/$defs/HourlyTemp"
+          },
+          "title": "Hourly",
+          "type": "array"
+        }
+      },
+      "required": [
+        "label",
+        "source",
+        "hourly"
+      ],
+      "title": "WeatherContext",
+      "type": "object"
+    }
+  }
+}

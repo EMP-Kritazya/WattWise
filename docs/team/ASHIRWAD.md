@@ -52,7 +52,7 @@ centred `Charts | Simulation` toggle, live charts from SpacetimeDB, the kitchen 
 **C. Screens** — design: `docs/design/UI.md`
 - [ ] Kitchen Builder: equipment counts (0–5), importance + limits per unit, **peak goal** `Minimize peak | Hard limit` (+ kW), location, preferences, Claude's authority
 - [ ] Live screen with the centred **`Charts | Simulation` toggle**: Charts view (two-lane chart, forecast, KPIs, energy + cost strip, context strip) · Simulation view (kitchen floor + hub tile) · right rail (decision feed + undo, escalation card in all states)
-- [ ] Top bar: clock (shows `paused_reason` / `slowed_reason`), play/pause, speed, surge buttons
+- [ ] Top bar: clock (shows `paused_reason`, `Day n of N`, phase), play/pause, speed, surge buttons
 - [ ] Agent Network, Proof, chat drawer + proposal cards, warning banners (`sim_host_offline`, `hub_offline`, `live_transport_down`, `store_down`, `cap_unreachable`)
 - [ ] `/sim` host panel: hub connection, last `tick_id`, "another sim host is running"
 
@@ -62,6 +62,8 @@ centred `Charts | Simulation` toggle, live charts from SpacetimeDB, the kitchen 
 - [ ] TickState: add `warnings: Warning[]` (`{code, message, data}`; `cap_unreachable.data` has `target_kw` too)
 - [ ] Escalation / `live_escalation`: statuses add `obsolete`; options carry `harm_score` + `rank`; add `updated_ts`, `block_start`, `default_option_id`, `active_option_id`, `deadline_sim_ts` columns; `projected.max_indoor_temp_change_c` may be `null` ("not modelled"); one escalation per block is updated in place (upsert by id)
 - [ ] Decision `reason_code` adds `escalation_fallback`; `reduce` value is % of `rated_kw` (SIMULATION.md must cap draw at `value% × rated_kw`, G40)
+- [ ] `delay` value 0 clears a hold; a hold ends by itself after `value` minutes (SIMULATION.md)
+- [ ] Escalation card: fallback in force from the start, options by `rank`, states incl. *Deadline passed* and *Risk passed*; minimize mode draws `target_kw` as the target line; `cap_unreachable` banner text from its `data`; Undo only on reduce / delay items (UI.md)
 - [ ] KitchenConfig: add `run_days`; Builder "Run for" control (UI.md)
 - [ ] `sim_tick`: add `fast_forward`; honour `inputs.is_open: false` closed-hours behaviour (SIMULATION.md "Closed hours"); state carries across midnight and days
 - [ ] Reconnect cue (your Q3): answer the replayed tick whose `tick_id` = `hub_welcome.tick_id`
@@ -77,9 +79,9 @@ centred `Charts | Simulation` toggle, live charts from SpacetimeDB, the kitchen 
 | REST (catalog, kitchen, commands, proposals, escalations, chat…) | `rest/*.json` (`{method, path, status, request, response}`, incl. 404/422) | Mock handlers match method + path |
 | `/ws` (chat streaming, proposals, `LIVE_TRANSPORT=ws` fallback) | `ws/*.json`, `ws/stream.jsonl` | Replay in order |
 | Builder inputs | `rest/get_catalog.json`, `shapes/kitchen_config.json`, `shapes/kitchen_config_minimize.json` | |
-| Multi-day run (day close → overnight → next day → `run_complete`) | `scenario/demo_cafe_multiday/` (same stream files as the evening scenario; overnight as one row per 15-min block) | Mock clock walks the phases; Builder `run_days` |
-| History behind the Proof screen and day-to-day inputs | `history/daily_inputs.json`, `rest/get_backtest.json` (fake June + July, label `simulated`) | Proof renders it, never as real savings |
-| The scenario story (what happens when) | `scenario/demo_cafe/scenario.json`, `index.json`, `README.md` | Surge at tick 30, escalation at tick 60, Claude's choice delivered at tick 62 |
+| Multi-day run (day close → overnight → next day → `run_complete`) | `scenario/demo_cafe_multiday/` (pending: next `fixture-builder` run; same stream files as the evening scenario; overnight as one row per 15-min block) | Mock clock walks the phases; Builder `run_days` |
+| History behind the Proof screen and day-to-day inputs | `history/daily_inputs.json`, `rest/get_backtest.json` (pending: next `fixture-builder` run; fake June + July, label `simulated`) | Proof renders it, never as real savings |
+| The scenario story (what happens when) | `scenario/demo_cafe/scenario.json`, `index.json`, `README.md` | Surge at tick 30, escalation `e_0001` opens at tick 50 with its fallback (dishwasher hold) applied in that step; Claude confirms the same option within authority; owner "start dishwasher" after tick 118 is rejected `job_running`. Multi-day: `scenario/demo_cafe_multiday/README.md` |
 
 ## 6. Two data paths in the UI (keep them separate)
 - **Charts view → SpacetimeDB only** (engine numbers): `live_tick`, `tick_history`, `live_comparison`, `live_feed`,

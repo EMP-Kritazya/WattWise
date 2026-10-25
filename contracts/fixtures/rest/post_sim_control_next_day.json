@@ -1,0 +1,18 @@
+{
+  "method": "POST",
+  "path": "/api/sim/control",
+  "status": 200,
+  "request": {
+    "action": "next_day"
+  },
+  "response": {
+    "playing": true,
+    "speed": 120,
+    "sim_ts": "2026-07-18T05:00:00Z",
+    "tick_id": 270,
+    "paused_reason": null,
+    "day_index": 1,
+    "run_days": 2,
+    "phase": "overnight"
+  }
+}

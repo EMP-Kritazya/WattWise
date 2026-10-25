@@ -8,16 +8,18 @@
   },
   "response": {
     "ts": "2026-07-18T02:30:00Z",
-    "total_kw": 40.86,
-    "block_avg_kw": 37.93,
+    "total_kw": 38.0,
+    "block_avg_kw": 38.12,
     "block_start": "2026-07-18T02:15:00Z",
-    "month_peak_kw": 39.9,
+    "month_peak_kw": 42.54,
+    "on_peak_month_peak_kw": 42.54,
     "peak_mode": "cap",
     "peak_cap_kw": 38.0,
     "target_kw": 38.0,
-    "energy_kwh_today": 359.471,
+    "energy_kwh_today": 321.914,
+    "energy_kwh_month": 5816.876,
     "price_usd_per_kwh_now": 0.38,
-    "cost_usd_today": 97.89,
-    "cost_usd_month": 1862.87
+    "cost_usd_today": 90.32,
+    "cost_usd_month": 2815.04
   }
 }

@@ -6,7 +6,9 @@
     "2026-07-18T02:30:00Z",
     120,
     null,
-    null,
+    1,
+    1,
+    "service",
     "connected"
   ]
 }

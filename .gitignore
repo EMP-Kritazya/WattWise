@@ -1,2 +1,10 @@
 .env
-.claude/
+!.claude/agents/
+.venv/
+__pycache__/
+.pytest_cache/
+.hypothesis/
+/data/
+/dataset/
+myTestsReport/
+./dataset

@@ -1,18 +1,18 @@
 {
   "call": "owner_command",
   "args": {
-    "device_id": "ice_machine_1",
+    "device_id": "dishwasher_1",
     "action": "start",
     "value": null
   },
   "returns": {
-    "command_id": "c_0020",
+    "command_id": "c_0023",
     "lane": "with",
-    "ts": "2026-07-18T01:20:00Z",
-    "device_id": "ice_machine_1",
+    "ts": "2026-07-18T02:28:00Z",
+    "device_id": "dishwasher_1",
     "action": "start",
     "value": null,
-    "decision_id": null,
+    "decision_id": "d_0020",
     "issued_by": "owner"
   }
 }
