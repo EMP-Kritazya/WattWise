@@ -145,7 +145,7 @@ export function BuilderPage() {
       location: LOCATIONS[locationIdx],
       owner_preferences: preferences.trim(),
       authority: FULL_AUTHORITY,
-      tariff_id: "demo_tariff_v1", // STUB: no tariff list endpoint exists yet.
+      tariff_id: import.meta.env.VITE_TARIFF_ID ?? "demo_tariff_v1",
       seed: Number(seed) || 42,
     };
     setBuilding(true);
@@ -263,8 +263,8 @@ export function BuilderPage() {
               onChange={(e) => setPreferences(e.target.value)}
             />
           </Field>
-          <Field id="tariff" label="Tariff" hint="The preset list arrives once the API serves tariffs.">
-            <Input id="tariff" disabled placeholder="Team's chosen tariff" />
+          <Field id="tariff" label="Tariff" hint="The backend loads this tariff for engine billing.">
+            <Input id="tariff" disabled value={import.meta.env.VITE_TARIFF_ID ?? "demo_tariff_v1"} />
           </Field>
           <Field id="seed" label="Seed" hint="Same seed, same run. Hidden in demo mode.">
             <Input id="seed" type="number" value={seed} onChange={(e) => setSeed(e.target.value)} />
@@ -272,7 +272,7 @@ export function BuilderPage() {
           <Button size="lg" disabled={!catalog || !capValid || !anyEquipment || building} onClick={build}>
             {building ? (
               <>
-                <LoaderCircle className="animate-spin" /> Warming up 21 days of history…
+                <LoaderCircle className="animate-spin" /> Building kitchen and loading history…
               </>
             ) : (
               "Build kitchen"

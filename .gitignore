@@ -1,10 +1,16 @@
 .env
+.env.*
+!.env.example
 !.claude/agents/
+.claude/settings.local.json
 .venv/
 __pycache__/
+*.pyc
 .pytest_cache/
 .hypothesis/
 /data/
 /dataset/
 myTestsReport/
-./dataset
+node_modules/
+dist/
+.DS_Store

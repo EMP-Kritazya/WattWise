@@ -24,6 +24,7 @@ export function startLive(): () => void {
   let tableBuffer: WsMessage[] = []; // messages derived from SpacetimeDB rows: legacy screen store only
   let latestTables: LiveTables | null = null; // newest SpacetimeDB snapshot, written to the row store on flush
   const pushFromTables = (msgs: WsMessage[]) => {
+    if (spacetimeDisabled || stopped) return;
     tableBuffer.push(...msgs);
   };
   const timer = setInterval(() => {
@@ -45,11 +46,22 @@ export function startLive(): () => void {
 
   const setSource = (kind: LiveSourceKind) => useSim.getState().setLiveSource(kind);
   let usingSpacetime = false;
+  let spacetimeDisabled = false;
+  let stopped = false;
   let stopSpacetime: (() => void) | undefined;
 
   // /ws always runs: it's the fallback, and it carries chat streaming and proposals in every mode.
   const stopWs = transport.subscribe(
     (msg) => {
+      if (msg.type === "warning" && msg.code === "live_transport_down") {
+        spacetimeDisabled = true;
+        usingSpacetime = false;
+        stopSpacetime?.();
+        stopSpacetime = undefined;
+        latestTables = null;
+        tableBuffer = [];
+        setSource("ws");
+      }
       // With SpacetimeDB live, its tables are the source of truth for ticks, feed, clock and comparison.
       if (usingSpacetime && LIVE_TABLE_TYPES.has(msg.type)) return;
       buffer.push(msg);
@@ -62,12 +74,14 @@ export function startLive(): () => void {
     connectSpacetime(
       { uri: spacetimeUri, database: spacetimeDb, token: spacetimeToken },
       (tables) => {
+        if (spacetimeDisabled || stopped) return;
         latestTables = tables;
       },
       pushFromTables,
       () => {},
     )
       .then((stop) => {
+        if (spacetimeDisabled || stopped) { stop(); return; }
         usingSpacetime = true;
         stopSpacetime = stop;
         setSource("spacetime");
@@ -84,6 +98,7 @@ export function startLive(): () => void {
   }
 
   return () => {
+    stopped = true;
     stopWs();
     stopSpacetime?.();
     stopRows();

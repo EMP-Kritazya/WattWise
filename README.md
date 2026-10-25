@@ -11,34 +11,131 @@ Keeps a restaurant's electricity peak under control without stopping service.
 - **Fetch.ai agents** bring live context: weather, grid prices, nearby events. Owners talk to the **Concierge** in **ASI:One**.
 - A **browser simulation** (one sim host tab) models the appliances and customers; every appliance reports to one **hub** (ESP32-style controller) that talks to FastAPI over a WebSocket.
 - FastAPI runs the clock (1 sim minute per tick, 120×). The **engine** computes every number from the hub's state and, every 5 simulated minutes, sends commands back through the hub inside the owner's rules.
-- When no in-rules move can hold the cap, the engine applies the safest option within the owner's limits at once and offers up to 3 evaluated alternatives; **Claude** may choose another, which the engine revalidates against the owner's authority; beyond it, the owner confirms.
+- When no in-rules move can hold the cap, the engine applies the safest option within the owner's limits at once and offers up to 3 evaluated alternatives; **Claude** may choose another, which the engine revalidates against the owner's authority; an unauthorized or late choice is rejected and the safe fallback stays active.
 - Every screen updates live from **SpacetimeDB**: energy, current price and cost, every appliance's state.
 - Every viewer sees the same live kitchen through **SpacetimeDB**. Records and the ESP32 bridge live in **Convex**. It runs on **Microsoft Azure**.
 - Proof: a year of DOE-calibrated restaurant data replayed on a real tariff — without vs. timer vs. WattWise.
 
-## Run
-> Fill in during the hackathon.
+## Run the connected application
+
+Use Python 3.11 and Node.js. Run these commands from the repository root. Copy
+`.env.example` to `.env`, replace `AGENT_TOKEN` and `FETCH_AGENT_SEED` with private
+values, and keep the same values in every process. The example runs the **real
+engine**, browser simulation, memory store, and WebSocket live fallback. External
+AI and hardware are optional.
+
+```sh
+cp .env.example .env
+python3.11 -m venv backend/.venv
+backend/.venv/bin/python -m pip install -r backend/requirements.txt
+backend/.venv/bin/python -m pip install -r agents/requirements.txt
+npm --prefix frontend ci
 ```
-cd backend && python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
-uvicorn api.main:app --reload
-cd frontend && npm install && npm run dev
+
+Start the API in one terminal. Settings are environment variables; the backend
+does not automatically read `.env`.
+
+```sh
+set -a
+source .env
+set +a
+cd backend
+.venv/bin/uvicorn api.main:app --reload
 ```
-`.env` (never committed; copy `.env.example`):
-| Variable | Values |
-|---|---|
-| `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | Claude |
-| `KITCHEN_IMPL` | `fake` \| `real` |
-| `DEMO_MODE` | `1` for the identical demo run |
-| `HUB_IMPL` | `browser` (default, the `/sim` tab) \| `fake` (fixture sim host, no browser) |
-| `CONTEXT_INTERVAL_S` | seconds between Fetch context refreshes (default 600) |
-| `LIVE_TRANSPORT` | `spacetime` (default) \| `ws` (offline fallback) |
-| `SPACETIMEDB_URL`, `SPACETIMEDB_DB`, `SPACETIMEDB_TOKEN` | SpacetimeDB (runtime identity) |
-| `STORE` | `convex` (default) \| `memory` |
-| `CONVEX_URL` | Convex deployment (`https://<name>.convex.cloud`) |
-| `HARDWARE` | `off` (default) \| `sim_bridge` \| `esp32` |
-| `CLAUDE_PROVIDER` | `anthropic` (default) \| `foundry` |
-| `AGENT_TOKEN` | shared secret for agent → API calls |
-| `FETCH_AGENT_SEED`, `AGENTVERSE_API_KEY` | Fetch.ai uAgent identity and Agentverse mailbox |
+
+Start the frontend in another terminal. These settings explicitly connect to the
+API instead of using fixture screens. Vite proxies `/api`, `/ws`, and `/ws/hub`
+to port 8000; set `API_TARGET` if your backend uses another address.
+
+```sh
+VITE_MOCKS=0 VITE_LIVE_TRANSPORT=ws npm --prefix frontend run dev
+```
+
+Open the frontend URL printed by Vite, build a kitchen, then keep exactly one
+`/sim` tab open and press Play. The `/sim` tab runs the appliances; other tabs are
+viewers. The API owns time and forwards hub reports into both engine lanes.
+Engine commands go back to the hub on the following tick, and viewers receive
+the computed energy, costs, decisions, and comparison. Without a sim host the
+clock waits. The catalog and selected tariff are served by the backend; the demo
+tariff is illustrative and must not be presented as a real utility saving.
+To show real billed amounts, install the PG&E URDB data described in
+`docs/design/DATA_AND_PROOF.md` and set frontend
+`VITE_TARIFF_ID=pge_b19_secondary_voluntary` before starting Vite.
+Calibrated warm-up requires the optional ComStock dataset. When the current
+recipe exceeds catalog ratings, the runtime logs the problem and uses explicitly
+labelled synthetic fixture history; it never clips those readings.
+
+### Fetch context and ASI:One
+
+For a reproducible demo, leave `DEMO_MODE=1` and the example July simulation
+start. In **four separate terminals**, load the root `.env` as above and run one
+of these commands per terminal:
+
+```sh
+backend/.venv/bin/python agents/weather.py --recorded
+backend/.venv/bin/python agents/grid.py --recorded
+backend/.venv/bin/python agents/events.py --recorded
+backend/.venv/bin/python agents/concierge.py --recorded
+```
+
+All four agents need working uAgents transport. Follow
+[Agentverse registration](agents/REGISTRATION.md) to connect their mailboxes;
+starting a process alone does not complete mailbox registration. The Concierge
+posts authenticated structured context to the API after detecting a kitchen
+build and every `CONTEXT_INTERVAL_S` real seconds. The shared `AGENT_TOKEN`
+authenticates context and agent-log posts. Recorded labels remain visible. This
+runs real engine decisions with recorded external context, not canned decisions.
+
+For live sources, set `DEMO_MODE=0`, remove `--recorded`, and set `SIM_START_TS`
+to a timezone-aware UTC timestamp on the current service day. Weather and grid
+responses use actual source timestamps and are matched against simulation time;
+the accelerated simulation can eventually outrun their forecast window. Weather
+uses Open-Meteo. Grid uses CAISO and falls back to explicitly recorded prices
+when CAISO fails. **Typed event context currently stays recorded**, because
+Ticketmaster does not publish the contract's required attendance field. A
+`TICKETMASTER_API_KEY` enables live event listings in public agent chat only.
+An unavailable source does not stop the kitchen.
+
+Set `ANTHROPIC_API_KEY` and an available `ANTHROPIC_MODEL` for Claude escalation
+choices and crowd classification. Without a key, routine engine decisions and
+safe escalation fallbacks still run; chat uses its available fallback. Set
+`ASI1_API_KEY` / `ASI1_MODEL` for the optional ASI:One model fallback. Open ASI:One
+to chat with the registered Concierge after registration.
+
+### SpacetimeDB and optional services
+
+For shared live tables, deploy the module in `spacetime/` and set backend
+`LIVE_TRANSPORT=spacetime`, `SPACETIMEDB_URL`, `SPACETIMEDB_DB`, and the runtime
+identity `SPACETIMEDB_TOKEN`. Set frontend `VITE_LIVE_TRANSPORT=spacetime`,
+`VITE_SPACETIME_URI` (the WebSocket URI), and `VITE_SPACETIME_DB` in
+`frontend/.env.local`, then restart Vite. Use only a viewer identity for the
+optional browser token; never expose the runtime token. `/ws` still carries chat
+and supplies the live fallback when configured services are unavailable.
+
+`STORE=convex` with `CONVEX_URL` enables durable records; see
+[Convex setup](convex/README.md). `HARDWARE=off` is the browser-only application;
+optional hardware setup is in [firmware/README.md](firmware/README.md). Memory
+records disappear on backend restart. Do not start multiple backend workers:
+one process owns the application clock.
+
+### Verify the integration
+
+```sh
+cd backend
+.venv/bin/python -m pytest tests/integration -q
+```
+
+The integration test runs the production Concierge context loop with recorded
+source replies through the real API, engine, runtime, hub protocol, and viewer
+WebSocket. It checks authenticated context reaching both lanes, command delivery
+on the next tick, automatic engine decisions, and live UI message shapes. Its
+hub is a protocol-level test client; frontend physics and rendering have separate
+checks:
+
+```sh
+npm --prefix frontend test -- --run
+npm --prefix frontend run build
+```
 
 ## Fetch.ai agents (Innovation Lab)
 | Agent | Address | Protocols |

@@ -1,0 +1,44 @@
+{
+  "_embedded": {
+    "events": [
+      {
+        "name": "San Francisco Giants vs. Los Angeles Dodgers",
+        "type": "event",
+        "id": "vvG1zZ9a1b2c3d",
+        "test": false,
+        "url": "https://www.ticketmaster.com/event/vvG1zZ9a1b2c3d",
+        "locale": "en-us",
+        "dates": {
+          "start": {"localDate": "2026-10-24", "localTime": "19:05:00", "dateTime": "2026-10-25T02:05:00Z",
+                    "dateTBD": false, "dateTBA": false, "timeTBA": false, "noSpecificTime": false},
+          "timezone": "America/Los_Angeles",
+          "status": {"code": "onsale"},
+          "spanMultipleDays": false
+        },
+        "classifications": [{"primary": true, "segment": {"id": "KZFzniwnSyZfZ7v7nE", "name": "Sports"}}],
+        "distance": 4.21,
+        "units": "KILOMETERS",
+        "_embedded": {
+          "venues": [{"name": "Oracle Park", "type": "venue", "id": "KovZpZAEA76A", "postalCode": "94107",
+                      "timezone": "America/Los_Angeles", "city": {"name": "San Francisco"},
+                      "location": {"longitude": "-122.38996", "latitude": "37.77847"}}]
+        }
+      },
+      {
+        "name": "Late Night Jazz",
+        "type": "event",
+        "id": "Z7r9jZ1A7a8bC",
+        "dates": {
+          "start": {"localDate": "2026-10-24", "localTime": "22:30:00", "dateTime": "2026-10-25T05:30:00Z"},
+          "timezone": "America/Los_Angeles",
+          "status": {"code": "onsale"}
+        },
+        "distance": 2.6,
+        "units": "KILOMETERS",
+        "_embedded": {"venues": [{"name": "Black Cat", "type": "venue", "id": "KovZpZAE7eEA"}]}
+      }
+    ]
+  },
+  "_links": {"self": {"href": "/discovery/v2/events.json?latlong=37.8,-122.44&radius=5.0&unit=km&page=0&size=20&sort=date,asc"}},
+  "page": {"size": 20, "totalElements": 2, "totalPages": 1, "number": 0}
+}

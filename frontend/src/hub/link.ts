@@ -25,6 +25,8 @@ export class HubLink {
   private readonly hub = new BrowserHub();
   private connection: HubConnection | null = null;
   private connectionVersion = 0;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private replayUntil = 0;
 
   async connectMock(options: { hostTaken?: boolean; intervalMs?: number } = {}) {
     this.close();
@@ -39,6 +41,7 @@ export class HubLink {
 
   connect(url = this.defaultUrl()) {
     this.close();
+    const version = this.connectionVersion;
     this.setConnecting("Connecting to FastAPI…");
     const socket = new WebSocket(url);
     this.connection = {
@@ -47,6 +50,7 @@ export class HubLink {
     };
     socket.addEventListener("open", () => socket.send(JSON.stringify(HELLO)));
     socket.addEventListener("message", (event) => {
+      if (version !== this.connectionVersion) return;
       try {
         this.handle(JSON.parse(String(event.data)) as ServerToHubMessage);
       } catch {
@@ -57,20 +61,25 @@ export class HubLink {
       useHubStatus.setState({ connection: "error", message: "Could not reach /ws/hub" });
     });
     socket.addEventListener("close", () => {
+      if (version !== this.connectionVersion) return;
       if (useHubStatus.getState().connection !== "host_taken") {
-        useHubStatus.setState({ connection: "offline", message: "Simulation host disconnected", playing: false });
+        useHubStatus.setState({ connection: "offline", message: "Reconnecting simulation host…", playing: false });
+        this.reconnectTimer = setTimeout(() => this.connect(url), 1000);
       }
     });
   }
 
   close() {
     this.connectionVersion += 1;
+    if (this.reconnectTimer !== null) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
     this.connection?.close();
     this.connection = null;
   }
 
   private handle(message: ServerToHubMessage) {
     if (message.type === "hub_welcome") {
+      this.replayUntil = message.tick_id;
       if (!message.accepted) {
         useHubStatus.setState({
           connection: "host_taken",
@@ -103,7 +112,7 @@ export class HubLink {
         simTs: report.reports.with.ts,
         lastReport: report,
       });
-      this.connection?.send(report);
+      if (!message.replay || message.tick_id === this.replayUntil) this.connection?.send(report);
     } catch (error) {
       useHubStatus.setState({
         connection: "error",
