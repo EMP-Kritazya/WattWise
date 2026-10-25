@@ -1,18 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
-import { ContextStrip } from "@/components/live/ContextStrip";
-import { DecisionFeed } from "@/components/live/DecisionFeed";
-import { EscalationCard } from "@/components/live/EscalationCard";
 import { LiveFloor } from "@/components/live/floor/LiveFloor";
-import { KpiRow } from "@/components/live/KpiRow";
-import { PowerTrendCard } from "@/components/live/LaneChart";
+import { SavingsPanel } from "@/components/live/SavingsPanel";
 import { SimControls } from "@/components/live/SimControls";
 import { WarningBanner } from "@/components/live/WarningBanner";
 import { Button } from "@/components/ui/button";
 import { useDashboardStore as useSim } from "@/data";
 import { transport } from "@/transport";
 
-/** The main demo screen: controls · KPIs · the 3D floor · charts and decisions, with the assistant docked on the right. */
+/** The Live Simulation tab: controls · what WattWise is saving · the 3D floor. The owner's numbers live on Dashboard. */
 export function LivePage() {
   const kitchen = useSim((s) => s.kitchen);
   const hasCatalog = useSim((s) => s.catalog != null);
@@ -43,7 +39,7 @@ export function LivePage() {
         <h1 className="text-xl font-semibold">No kitchen yet</h1>
         <p className="mt-2 text-muted-foreground">Build one first. Both lanes start from it.</p>
         <Button asChild className="mt-4">
-          <Link to="/builder">Open Kitchen Builder</Link>
+          <Link to="/dashboard/builder">Open Kitchen Builder</Link>
         </Button>
       </div>
     );
@@ -54,14 +50,8 @@ export function LivePage() {
       <div className="flex min-w-0 flex-col gap-4">
         <WarningBanner />
         <SimControls />
-        <ContextStrip />
-        <EscalationCard />
+        <SavingsPanel />
         <LiveFloor demo={demo} onDemoChange={setDemoMode} />
-        <KpiRow />
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-          <PowerTrendCard />
-          <DecisionFeed />
-        </div>
       </div>
     </div>
   );

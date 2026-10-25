@@ -3,6 +3,25 @@
 You are taking over Ashirwad's work on **WattWise** (Cal Hacks 13.0, Oct 23–25 2026). Work carefully, keep the existing code style,
 and run `npm run build` and `npm test` (in `frontend/`) before calling anything done.
 
+## ⭐ Oct 24 evening: four-tab UI ported from `WattWise-suyog-work` (uncommitted on `ashirwad`)
+**Pitch work is parked** on local branch `pitch-wip` (commit `62c0add`, not pushed): `PitchPage.tsx`, `.env.demo`, `public/`
+(`_redirects`, `staticwebapp.config.json`), and its edits to `App.tsx`, `SimControls.tsx`, `Hud.tsx`, `LiveFloor.tsx`, `ToyBoxRail.tsx`,
+`vite.config.ts`, `package.json`. The new `App.tsx` replaced the pitch version, so re-add the `/pitch` route when rebuilding it.
+
+Copied as-is from `~/Downloads/WattWise-suyog-work` (branch `ashirwad-suyog-work`, uncommitted UI there); see its HANDOFF
+("four top tabs…", "Play doesn't work") for the why:
+- New: `components/SectionTabs.tsx`, `pages/DashboardPage.tsx`, `components/live/SavingsPanel.tsx`.
+- Replaced: `App.tsx` (no sidebar; top tabs Live Simulation `/live` · Dashboard `/dashboard` [+ Kitchen Builder `/dashboard/builder`] ·
+  Evaluation Lab `/eval` · Proof & Agents `/proof` [+ Agent Network `/proof/agents`]; `/` → `/live`; `/builder` and `/agents` redirect;
+  Ask WattWise in the top bar), `pages/LivePage.tsx` (controls · savings panel · 3D floor; KPIs/context/escalation/trend/decisions moved to
+  Dashboard), `pages/BuilderPage.tsx` (no "Claude's authority" card; always sends `FULL_AUTHORITY`), `components/live/SimControls.tsx`
+  (simulation-host-offline notice + "Open simulation host" button; also brings commit `a63d76d`'s outline style for "+40 customers"),
+  `components/live/floor/OperationsPanel.tsx` (no "your decision needed" state).
+- Deleted: `components/live/EscalationDialog.tsx`. `EscalationCard` (on Dashboard) only displays; there is no UI Confirm path now.
+- Backend half (Claude full authority, sim-host pause) is only on `ashirwad-suyog-work`; nothing under `backend/`, `contracts/`, `docs/` changed here.
+- Verified: build + tests pass; in `dev:mocks` the four tabs, both sub-tab rows, both redirects, Build kitchen → `/live` with controls,
+  savings panel and 3D floor, and the Dashboard all work.
+
 ## ⭐ CURRENT TASK (Oct 24, latest): build the Toy Box restaurant design
 **Spec:** `frontend/UI_CONCEPTS.md`, chosen by Ashirwad. **Visual target:** `frontend/design/toybox-restaurant-mockup.html`; open it in a browser.
 

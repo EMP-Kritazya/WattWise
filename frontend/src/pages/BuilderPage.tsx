@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
-import { Bot, LoaderCircle, MapPin, Minus, Plus, ShieldCheck } from "lucide-react";
+import { LoaderCircle, MapPin, Minus, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,11 +25,16 @@ const MAX_COUNT = 5;
 const PRESET_COUNT = 1; // "Demo Café": one of each type
 
 const LOCATIONS = [{ label: "Marina, San Francisco", lat: 37.8, lon: -122.44 }];
-const DEFAULT_AUTHORITY: ClaudeAuthority = {
+/**
+ * Claude resolves every escalation itself so the kitchen never stops for the owner (DECISIONS: full authority).
+ * It may let the peak run over the cap and keep flexible units reduced longer, but deadlines stay hard (no extra
+ * delay), units never go below their minimum power, and refrigeration never goes below 50 %.
+ */
+const FULL_AUTHORITY: ClaudeAuthority = {
   enabled: true,
-  max_cap_overrun_kw: 3,
-  max_extra_delay_min: 20,
-  max_extra_reduce_min: 15,
+  max_cap_overrun_kw: 1000,
+  max_extra_delay_min: 0,
+  max_extra_reduce_min: 1440,
   may_go_below_min_power: false,
 };
 /** Food safety (SIMULATION.md): refrigeration never goes below 50 % power, whatever the owner sets. */
@@ -74,7 +79,6 @@ export function BuilderPage() {
   const [seed, setSeed] = useState("42");
   const [locationIdx, setLocationIdx] = useState(0);
   const [preferences, setPreferences] = useState("");
-  const [authority, setAuthority] = useState<ClaudeAuthority>(DEFAULT_AUTHORITY);
   // Per-unit overrides keyed by device id (`<type_id>_<n>`); units without one use the type's defaults.
   const [units, setUnits] = useState<Record<string, UnitSetting>>({});
   const [building, setBuilding] = useState(false);
@@ -122,7 +126,7 @@ export function BuilderPage() {
       operating_hours: { open, close },
       location: LOCATIONS[locationIdx],
       owner_preferences: preferences.trim(),
-      authority,
+      authority: FULL_AUTHORITY,
       tariff_id: "demo_tariff_v1", // STUB: no tariff list endpoint exists yet.
       seed: Number(seed) || 42,
     };
@@ -184,34 +188,6 @@ export function BuilderPage() {
           </Card>
         )}
 
-        <Card className="gap-3 py-4">
-          <CardHeader className="px-4">
-            <CardTitle className="flex items-center gap-2">
-              <Bot className="size-4" /> Claude's authority
-            </CardTitle>
-            <CardDescription>
-              When routine moves can't hold the cap, Claude may pick an option within these limits. Anything beyond them waits for you.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3 px-4">
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <input type="checkbox" className="size-4 accent-[var(--color-importance-flexible)]" checked={authority.enabled} onChange={(e) => setAuthority((a) => ({ ...a, enabled: e.target.checked }))} />
-              Let Claude decide escalations on its own
-            </label>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <NumberField id="auth-overrun" label="Go over the cap by up to (kW)" value={authority.max_cap_overrun_kw} step={0.5} disabled={!authority.enabled} onChange={(v) => setAuthority((a) => ({ ...a, max_cap_overrun_kw: v }))} />
-              <NumberField id="auth-delay" label="Extra delay (min)" value={authority.max_extra_delay_min} step={5} disabled={!authority.enabled} onChange={(v) => setAuthority((a) => ({ ...a, max_extra_delay_min: v }))} />
-              <NumberField id="auth-reduce" label="Extra reduce time (min)" value={authority.max_extra_reduce_min} step={5} disabled={!authority.enabled} onChange={(v) => setAuthority((a) => ({ ...a, max_extra_reduce_min: v }))} />
-            </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" className="size-4" disabled={!authority.enabled} checked={authority.may_go_below_min_power} onChange={(e) => setAuthority((a) => ({ ...a, may_go_below_min_power: e.target.checked }))} />
-              May go below a unit's minimum power
-            </label>
-            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <ShieldCheck className="size-3.5 text-lane-with" /> Refrigeration never goes below 50 % power, whatever you set here.
-            </p>
-          </CardContent>
-        </Card>
       </div>
 
       <Card className="h-fit gap-4 lg:sticky lg:top-6">
@@ -386,13 +362,5 @@ function UnitRow({ name, type: t, setting, close, onChange }: { name: string; ty
         </div>
       )}
     </div>
-  );
-}
-
-function NumberField({ id, label, value, step, disabled, onChange }: { id: string; label: string; value: number; step: number; disabled?: boolean; onChange: (v: number) => void }) {
-  return (
-    <Field id={id} label={label}>
-      <Input id={id} type="number" min={0} step={step} value={value} disabled={disabled} onChange={(e) => onChange(Math.max(0, Number(e.target.value) || 0))} />
-    </Field>
   );
 }
