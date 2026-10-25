@@ -89,6 +89,7 @@ def test_post_kitchen_without_authority_uses_full_authority_in_fake_mode(app, cl
 
     assert response.status_code == 200
     assert app.state.store.latest_kitchen()["config"]["authority"] == FULL_AUTHORITY
+    assert app.state.runtime.hub._build["config"]["authority"] == FULL_AUTHORITY
 
 
 def test_authority_update_is_visible_to_escalation_gating(app, client):

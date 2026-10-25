@@ -185,10 +185,14 @@ class RunLoop:
     async def build(self, config: dict) -> dict:
         """`POST /api/kitchen`: both lanes → `sim_build` → `reset_all` → first publish (clock at tick 0, context)."""
         result = self.service.build_kitchen(config)  # RuleError → nothing below happens
+        # The service may inject the Builder's implicit FULL_AUTHORITY.  Use
+        # that normalized config everywhere after construction, including the
+        # sim host's build message.
+        built_config = copy.deepcopy(self.service.lanes.config or config)
         self._build_count += 1
         self.playing, self._manual = False, False
         self.tick_id = 0
-        self.day_index, self.run_days = 1, config.get("run_days", 1)
+        self.day_index, self.run_days = 1, built_config.get("run_days", 1)
         # Day 1 starts at start_sim_ts; a start outside opening hours runs the night up to the first open.
         self.phase = "service" if self._is_open(self.sim_ts) else "overnight"
         self._day_started = self.phase == "service"
@@ -198,7 +202,7 @@ class RunLoop:
         self.blocks.reset()
         devices = self.service.get_kitchen()["devices"]
         await self.bridge.reset({d["device_id"] for d in devices})
-        await self.hub.send_build(KITCHEN_ID, config, self.service.catalog(), devices, self.service.lanes.seed,
+        await self.hub.send_build(KITCHEN_ID, built_config, self.service.catalog(), devices, self.service.lanes.seed,
                                   _iso(self._start))
         self.live.send("reset_all")
         self._publish_clock()
