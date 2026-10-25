@@ -140,8 +140,23 @@ def test_factory_fake_mode():
     engine = load_engine("fake")
     assert engine.impl == "fake"
     assert engine.Kitchen is FakeKitchen
+    assert engine.build_lanes.__func__ is FakeKitchen.build_lanes.__func__
     assert engine.run_backtest is fake_run_backtest
     assert engine.compare_lanes is fake_compare_lanes
     assert engine.RuleError is RuleError
     with pytest.raises(ValueError):
         load_engine("mock")
+
+
+def test_build_lanes_shares_ids_and_records_warm_up():
+    kitchens = FakeKitchen.build_lanes(
+        KITCHEN_ARGS["config"], KITCHEN_ARGS["tariff"], KITCHEN_ARGS["seed"]
+    )
+    history = {"source": "test", "blocks": []}
+
+    for kitchen in kitchens.values():
+        kitchen.warm_up(history)
+
+    assert tuple(kitchens) == ("without", "with")
+    assert kitchens["without"].ids is kitchens["with"].ids
+    assert [kitchen.warm_up_calls for kitchen in kitchens.values()] == [[history], [history]]

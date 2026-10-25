@@ -6,6 +6,7 @@ pending Proposal with `confirmed_via: "asi_one"`.
 """
 
 import asyncio
+import copy
 import importlib.util
 import json
 import sys
@@ -70,6 +71,16 @@ def owner_message(llm, request_index=0):
 
 def hint(summary):
     return f"\n\nWaiting for your confirmation: {summary}. {owner_chat.CONFIRM_HINT}"
+
+
+def contract_escalation() -> dict:
+    """Adapt the read-only pre-contract fixture in test memory, never on disk."""
+    escalation = copy.deepcopy(load("shapes/escalation_open.json"))
+    escalation.update(updated_ts=escalation["ts"], active_option_id="accept_overrun")
+    for rank, option in enumerate(escalation["options"], 1):
+        option["rank"] = rank if option["option_id"] != "ask_owner" else None
+        option["harm_score"] = float(rank) if option["option_id"] != "ask_owner" else None
+    return escalation
 
 
 # ---------------------------------------------------------------- the seven flows
@@ -146,51 +157,41 @@ async def test_how_much_did_we_save_this_month(app, concierge):
     assert tool_results(llm, 1)["t1"] == bill["output"]
 
 
-async def test_what_did_you_decide_then_choose_option_2_then_confirm(app, set_clock, facade_calls, concierge):
+async def test_what_did_you_decide_then_owner_override_option_2_directly(app, set_clock, facade_calls, concierge,
+                                                                           monkeypatch):
     set_clock("2026-07-18T01:32:00Z")  # e_0001 is open until 01:40Z
-    escalations = load("ai_tools/get_escalation.json")["output"]
-    options = escalations[0]["options"]
-    listing = "Tonight's dinner rush needs your call:\n" + "\n".join(
-        f"{i}. {o['summary']}" for i, o in enumerate(options, 1))
-    pick = {"escalation_id": "e_0001", "option_id": options[1]["option_id"], "summary": options[1]["summary"]}
-    llm = use_llm(app, ScriptedLLM(
-        tool_turn(("t1", "get_escalation", {})), text_turn(listing),
-        tool_turn(("t2", "get_escalation", {})), tool_turn(("t3", "propose_escalation_choice", pick)),
-        text_turn(f"Option 2 it is: {options[1]['summary']}.")))
+    monkeypatch.setattr(app.state.service.lanes["with"], "open_escalations", lambda: [contract_escalation()])
+    llm = use_llm(app, ScriptedLLM(text_turn("Here is the current escalation report.")))
 
     reply = await concierge.answer_reply(OWNER, "What did you decide about tonight?")
-    card = reply.card  # the escalation card rides on Claude's answer; its fallback follows the answer in the text
-    assert reply.text == f"{listing}\n\n{card.fallback}"
-    assert json.loads(card.metadata()["card_payload"])["root"]["title"] == "Peak cap at risk"
-    assert tool_results(llm, 1)["t1"] == escalations
+    card = reply.card
+    root = json.loads(card.metadata()["card_payload"])["root"]
+    assert root["title"] == "Escalation report"
+    assert "Ask me later" not in card.fallback and "Approve" not in card.fallback
 
-    reply = await concierge.answer_reply(OWNER, "Choose option 2")  # typed: still Claude's propose → confirm flow
-    assert reply.text == f"Option 2 it is: {options[1]['summary']}." + hint(pick["summary"])
-    assert reply.card.kind == "review" and reply.card.payload["approve_cta"]["selection"]["proposal_id"] == "p_0002"
-    assert f"2. {options[1]['summary']}" in owner_message(llm, 2)  # the numbered list it refers to
-
-    assert await concierge.answer(OWNER, "YES") == f"Done: {pick['summary']}."
+    assert await concierge.answer(OWNER, "Choose option 2") == "Done: HVAC 1 and 2 to 30 % until their planned restore."
     assert facade_calls == [("resolve_escalation", ("e_0001", "deep_reduce_hvac", "owner", None))]
     resolved = next(e for e in app.state.store.escalations() if e["escalation_id"] == "e_0001")
     assert resolved["status"] == "resolved" and resolved["resolved_by"] == "owner"
     assert resolved["chosen_option_id"] == "deep_reduce_hvac"
-    proposal = app.state.store.proposal("p_0002")
-    assert proposal["kind"] == "resolve_escalation" and proposal["confirmed_via"] == "asi_one"
+    assert not [p for p in app.state.store.proposals() if p["kind"] == "resolve_escalation"]
+    assert len(llm.requests) == 1  # the explicit owner override did not return to the model
 
 
 async def test_escalation_card_button_resolves_it_and_typed_confirm_still_works(app, set_clock, facade_calls,
-                                                                               concierge):
+                                                                                concierge, monkeypatch):
     set_clock("2026-07-18T01:32:00Z")  # e_0001 is open until 01:40Z
+    monkeypatch.setattr(app.state.service.lanes["with"], "open_escalations", lambda: [contract_escalation()])
     use_llm(app, ScriptedLLM(text_turn("Tonight's dinner rush needs your call.")))
     card = (await concierge.answer_reply(OWNER, "What did you decide about tonight?")).card
     root = json.loads(card.metadata()["card_payload"])["root"]
-    option_1 = next(el for el in root["children"] if el.get("title") == "Option 1")
-    selection = next(c for c in option_1["children"] if c["type"] == "button")["action"]["selection"]
+    option_2 = next(el for el in root["children"] if el.get("title") == "Option 2")
+    selection = next(c for c in option_2["children"] if c["type"] == "button")["action"]["selection"]
 
-    # The tap arrives as the selection JSON (direct @mention); code resolves it, the model is never asked.
+    # The override tap arrives as selection JSON; it resolves directly and never creates a Proposal.
     reply = await concierge.answer(OWNER, json.dumps(selection))
-    assert reply == "Done: Let the peak reach 42.4 kW for one block."
-    assert facade_calls == [("resolve_escalation", ("e_0001", "accept_overrun", "owner", None))]
+    assert reply == "Done: HVAC 1 and 2 to 30 % until their planned restore."
+    assert facade_calls == [("resolve_escalation", ("e_0001", "deep_reduce_hvac", "owner", None))]
 
     assert await concierge.answer(OWNER, json.dumps({"action": "wattwise_launch"})) == "Sorry, that option expired."
     set_clock("2026-07-18T02:30:00Z")

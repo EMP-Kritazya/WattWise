@@ -22,7 +22,8 @@ from typing import Any, Awaitable, Callable, Protocol
 log = logging.getLogger("runtime.live_port")
 
 LANES = ("without", "with")
-CLOCK_FIELDS = ("playing", "speed", "sim_ts", "tick_id", "paused_reason", "slowed_reason")
+# ClockState in the order of the `set_clock` reducer args (CONTRACTS.md §5); `sim_host` follows them.
+CLOCK_FIELDS = ("playing", "speed", "sim_ts", "tick_id", "paused_reason", "day_index", "run_days", "phase")
 
 Broadcast = Callable[[dict], Awaitable[None]]
 
@@ -93,8 +94,12 @@ class LiveRows:
         forecast, forecast_ts = self._forecast.get(st["lane"], (None, None))
         return {
             "lane": st["lane"], "ts": st["ts"], "tick_id": tick_id, "total_kw": m["total_kw"],
-            "block_avg_kw": m["block_avg_kw"], "month_peak_kw": m["month_peak_kw"], "peak_mode": m["peak_mode"],
+            "block_avg_kw": m["block_avg_kw"], "month_peak_kw": m["month_peak_kw"],
+            # Older recorded fixtures predate these engine-owned month-to-date fields. Do not invent values when
+            # replaying them; a current engine TickState always supplies both keys.
+            "on_peak_month_peak_kw": m.get("on_peak_month_peak_kw"), "peak_mode": m["peak_mode"],
             "peak_cap_kw": m["peak_cap_kw"], "target_kw": m["target_kw"], "energy_kwh_today": m["energy_kwh_today"],
+            "energy_kwh_month": m.get("energy_kwh_month"),
             "price_usd_per_kwh_now": m["price_usd_per_kwh_now"], "cost_usd_today": m["cost_usd_today"],
             "cost_usd_month": m["cost_usd_month"], "customers_per_hour": st["customers_per_hour"],
             "indoor_temp_c": st["indoor_temp_c"], "forecast_kw_json": compact_json(forecast), "forecast_ts": forecast_ts,
@@ -127,7 +132,10 @@ class LiveRows:
     def escalation(e: dict) -> dict:
         return {
             "escalation_id": e["escalation_id"], "lane": e["lane"], "status": e["status"],
+            "block_start": e.get("block_start"), "updated_ts": e.get("updated_ts"),
             "problem_json": compact_json(e["problem"]), "options_json": compact_json(e["options"]),
+            "default_option_id": e.get("default_option_id"), "active_option_id": e.get("active_option_id"),
+            "deadline_sim_ts": e.get("deadline_sim_ts"),
             "chosen_option_id": e.get("chosen_option_id"), "resolved_by": e.get("resolved_by"),
             "rationale": e.get("rationale"),
         }

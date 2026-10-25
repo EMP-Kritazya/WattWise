@@ -1,7 +1,8 @@
 """Proposals: changes the AI suggests, applied by code only after an owner confirmation (CONTRACTS.md §1 Proposal).
 
-Created by the `propose_*` tools (and by `choose_escalation_option` when the engine answers `awaiting_owner`), stored in
-the store's `proposals` table, pushed as a `proposal` message on `/ws` at every change. Confirm paths: the UI
+Created by the `propose_*` tools, stored in the store's `proposals` table, pushed as a `proposal` message on `/ws` at
+every change. ``resolve_escalation`` is reserved for an explicit owner override; Claude's bounded escalation choice
+never creates a Proposal. Confirm paths: the UI
 (`POST /api/proposals/{id}/confirm`), an ASI:One card button or a `confirm` / `yes` reply (`confirmed_via: "asi_one"`).
 Applying = the normal facade call through the service (`set_importance`, `set_peak_cap`, `set_authority`, `undo`,
 `resolve_escalation`) or scheduling a customer surge in the run loop. Never the model.
@@ -22,6 +23,7 @@ from api.errors import NotFoundError, RuleError
 PROPOSAL_TTL_MIN = 30
 CONFIRM_VIA = ("ui", "asi_one")
 _ID = re.compile(r"^p_(\d+)$")
+OWNER_OVERRIDE_STATUSES = ("open", "awaiting_owner", "resolved", "expired_default", "obsolete")
 
 
 def _parse(ts: str) -> datetime:
@@ -74,8 +76,12 @@ class ProposalBook:
     def _expires_at(self, kind: str, payload: dict, now: str) -> str:
         expires = _parse(now) + timedelta(minutes=PROPOSAL_TTL_MIN)
         if kind == "resolve_escalation":
-            escalation = next((e for e in self._service.escalations("open") + self._service.escalations("awaiting_owner")
-                               if e["escalation_id"] == payload["escalation_id"]), None)
+            rows = [
+                escalation
+                for status in OWNER_OVERRIDE_STATUSES
+                for escalation in self._service.escalations(status)
+            ]
+            escalation = next((e for e in rows if e["escalation_id"] == payload["escalation_id"]), None)
             if escalation is None:
                 raise NotFoundError("open escalation", payload["escalation_id"])
             if payload["option_id"] not in {o["option_id"] for o in escalation["options"]}:

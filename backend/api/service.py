@@ -11,7 +11,10 @@ from __future__ import annotations
 
 import copy
 import functools
+import importlib
+import inspect
 import json
+import logging
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,8 +28,17 @@ from .errors import NoKitchenError, NotFoundError
 
 KITCHEN_ID = "k_01"  # one kitchen per process (demo)
 SEED = 42
+FULL_AUTHORITY = {
+    "enabled": True,
+    "max_cap_overrun_kw": 1000,
+    "max_extra_delay_min": 0,
+    "max_extra_reduce_min": 1440,
+    "may_go_below_min_power": False,
+}
 DECISION_EXTRAS = ("lane", "explanation", "explanation_source")
-FINAL_ESCALATION_STATUSES = ("resolved", "expired_default")
+FINAL_ESCALATION_STATUSES = ("resolved", "expired_default", "obsolete")
+
+log = logging.getLogger(__name__)
 
 
 def _load(path: Path) -> Any:
@@ -54,6 +66,7 @@ class KitchenService:
     def __init__(self, fixtures_dir: Path, engine: EngineApi, store: Store):
         self._engine = engine
         self._store = store
+        self._fixtures_dir = fixtures_dir
         # One lock for every facade call and check-then-write (e.g. confirming a proposal from UI + ASI:One at once).
         # runtime/loop.py takes the same lock around step().
         self.lock = threading.RLock()
@@ -64,7 +77,8 @@ class KitchenService:
         self.on_escalation: Callable[[dict], None] | None = None  # every resolve, from any thread (runtime/escalations.py)
         kitchen = store.latest_kitchen()
         if kitchen is not None:
-            self.lanes.build(kitchen["config"], SEED)
+            config = self._normalized_config(kitchen["config"])
+            self.lanes.build(config, config.get("seed", SEED), self._warm_up_history())
 
     @property
     def tariff(self) -> dict:
@@ -92,6 +106,53 @@ class KitchenService:
     def _now_utc() -> str:
         return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
+    @staticmethod
+    def _normalized_config(config: dict) -> dict:
+        """Copy the caller's config and fill the Builder's implicit authority."""
+        normalized = copy.deepcopy(config)
+        if normalized.get("authority") is None:
+            normalized["authority"] = copy.deepcopy(FULL_AUTHORITY)
+        return normalized
+
+    def _warm_up_history(self) -> dict | None:
+        """Return optional history without guessing the unshipped data helper's API.
+
+        ``data.warmup.build_warmup`` is owned by the data workstream and its
+        call signature is not part of the runtime contract yet.  When it is
+        available and explicitly accepts a zero-argument call, use it.  A
+        builder requiring inputs is left alone rather than inventing an
+        interface; the checked-in fixture is the next fallback.
+        """
+        try:
+            build_warmup = importlib.import_module("data.warmup").build_warmup
+        except (ImportError, AttributeError) as exc:
+            log.info("warm_up skipped from data.warmup: %s", exc)
+        else:
+            try:
+                signature = inspect.signature(build_warmup)
+                signature.bind()
+            except (TypeError, ValueError) as exc:
+                log.warning("warm_up skipped: data.warmup.build_warmup has no documented zero-argument call (%s)", exc)
+            else:
+                try:
+                    history = build_warmup()
+                except Exception:  # Optional calibrated data must never block a kitchen build.
+                    log.warning("warm_up from data.warmup failed; trying fixture history", exc_info=True)
+                else:
+                    if history is not None:
+                        return history
+                    log.info("warm_up skipped: data.warmup.build_warmup returned no history")
+
+        fixture = self._fixtures_dir / "history" / "warmup_demo_cafe.json"
+        if fixture.is_file():
+            try:
+                return _load(fixture)
+            except (OSError, json.JSONDecodeError):
+                log.warning("warm_up fixture could not be read: %s", fixture, exc_info=True)
+        else:
+            log.info("warm_up skipped: no data.warmup history or fixture at %s", fixture)
+        return None
+
     # ------------------------------------------------------------ kitchen
 
     @_serialized
@@ -101,8 +162,9 @@ class KitchenService:
     @_serialized
     def build_kitchen(self, config: dict) -> dict:
         """Both lanes + the `kitchens` record. Called by `RunLoop.build`, which then sends `sim_build`."""
-        self.lanes.build(config, SEED)  # RuleError leaves the lanes and the store untouched
-        self._store.record_kitchen(config, self._now_utc())
+        normalized = self._normalized_config(config)
+        self.lanes.build(normalized, normalized.get("seed", SEED), self._warm_up_history())
+        self._store.record_kitchen(normalized, self._now_utc())
         return {"kitchen_id": KITCHEN_ID}
 
     @_serialized
@@ -122,6 +184,10 @@ class KitchenService:
     @_serialized
     def set_authority(self, body: dict) -> dict:
         self._lane().set_authority(body)
+        # Keep the build configuration in sync with the engine's with-lane
+        # state so a later reset/rebuild preserves the owner's authority.
+        if self.lanes.config is not None:
+            self.lanes.config["authority"] = copy.deepcopy(body)
         return {"ok": True}
 
     @_serialized
@@ -133,9 +199,13 @@ class KitchenService:
 
     @_serialized
     def device_command(self, device_id: str, body: dict) -> dict:
-        """The owner Command; `RunLoop.owner_command` queues it for the next sim_tick."""
+        """Record the same owner command in both lanes; delivery stays with the loop."""
         self._require_device(device_id)
-        return self._lane().owner_command(device_id, body["action"], body.get("value"))
+        commands = {
+            lane: self._lane(lane).owner_command(device_id, body["action"], body.get("value"))
+            for lane in LANES
+        }
+        return commands["with"]
 
     # ------------------------------------------------------------ decisions, escalations
 
@@ -175,21 +245,6 @@ class KitchenService:
         if self.on_escalation is not None:
             self.on_escalation(copy.deepcopy(escalation))  # runtime/escalations.py publishes it
         return escalation
-
-    @_serialized
-    def expire_escalation(self, last_known: dict) -> dict:
-        """Past its deadline the engine has applied its default itself (CONTRACTS.md §1 Escalation, §3). Stores and
-        returns the final state: the engine's when it lists one. STUB (contract question): the facade has no call that
-        returns an expired escalation, so otherwise it is the last known state with the engine's default filled in."""
-        escalation_id = last_known["escalation_id"]
-        engine = next((e for e in self._lane().open_escalations() if e["escalation_id"] == escalation_id), None)
-        if engine is not None and engine["status"] in FINAL_ESCALATION_STATUSES:
-            final = engine
-        else:
-            final = {**copy.deepcopy(last_known), "status": "expired_default", "resolved_by": "default",
-                     "chosen_option_id": last_known["default_option_id"], "rationale": None}
-        self._store.record_escalation(final)
-        return final
 
     # ------------------------------------------------------------ backtest
 

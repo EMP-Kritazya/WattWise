@@ -41,6 +41,20 @@ class _Recorded:
     comparisons: dict[str, dict] = field(default_factory=dict)  # TickState ts → LaneComparison
 
 
+@dataclass
+class _FakeIdAllocator:
+    """Identity-only stand-in for the engine's shared id allocator.
+
+    Fixture responses already contain their engine-computed ids, so fake mode
+    deliberately does not manufacture ids.  The object still lets tests prove
+    that both lanes were created with one allocator, as the real facade does.
+    """
+
+    decisions: int = 0
+    commands: int = 0
+    escalations: int = 0
+
+
 @lru_cache(maxsize=4)
 def _recorded(fixtures_dir: Path) -> _Recorded:
     rec = _Recorded()
@@ -75,17 +89,49 @@ def _answer(rec: _Recorded, call: str, args: dict[str, Any], *, any_args: bool =
 
 
 class FakeKitchen:
-    def __init__(self, config: dict, tariff: dict, control: str, seed: int, *, fixtures_dir: Path | None = None):
+    def __init__(self, config: dict, tariff: dict, control: str, seed: int, ids: Any | None = None,
+                 *, fixtures_dir: Path | None = None):
         if control not in LANES:
             raise ValueError(f"control={control!r}; expected one of {LANES}")
         self._rec = _recorded(_fixtures_dir(fixtures_dir))
         self._raise_recorded_rule_errors(config)
         if not any(
-            ex["args"]["config"] == config and ex["args"]["tariff"] == tariff for ex in self._rec.calls.get("Kitchen", [])
+            self._matches_recorded_kitchen(ex, config, tariff) for ex in self._rec.calls.get("Kitchen", [])
         ):
             raise NotRecordedError("STUB: FakeKitchen only knows the recorded kitchen config and tariff")
         self.control = control
         self.seed = seed
+        self.config = copy.deepcopy(config)
+        # Match ``Kitchen(..., ids=None)``: individual lanes receive their own
+        # allocator, while ``build_lanes`` passes the same object to both.
+        self.ids = ids if ids is not None else _FakeIdAllocator()
+        self.warm_up_calls: list[Any] = []
+        self.warm_up_history: Any | None = None
+
+    @staticmethod
+    def _matches_recorded_kitchen(example: dict, config: dict, tariff: dict) -> bool:
+        """Authority is owner input, not fixture-owned fake data.
+
+        The recordings predate the Builder's full-authority default.  The fake
+        can therefore reuse the same simulated kitchen for a config that only
+        differs in authority, while preserving strict matching for its roster,
+        tariff, rules, and every other setting.
+        """
+        if example["args"]["tariff"] != tariff:
+            return False
+        recorded, requested = copy.deepcopy(example["args"]["config"]), copy.deepcopy(config)
+        recorded.pop("authority", None)
+        requested.pop("authority", None)
+        return recorded == requested
+
+    @classmethod
+    def build_lanes(cls, config: dict, tariff: dict, seed: int, *, fixtures_dir: Path | None = None) -> dict[str, "FakeKitchen"]:
+        """Build the contract's two lanes with one shared fake allocator."""
+        ids = _FakeIdAllocator()
+        return {
+            lane: cls(config, tariff, lane, seed, ids, fixtures_dir=fixtures_dir)
+            for lane in LANES
+        }
 
     def _raise_recorded_rule_errors(self, config: dict) -> None:
         """A config entry that sets a device to a recorded unsafe importance raises that recorded RuleError."""
@@ -104,7 +150,15 @@ class FakeKitchen:
 
     # ------------------------------------------------------------ run
 
-    def warm_up(self, *args: Any, **kwargs: Any) -> None:
+    def warm_up(self, history: Any = None, *args: Any, **kwargs: Any) -> None:
+        """Record the contract warm-up call without producing fixture data.
+
+        ``None`` remains accepted only for the stale, argument-free facade
+        fixture; runtime construction never calls this method without history.
+        """
+        recorded = copy.deepcopy(history)
+        self.warm_up_calls.append(recorded)
+        self.warm_up_history = recorded
         return None
 
     def step(self, minutes: int, hub_report: dict) -> dict:
@@ -138,7 +192,11 @@ class FakeKitchen:
         return _answer(self._rec, "undo", {"decision_id": decision_id})
 
     def set_authority(self, authority: dict) -> None:
-        return _answer(self._rec, "set_authority", {"authority": authority}, any_args=True)
+        _answer(self._rec, "set_authority", {"authority": authority}, any_args=True)
+        # Authority is owner input rather than a fixture-derived engine value.
+        # Keep the fake snapshot in step with the real facade after a PUT.
+        self.config["authority"] = copy.deepcopy(authority)
+        return None
 
     def set_preferences(self, text: str) -> None:
         return _answer(self._rec, "set_preferences", {"text": text}, any_args=True)
@@ -180,7 +238,12 @@ class FakeKitchen:
         return _answer(self._rec, "what_if", {"device_id": device_id, "action": action, "value": value, "at": at})
 
     def snapshot(self) -> dict:
-        return _answer(self._rec, "snapshot", {})
+        snapshot = _answer(self._rec, "snapshot", {})
+        # The configuration is owner input, so keeping the normalized request
+        # here does not manufacture an engine number and lets the API expose
+        # the Builder's implicit FULL_AUTHORITY accurately in fake mode.
+        snapshot["config"] = copy.deepcopy(self.config)
+        return snapshot
 
 
 def fake_run_backtest(

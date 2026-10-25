@@ -1,7 +1,7 @@
-"""The AI tools of CONTRACTS.md §4: thin wrappers over the `with`-lane facade, the store and `agent/proposals.py`.
+"""The AI tools of CONTRACTS.md §4: thin wrappers over the facade, store and ``agent/proposals.py``.
 
 Every number a tool returns is the engine's (or a stored engine record), unchanged. Only two tools change state:
-`choose_escalation_option` (an offered option id, validated by the engine against the owner's authority) and
+`choose_escalation_option` (an authority-eligible option id, validated again by the engine) and
 `set_crowd_effect` (a category). Every `propose_*` tool only creates a pending Proposal; code applies it after an owner
 confirmation. Inputs are checked here against the same schemas Claude sees (enums included), whatever the model sent.
 """
@@ -21,6 +21,9 @@ PEAK_MODES = ("cap", "minimize")
 COMMAND_ACTIONS = ("on", "off", "start", "delay", "reduce", "restore")
 DECISION_EXTRAS = ("lane", "explanation", "explanation_source")
 FORECAST_HORIZON_MIN = 120
+LANES = ("without", "with")
+ASK_OWNER_OPTION_ID = "ask_owner"
+_UNSET = object()
 
 
 class ToolInputError(ValueError):
@@ -45,7 +48,10 @@ _TOOLS: dict[str, tuple[str, dict]] = {
     "what_if": ("Engine projection of one device move (no change is made): peak before/after and saving.",
                 _obj({"device_id": _STR, "action": {"type": "string", "enum": list(COMMAND_ACTIONS)},
                       "value": {"type": ["number", "null"], "description": "Minutes for delay, percent for reduce."},
-                      "at": {"type": "string", "description": "Sim time, ISO 8601 UTC."}})),
+                      "at": {"type": "string", "description": "Sim time, ISO 8601 UTC."},
+                      "lane": {"type": "string", "enum": list(LANES),
+                               "description": "Optional lane; defaults to with."}},
+                      required=["device_id", "action", "value", "at"])),
     "get_bill": ("The engine's bill for a month (energy, demand charges, total).",
                  _obj({"period": {"type": "string", "description": "YYYY-MM"}})),
     "get_context": ("Live context the agents posted: weather, grid prices, events, crowd effect.", _obj({})),
@@ -72,8 +78,8 @@ _TOOLS: dict[str, tuple[str, dict]] = {
         "Set the crowd effect category from the context (events, weather). A category, never a number.",
         _obj({"value": {"type": "string", "enum": list(CROWD_EFFECTS)}, "reason": _STR})),
     "choose_escalation_option": (
-        "Resolve the escalation you were given with one of its offered options, and say why in one sentence "
-        "quoting the option's numbers. Code checks it against the owner's authority.",
+        "Resolve the escalation you were given with one authority-eligible option, and say why in one sentence "
+        "quoting the option's engine-computed fields. Code validates it again.",
         _obj({"option_id": {"type": "string"}, "rationale": _STR})),
 }
 READ_TOOLS = ("get_kitchen_state", "get_forecast", "explain_decision", "what_if", "get_bill", "get_context",
@@ -120,9 +126,31 @@ class AgentTools:
     # ------------------------------------------------------------ schemas + dispatch
 
     @staticmethod
-    def schemas(names: tuple[str, ...] = CHAT_TOOLS, escalation: dict | None = None) -> list[dict]:
-        """Anthropic tool definitions. `choose_escalation_option` is offered only with an escalation, its `option_id`
-        enum = that escalation's offered ids."""
+    def eligible_option_ids(escalation: dict, authority: dict | None | object = _UNSET) -> list[str]:
+        """Return exactly the option ids Claude may be offered.
+
+        ``ask_owner`` is never an AI choice.  The engine supplies ``within_authority`` for every option; a missing or
+        disabled authority means Claude is not offered a choice at all.  ``_UNSET`` is only for callers that have an
+        escalation but not its KitchenConfig (for example a schema-only UI inspection).
+        """
+        if authority is _UNSET and "authority" in escalation:
+            authority = escalation["authority"]
+        if authority is not _UNSET and (not authority or not authority.get("enabled", False)):
+            return []
+        return [
+            option["option_id"]
+            for option in escalation.get("options", [])
+            if option.get("within_authority") and option.get("option_id") != ASK_OWNER_OPTION_ID
+        ]
+
+    @staticmethod
+    def schemas(names: tuple[str, ...] = CHAT_TOOLS, escalation: dict | None = None,
+                authority: dict | None | object = _UNSET) -> list[dict]:
+        """Anthropic tool definitions.
+
+        ``choose_escalation_option`` is omitted unless the engine has an active, authority-eligible option.  Its enum
+        contains only those eligible ids, never ``ask_owner`` or an outside-authority option.
+        """
         out = []
         for name in names:
             description, schema = _TOOLS[name]
@@ -130,15 +158,21 @@ class AgentTools:
             if name == "choose_escalation_option":
                 if escalation is None:
                     continue
-                schema["properties"]["option_id"]["enum"] = [o["option_id"] for o in escalation["options"]]
+                eligible = AgentTools.eligible_option_ids(escalation, authority)
+                if not eligible:
+                    continue
+                schema["properties"]["option_id"]["enum"] = eligible
             out.append({"name": name, "description": description, "input_schema": schema,
                         "eager_input_streaming": True})
         return out
 
     def call(self, name: str, tool_input: dict, *, allowed: tuple[str, ...] = CHAT_TOOLS,
-             escalation: dict | None = None) -> Any:
+             escalation: dict | None = None, authority: dict | None | object = _UNSET) -> Any:
         """Validate `tool_input` against the schema offered for this call, then run the tool."""
-        schema = next((t["input_schema"] for t in self.schemas(allowed, escalation) if t["name"] == name), None)
+        if escalation is not None and authority is _UNSET:
+            authority = self._authority()
+        schema = next((t["input_schema"] for t in self.schemas(allowed, escalation, authority) if t["name"] == name),
+                      None)
         if schema is None:
             raise ToolInputError(f"tool {name!r} is not available here")
         validate(schema, tool_input)
@@ -148,9 +182,14 @@ class AgentTools:
 
     # ------------------------------------------------------------ helpers
 
-    def _kitchen(self) -> Any:
+    def _authority(self) -> dict | None:
+        return self._snapshot().get("config", {}).get("authority")
+
+    def _kitchen(self, lane: str = "with") -> Any:
+        if lane not in LANES:
+            raise ToolInputError(f"lane: {lane!r} is not one of {list(LANES)}")
         self._service.require_kitchen()
-        return self._service.lanes["with"]
+        return self._service.lanes[lane]
 
     def _snapshot(self) -> dict:
         with self._service.lock:
@@ -175,9 +214,9 @@ class AgentTools:
             decision = {k: v for k, v in stored.items() if k not in DECISION_EXTRAS}
         return decision
 
-    def what_if(self, device_id: str, action: str, value: float | None, at: str) -> dict:
+    def what_if(self, device_id: str, action: str, value: float | None, at: str, lane: str = "with") -> dict:
         with self._service.lock:
-            return self._kitchen().what_if(device_id, action, value, at)
+            return self._kitchen(lane).what_if(device_id, action, value, at)
 
     def get_bill(self, period: str) -> dict:
         """A stored engine Bill for the period (`with` lane first), else the `with` policy of a stored BacktestResult,
@@ -217,6 +256,11 @@ class AgentTools:
         return self._proposals.create("peak_cap", {"peak_mode": peak_mode, "peak_cap_kw": peak_cap_kw}, summary)
 
     def propose_escalation_choice(self, escalation_id: str, option_id: str, summary: str) -> dict:
+        """Create an explicit *owner* override Proposal.
+
+        This is deliberately separate from Claude's bounded ``choose_escalation_option`` tool.  A model's routine
+        escalation resolution must never create a Proposal.
+        """
         return self._proposals.create("resolve_escalation", {"escalation_id": escalation_id, "option_id": option_id},
                                       summary)
 
@@ -236,12 +280,17 @@ class AgentTools:
         return self._set_crowd_effect({"value": value, "reason": reason})
 
     def choose_escalation_option(self, escalation_id: str, option_id: str, rationale: str) -> dict:
-        """`resolve_escalation(..., "claude", rationale)`. Outside the owner's authority the engine answers
-        `awaiting_owner`, and Claude's pick becomes a Proposal the owner confirms (or picks another option)."""
-        escalation = self._service.resolve_escalation(escalation_id, {"option_id": option_id}, resolved_by="claude",
-                                                      rationale=rationale)
-        if escalation["status"] == "awaiting_owner":
-            option = next(o for o in escalation["options"] if o["option_id"] == option_id)
-            self._proposals.create("resolve_escalation", {"escalation_id": escalation_id, "option_id": option_id},
-                                   f"{option['summary']} (Claude's pick, outside its authority)")
-        return escalation
+        """Resolve through the engine; no Proposal is created on this path.
+
+        The enum gate is repeated here for direct callers.  The engine remains the final authority validator because
+        the escalation may have changed between the tool schema being offered and this call.
+        """
+        authority = self._authority()
+        escalation = next((item for item in self.get_escalation() if item["escalation_id"] == escalation_id), None)
+        if escalation is None:
+            raise NotFoundError("open escalation", escalation_id)
+        eligible = self.eligible_option_ids(escalation, authority)
+        if option_id not in eligible:
+            raise ToolInputError(f"option_id: {option_id!r} is not an authority-eligible escalation option")
+        return self._service.resolve_escalation(escalation_id, {"option_id": option_id}, resolved_by="claude",
+                                                rationale=rationale)

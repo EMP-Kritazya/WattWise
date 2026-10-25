@@ -5,7 +5,12 @@ surges + physical inputs + the Commands queued last tick → `HubLink.tick` (sim
 both lanes → `compare_lanes` → live publish → the lanes' `new_commands` queued for tick n + 1 → store buffer (written at
 most once per real second). The loop computes no number and never waits on Claude, agents, Convex or SpacetimeDB: live
 calls are queued (`LivePublisher`), store writes run in a worker thread, surge reads are time-boxed. It only waits for the
-hub, which is the simulation itself (`hub_waiting` / `sim_host_offline` pause the clock).
+hub, which is the simulation itself (`hub_waiting` / `sim_host_offline` pause the clock). Escalations never touch the clock.
+
+Day lifecycle (CONTRACTS.md §8, API.md "Day lifecycle"): a run lasts `config.run_days` service days. `service` ticks at
+`speed` until local close; then `overnight` (if days remain) ticks back to back with `fast_forward: true` until local open,
+publishing ticks and the clock once per closed 15-min block (every tick is still stepped and stored); after the last day's
+close the clock stops in `closed` (`paused_reason: run_complete`) until `next_day`. Surges wait for the next service tick.
 
 `tick_once()` is the whole tick; `_run()` paces it while playing. Tests call `tick_once()` directly (`autorun=False`).
 """
@@ -38,7 +43,13 @@ KITCHEN_ID = "k_01"  # one kitchen per process (demo)
 CROWD_MULTIPLIER = {"none": 1.00, "small": 1.10, "medium": 1.25, "large": 1.40}
 DEFAULT_CROWD_MULTIPLIER = 1.0
 
+BLOCK_MIN = 15  # overnight: publish once per closed 15-min block
+
 log = logging.getLogger("runtime.loop")
+
+
+class ClockConflict(Exception):
+    """A clock action that the current phase does not allow (`next_day` before run_complete). Mapped to HTTP 422."""
 
 
 def tick_interval_s(speed: int) -> float:
@@ -69,7 +80,6 @@ class RunLoop:
         start_sim_ts: str,
         autorun: bool = True,
         publish_ws: Callable[[dict], None] | None = None,
-        demo_mode: bool = False,
         council_wait_s: float = 0.0,
         bridge: DeviceBridge | None = None,
     ):
@@ -84,12 +94,16 @@ class RunLoop:
         self.surges = SurgeQueue()
         self.playing = False
         self.speed = DEFAULT_SPEED
-        self.slowed_reason: str | None = None  # escalation slowdown: not built (open question Q1 for Kritazya)
+        self._manual = False  # paused by the owner / presenter
+        self.day_index = 1  # 1-based service day of this run
+        self.run_days = 1  # days planned; grows by 1 on each next_day
+        self.phase = "service"  # service | overnight | closed
+        self._day_started = True  # False while a run that starts outside opening hours waits for its first open
         self.hub_status: str | None = hub.paused_reason  # hub_waiting | sim_host_offline | None, from HubLink.on_status
         self.context: dict | None = None  # latest merged Context (posts merge)
         self.tick_id = 0
         self._commands: list[dict] = []  # delivered in the next sim_tick
-        self._owner_command_ids: set[str] = set()  # queued at once; skipped if the engine echoes them in new_commands
+        self._publish_ws = publish_ws  # raw warnings have no live table and always go to viewers
         self._build_count = 0
         self._store_buffer: list[Callable[[], None]] = []
         self._store_task: asyncio.Future | None = None
@@ -97,8 +111,7 @@ class RunLoop:
         self._task: asyncio.Task | None = None
         self._wake: asyncio.Event | None = None
         # Claude resolves the engine's escalations; `escalations.agent` is set once the agent exists (api/main.py).
-        self.escalations = Escalations(service=service, live=live, clock=lambda: self.sim_ts,
-                                       on_pause=self._on_escalation_pause, publish_ws=publish_ws, demo_mode=demo_mode,
+        self.escalations = Escalations(service=service, live=live, clock=lambda: self.sim_ts, publish_ws=publish_ws,
                                        council_wait_s=council_wait_s)
 
     # ------------------------------------------------------------ clock
@@ -110,29 +123,40 @@ class RunLoop:
 
     @property
     def paused_reason(self) -> str | None:
-        """The hub first (nothing can tick without it), then the demo-mode escalation pause."""
-        return self.hub_status or self.escalations.paused_reason
+        """run_complete once the last day has closed, then the hub (nothing can tick without it), then a manual pause."""
+        if self.phase == "closed":
+            return "run_complete"
+        return self.hub_status or ("manual" if self._manual else None)
 
     def clock_state(self) -> dict:
         return {"playing": self.playing, "speed": self.speed, "sim_ts": self.sim_ts, "tick_id": self.tick_id,
-                "paused_reason": self.paused_reason, "slowed_reason": self.slowed_reason}
+                "paused_reason": self.paused_reason, "day_index": self.day_index, "run_days": self.run_days,
+                "phase": self.phase}
 
     def _publish_clock(self) -> None:
         self.live.send("set_clock", self.clock_state(), "connected" if self.hub.connected else "offline")
 
     async def control(self, action: str, speed: int | None = None) -> dict:
         """`POST /api/sim/control` → ClockState."""
+        if speed is not None and speed not in SPEEDS:
+            raise ValueError(f"speed {speed}; expected one of {SPEEDS}")
+        if action in ("play", "next_day"):
+            self.service.require_kitchen()
+            if action == "play" and self.phase == "closed":
+                raise ClockConflict("The run is complete; next_day adds one more day")
+            if action == "next_day" and self.paused_reason != "run_complete":
+                raise ClockConflict("next_day is only allowed while paused_reason is run_complete")
         if speed is not None:
-            if speed not in SPEEDS:
-                raise ValueError(f"speed {speed}; expected one of {SPEEDS}")
             self.speed = speed
         if action == "play":
-            self.service.require_kitchen()
-            self.playing = True
-            if self.autorun:
-                self._ensure_task()
+            self.playing, self._manual = True, False
+        elif action == "next_day":
+            self.run_days += 1
+            self.phase = "overnight"  # the night after the last close, then one more service day
+            self.playing, self._manual = True, False
+            action = "play"  # sim_control only knows play | pause | reset
         elif action == "pause":
-            self.playing = False
+            self.playing, self._manual = False, True
         elif action == "reset":
             self.playing = False
             await self.hub.send_control("reset", self.speed, self.paused_reason)
@@ -140,6 +164,8 @@ class RunLoop:
             return self.clock_state()
         else:
             raise ValueError(f"unknown clock action {action!r}")
+        if self.playing and self.autorun:
+            self._ensure_task()
         await self.hub.send_control(action, self.speed, self.paused_reason)
         self._publish_clock()
         self._poke()
@@ -154,21 +180,19 @@ class RunLoop:
     def on_host(self, connected: bool) -> None:
         self._poke()
 
-    def _on_escalation_pause(self) -> None:
-        """DEMO_MODE=1: the clock pauses while Claude decides an escalation and resumes after."""
-        self._publish_clock()
-        self._poke()
-
     # ------------------------------------------------------------ kitchen
 
     async def build(self, config: dict) -> dict:
         """`POST /api/kitchen`: both lanes → `sim_build` → `reset_all` → first publish (clock at tick 0, context)."""
         result = self.service.build_kitchen(config)  # RuleError → nothing below happens
         self._build_count += 1
-        self.playing = False
+        self.playing, self._manual = False, False
         self.tick_id = 0
+        self.day_index, self.run_days = 1, config.get("run_days", 1)
+        # Day 1 starts at start_sim_ts; a start outside opening hours runs the night up to the first open.
+        self.phase = "service" if self._is_open(self.sim_ts) else "overnight"
+        self._day_started = self.phase == "service"
         self._commands = []
-        self._owner_command_ids = set()
         self.surges.reset()
         self.escalations.reset()
         self.blocks.reset()
@@ -187,11 +211,12 @@ class RunLoop:
     # ------------------------------------------------------------ owner + agents
 
     def owner_command(self, device_id: str, body: dict) -> dict:
-        """`POST /api/devices/{id}/command`: the engine's owner Command goes out in the next sim_tick."""
-        command = self.service.device_command(device_id, body)
-        self._commands.append(command)
-        self._owner_command_ids.add(command["command_id"])
-        return command
+        """Record the owner action in both engine lanes.
+
+        The facade returns the with-lane Command for the REST response, but it is deliberately not queued here:
+        it appears in the next ``step``'s ``new_commands`` and is delivered in the following ``sim_tick``.
+        """
+        return self.service.device_command(device_id, body)
 
     def customer_event(self, body: dict) -> dict:
         """`POST /api/events/customers` → a surge in the next sim_tick."""
@@ -246,15 +271,20 @@ class RunLoop:
         return opens <= now < closes if opens < closes else (now >= opens or now < closes)
 
     async def tick_once(self) -> bool:
-        """One sim minute. False when the tick was abandoned (kitchen rebuilt meanwhile) or the engine failed."""
+        """One sim minute. False when nothing was stepped: the run is complete, the tick was abandoned (kitchen rebuilt
+        meanwhile) or the engine failed."""
+        if self.phase == "closed":
+            return False
         build = self._build_count
         tick_id, sim_ts = self.tick_id + 1, self.sim_ts
+        overnight = self.phase == "overnight"
         for request_id in self.surges.add_requests(await self.live.read_surges()):
             self.live.send("consume_surge", request_id)
-        surges, commands = self.surges.drain(sim_ts), self._commands
-        self._commands = []
+        surges = [] if overnight else self.surges.drain(sim_ts)  # held until the next service tick
+        commands, self._commands = self._commands, []
         try:
-            report = await self.hub.tick(tick_id, sim_ts, surges, self.inputs(sim_ts), commands)
+            report = await self.hub.tick(tick_id, sim_ts, surges, self.inputs(sim_ts), commands,
+                                         fast_forward=overnight)
         except TickAborted:
             return False
         if build != self._build_count:
@@ -270,31 +300,57 @@ class RunLoop:
             self._publish_clock()
             return False
         self._queue_commands(states)
-        self._publish(tick_id, states, comparison)
-        self.escalations.after_tick()
+        phase_changed = await self._advance_phase()
+        # Overnight: viewers get one row per closed 15-min block (the engine and the store still get every tick).
+        block_closed = _parse_ts(self.sim_ts).minute % BLOCK_MIN == 0
+        self._publish(tick_id, states, comparison, ticks=not overnight or block_closed,
+                      clock=not overnight or block_closed or phase_changed)
         self.bridge.start()
         self.bridge.after_step(report)
         self._buffer_records(states, report, self.blocks.add(report, self.bridge.measured_kw()))
         self._maybe_flush_store()
         return True
 
+    async def _advance_phase(self) -> bool:
+        """After a tick: service → overnight / closed at local close, overnight → service at local open. True if changed."""
+        is_open = self._is_open(self.sim_ts)
+        if self.phase == "service" and not is_open:
+            if self.day_index < self.run_days:
+                self.phase = "overnight"
+            else:
+                self.phase, self.playing = "closed", False
+                await self.hub.send_control("pause", self.speed, self.paused_reason)
+            return True
+        if self.phase == "overnight" and is_open:
+            if self._day_started:
+                self.day_index += 1
+            self.phase, self._day_started = "service", True
+            return True
+        return False
+
     def _queue_commands(self, states: dict[str, dict]) -> None:
         for lane in LANES:
             for command in states[lane]["new_commands"]:
-                if command["command_id"] in self._owner_command_ids:
-                    continue  # already delivered when the owner clicked
                 self._commands.append(command)
 
-    def _publish(self, tick_id: int, states: dict[str, dict], comparison: dict) -> None:
-        self.live.send("publish_ticks", tick_id, states, comparison)
+    def _publish(self, tick_id: int, states: dict[str, dict], comparison: dict, *, ticks: bool = True,
+                 clock: bool = True) -> None:
+        if ticks:
+            self.live.send("publish_ticks", tick_id, states, comparison)
         for lane in LANES:
+            for warning in states[lane].get("warnings", []):
+                # Warnings have no SpacetimeDB row; viewers receive the engine/runtime object unchanged, including
+                # target_kw and a nullable peak_cap_kw in minimize mode.
+                if self._publish_ws is not None:
+                    self._publish_ws({"type": "warning", **copy.deepcopy(warning)})
             names = {d["device_id"]: d["name"] for d in states[lane]["hub"]["devices"]}
             for decision in states[lane]["new_decisions"]:
                 text = explain_decision(decision, names.get(decision["device_id"], decision["device_id"]))
                 self.live.send("publish_feed", lane, decision, text, "template")
             for escalation in states[lane]["new_escalations"]:
                 self.escalations.opened(escalation)  # published, then Claude decides in the background
-        self._publish_clock()
+        if clock:
+            self._publish_clock()
 
     # ------------------------------------------------------------ store
 
@@ -348,8 +404,7 @@ class RunLoop:
     # ------------------------------------------------------------ pacing
 
     def _runnable(self) -> bool:
-        return (self.playing and self.hub.connected and bool(self.service.lanes)
-                and self.escalations.paused_reason is None)
+        return self.playing and self.phase != "closed" and self.hub.connected and bool(self.service.lanes)
 
     def _poke(self) -> None:
         if self._wake is not None:
@@ -371,6 +426,9 @@ class RunLoop:
                 await self.tick_once()
             except Exception:
                 log.exception("tick failed; the loop goes on")
+            if self.phase == "overnight":
+                await asyncio.sleep(0)  # back to back: only the hub_report paces the night
+                continue
             while self._runnable():  # wait out this tick's interval at the current speed
                 remaining = started + tick_interval_s(self.speed) - loop.time()
                 if remaining <= 0:
