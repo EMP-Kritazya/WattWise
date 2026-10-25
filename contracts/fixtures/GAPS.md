@@ -7,6 +7,7 @@ tariff-based prices and bills, rule_break kinds and authority, default option, d
 the shared indoor temperature, `replay`, SpacetimeDB key/id/forecast columns, and the agent enums.
 
 ## Readings the fixtures had to choose (not fully pinned down by CONTRACTS.md)
+
 - **Single-row `id: 0`.** §5 shows `id = 0` only on `live_context`; Main_Gaps G30 says "single-row tables". Fixtures add
   `id: 0` to `live_clock` and `live_comparison` too, including the `live_comparison` object inside the `publish_ticks` payload.
 - **Per-charge demand peaks in effects.** `saving_usd` and `cost_delta_usd` charge each tariff demand charge on its own
@@ -19,5 +20,6 @@ the shared indoor temperature, `replay`, SpacetimeDB key/id/forecast columns, an
   (an owner reduce to 10 % applied as 20 %). It is simulation-only, not a contract value.
 
 ## Fixture wrapper fields (not contract shapes)
+
 `rest/*` `status`, `facade/*` `raises`, `ai_tools/*` `input_enum`, `spacetime/reducers/*` `{reducer, args}`,
 `convex/functions/*` `{function, type, args, returns}` are this folder's own wrappers.
