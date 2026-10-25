@@ -1,7 +1,7 @@
 .env
 .env.*
 !.env.example
-!.claude/agents/
+.claude/agents/
 .claude/settings.local.json
 .venv/
 __pycache__/
