@@ -7,8 +7,10 @@ back to `agent/templates.py`: the kitchen runs identically with Claude off.
 
 - `start_chat(message)` → `{chat_id}`; the reply streams on `/ws` as `chat_delta` messages, then one `chat_done`.
 - `explain_decision(decision, device_name)` → (text, "ai" | "template"), 3 s timeout.
-- `decide_escalation(escalation)` → the engine's resolved Escalation, or None (8 s timeout, no choice): the engine's
-  default then applies at the deadline. Used by `runtime/escalations.py`.
+- `decide_escalation(escalation, council=[...])` → the engine's resolved Escalation, or None (8 s timeout, no choice):
+  the engine's default then applies at the deadline. `council` names the Context parts the context agents posted for this
+  escalation's window; the rationale cites them by source with numbers copied from the context. Used by
+  `runtime/escalations.py`.
 """
 
 from __future__ import annotations
@@ -56,9 +58,15 @@ SYSTEM_PROMPT = """You are WattWise's assistant for a restaurant owner. Be brief
 
 ESCALATION_PROMPT = """
 An escalation is open: the engine found no move inside the owner's rules that holds the peak target. Choose exactly
-one of its offered options by calling choose_escalation_option once, with its option_id and a one-sentence rationale
-that quotes only that option's numbers. Choose what best fits the context and the owner's preferences. Prefer options
-with within_authority true; choose ask_owner when the trade-off is the owner's to make."""
+one of its offered options by calling choose_escalation_option once, with its option_id and a short rationale (one or
+two sentences). Choose what best fits the context and the owner's preferences. Prefer options with within_authority
+true; choose ask_owner when the trade-off is the owner's to make.
+`council` lists the agents just asked about this block. In the rationale, quote the chosen option's numbers, then cite
+one piece of evidence from each council agent by name, shaped like "Weather agent: <temp_c> °C at <time>", "Grid agent:
+stress <stress>, <usd_per_kwh> $/kWh at <time>", "Events agent: <name>, <expected_attendance> expected at <time>". Copy those numbers exactly from
+`context` (weather.hourly, prices.hourly / stress, events.items); never compute, round or convert them. If `council` is
+empty, cite no agent."""
+COUNCIL_AGENTS = {"weather": "Weather agent", "prices": "Grid agent", "events": "Events agent"}
 
 
 # ---------------------------------------------------------------- the model behind one interface
@@ -223,7 +231,7 @@ class ClaudeAgent:
 
     # ------------------------------------------------------------ escalations
 
-    async def decide_escalation(self, escalation: dict) -> dict | None:
+    async def decide_escalation(self, escalation: dict, council: list[str] | None = None) -> dict | None:
         """Claude picks one offered option (enum-constrained); the engine validates it. None = no choice."""
         if self._llm is None:
             return None
@@ -232,7 +240,8 @@ class ClaudeAgent:
             snapshot = await asyncio.to_thread(self._tools.get_kitchen_state)
             config = snapshot["config"]
             facts = {"escalation": escalation, "context": snapshot["context"],
-                     "owner_preferences": config.get("owner_preferences"), "authority": config.get("authority")}
+                     "owner_preferences": config.get("owner_preferences"), "authority": config.get("authority"),
+                     "council": [COUNCIL_AGENTS[p] for p in council or () if p in COUNCIL_AGENTS]}
             await asyncio.wait_for(
                 self._run(self._system + ESCALATION_PROMPT, [{"role": "user", "content": json.dumps(facts)}],
                           ESCALATION_TOOLS, effort="medium", escalation=escalation, chosen=chosen),

@@ -12,6 +12,9 @@ STRIPE_SECRET_KEY / STRIPE_PUBLISHABLE_KEY test keys the plan is unavailable and
 
 Context loop (`context_loop.py`): every CONTEXT_INTERVAL_S (600 real s) and whenever a kitchen is built (GET /api/kitchen
 polled every KITCHEN_POLL_S), ask Weather, Grid and Events over uAgents → Claude crowd effect → POST /api/context.
+Escalation council (`council.py`): GET /api/escalations?status=open every COUNCIL_POLL_S (2 real s); a new escalation →
+Weather, Grid and Events asked for its window in parallel (COUNCIL_REPLY_S, 4 s each) → POST /api/context before Claude
+decides. COUNCIL=0 switches it off.
 Env: API_URL (default http://127.0.0.1:8000), AGENT_TOKEN, CHAT_REPLY_TIMEOUT_S (30), CONTEXT_LOOP=0 to switch it off,
 DEMO_MODE=1 / --recorded for the recorded crowd effect. The context agents' addresses come from their seeds (common.agent_address).
 
@@ -42,6 +45,7 @@ from uagents_core.contrib.protocols.payment import CommitPayment, RejectPayment,
 from cards import Reply
 from common import agent_address, load_dotenv, recorded_mode
 from context_loop import ApiClient, ContextLoop, Location
+from council import Council
 from crowd import create_classifier
 from models import EventsResponse, PriceResponse, WeatherResponse
 from owner_chat import OwnerChat, ws_url
@@ -166,14 +170,14 @@ _round_lock = asyncio.Lock()
 _kitchen_seen: str | None = None  # the last kitchen config seen (JSON), to spot a new build
 
 
-def _asker(ctx: Context):
+def _asker(ctx: Context, timeout_s: int = AGENT_REPLY_TIMEOUT_S):
     async def ask(name: str, request: Model) -> Model | None:
         address = agent_address(name)
         if address is None:
             ctx.logger.warning(f"no address for the {name} agent (set FETCH_AGENT_SEED or {name.upper()}_AGENT_ADDRESS)")
             return None
         reply, status = await ctx.send_and_receive(address, request, response_type=RESPONSE_TYPES[name],
-                                                   timeout=AGENT_REPLY_TIMEOUT_S)
+                                                   timeout=timeout_s)
         if reply is None:
             ctx.logger.warning(f"{name} did not answer: {status.detail}")
         return reply
@@ -221,6 +225,30 @@ if os.environ.get("CONTEXT_LOOP", "1") != "0":
         seen = json.dumps(config, sort_keys=True)
         if seen != _kitchen_seen and await _round(ctx, config):
             _kitchen_seen = seen
+
+
+# ---------------------------------------------------------------- escalation council
+
+COUNCIL_POLL_S = float(os.environ.get("COUNCIL_POLL_S", "2"))
+COUNCIL_REPLY_S = int(os.environ.get("COUNCIL_REPLY_S", "4"))
+
+_council = Council(_http, ApiClient(_http, AGENT_TOKEN), reply_s=COUNCIL_REPLY_S)
+
+if os.environ.get("COUNCIL", "1") != "0":
+
+    @agent.on_interval(period=COUNCIL_POLL_S)
+    async def council_on_escalation(ctx: Context):
+        fresh = await _council.new_escalations()
+        if not fresh:
+            return
+        config = await _kitchen_config()
+        loc = (config or {}).get("location") or {}
+        if "lat" not in loc or "lon" not in loc:
+            ctx.logger.warning("no kitchen location; escalations go to Claude on the last known context")
+            return
+        where = Location(lat=loc["lat"], lon=loc["lon"])
+        await asyncio.gather(*(_council.convene(e, where, _asker(ctx, COUNCIL_REPLY_S)) for e in fresh))
+        ctx.logger.info("council done for " + ", ".join(e["escalation_id"] for e in fresh))
 
 
 if __name__ == "__main__":

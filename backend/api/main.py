@@ -281,7 +281,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     bridge = DeviceBridge(settings.hardware, store, on_warning=broadcaster.send_soon)
     app.state.runtime = runtime = RunLoop(service=service, hub=hub, live=live, store=store,
                                           start_sim_ts=settings.sim_start_ts, publish_ws=broadcaster.send_soon,
-                                          demo_mode=settings.demo_mode, bridge=bridge)
+                                          demo_mode=settings.demo_mode, council_wait_s=settings.council_wait_s,
+                                          bridge=bridge)
     service.on_escalation = runtime.escalations.changed
     # Proposals and chat use /ws whatever the live transport (CONTRACTS.md §2).
     app.state.proposals = proposals = ProposalBook(

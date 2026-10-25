@@ -70,6 +70,7 @@ class RunLoop:
         autorun: bool = True,
         publish_ws: Callable[[dict], None] | None = None,
         demo_mode: bool = False,
+        council_wait_s: float = 0.0,
         bridge: DeviceBridge | None = None,
     ):
         self.service = service  # api.service.KitchenService: lanes, tariff, catalog, lock
@@ -97,7 +98,8 @@ class RunLoop:
         self._wake: asyncio.Event | None = None
         # Claude resolves the engine's escalations; `escalations.agent` is set once the agent exists (api/main.py).
         self.escalations = Escalations(service=service, live=live, clock=lambda: self.sim_ts,
-                                       on_pause=self._on_escalation_pause, publish_ws=publish_ws, demo_mode=demo_mode)
+                                       on_pause=self._on_escalation_pause, publish_ws=publish_ws, demo_mode=demo_mode,
+                                       council_wait_s=council_wait_s)
 
     # ------------------------------------------------------------ clock
 
@@ -206,6 +208,7 @@ class RunLoop:
         self.service.post_context(stamped)
         self.context = {**(self.context or {}), **copy.deepcopy(stamped)}
         self.live.send("publish_context", copy.deepcopy(self.context))
+        self.escalations.context_posted([part for part in body if part != "ts"])  # an escalation's council may wait
         return {"ok": True}
 
     def set_crowd_effect(self, body: dict) -> dict:

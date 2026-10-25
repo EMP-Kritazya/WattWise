@@ -53,7 +53,7 @@ class GatedAgent:
         self.asked = []
         self.release = asyncio.Event()
 
-    async def decide_escalation(self, escalation):
+    async def decide_escalation(self, escalation, council=None):
         self.asked.append(escalation["escalation_id"])
         await self.release.wait()
         return None
@@ -267,3 +267,120 @@ async def test_confirmed_proposal_is_published(h, opened):
     final = (await h.published())[-1]
     assert (final["status"], final["resolved_by"], final["chosen_option_id"]) == ("resolved", "owner", "deep_reduce_hvac")
     assert h.esc.tracked() == []
+
+
+# ---------------------------------------------------------------- council (agents/council.py posts, Claude waits)
+
+AGENT_HEADERS = {"X-Agent-Token": "t"}
+
+
+class FactsLLM(ScriptedLLM):
+    """Chooses like `choosing`, and records the facts Claude was given and when."""
+
+    def __init__(self, option_id, rationale):
+        super().__init__(*choosing(option_id, rationale).turns)
+        self.facts = None
+        self.at = None
+
+    async def turn(self, **kw):
+        if self.facts is None:
+            self.facts = json.loads(kw["messages"][0]["content"])
+            self.at = asyncio.get_running_loop().time()
+        return await super().turn(**kw)
+
+
+def council_post(*parts):
+    """The council's POST /api/context body: the recorded agent replies, unchanged."""
+    replies = {"weather": "agents/weather_response.json", "prices": "agents/price_response.json",
+               "events": "agents/events_response.json"}
+    return {part: load(replies[part]) for part in parts}
+
+
+async def post_context(app, body):
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as http:
+        resp = await http.post("/api/context", json=body, headers=AGENT_HEADERS)
+    assert resp.status_code == 200
+
+
+def council_harness(wait_s):
+    h = Harness(make_app(council_wait_s=wait_s))
+    resolved = load("shapes/escalation_resolved_claude.json")
+    llm = FactsLLM(resolved["chosen_option_id"], resolved["rationale"])
+    h.use_claude(llm)
+    return h, llm
+
+
+async def test_council_context_is_posted_before_the_claude_call(opened):
+    h, llm = council_harness(2.0)
+    h.at(OPENED_AT)
+    h.esc.opened(opened)
+    await asyncio.sleep(0.05)
+    assert llm.facts is None  # Claude waits for the council
+    posted_at = asyncio.get_running_loop().time()
+    await post_context(h.app, council_post("weather", "prices", "events"))
+    await asyncio.wait_for(h.esc.idle(), 2)
+
+    assert llm.at >= posted_at and llm.at - posted_at < 1  # called at once after the post, not after the full wait
+    assert llm.facts["council"] == ["Weather agent", "Grid agent", "Events agent"]
+    for part, body in council_post("weather", "prices", "events").items():
+        assert llm.facts["context"][part] == body  # the freshest context, numbers unchanged
+    assert h.stored()[-1]["status"] == "resolved"
+
+
+async def test_one_silent_agent_council_proceeds_without_it(opened):
+    h, llm = council_harness(2.0)
+    h.at(OPENED_AT)
+    h.esc.opened(opened)
+    await post_context(h.app, council_post("prices", "events"))  # Weather never answered
+    await asyncio.wait_for(h.esc.idle(), 2)
+    assert llm.facts["council"] == ["Grid agent", "Events agent"]
+
+
+async def test_all_silent_claude_is_still_called_after_council_wait(opened):
+    h, llm = council_harness(0.2)
+    await post_context(h.app, council_post("weather"))  # older context: posted before the escalation opened
+    h.at(OPENED_AT)
+    loop = asyncio.get_running_loop()
+    opened_at = loop.time()
+    h.esc.opened(opened)
+    await asyncio.wait_for(h.esc.idle(), 2)
+    assert llm.at - opened_at >= 0.2
+    assert llm.facts["council"] == []  # nothing fresh: Claude cites no agent
+    assert llm.facts["context"]["weather"] == council_post("weather")["weather"]  # the last known context
+    assert h.stored()[-1]["status"] == "resolved"
+
+
+async def test_no_council_wait_by_default_in_tests(h, opened):
+    llm = FactsLLM("extend_delay_dishwasher", "r")
+    h.use_claude(llm)
+    assert h.esc.council_wait_s == 0
+    h.at(OPENED_AT)
+    loop = asyncio.get_running_loop()
+    opened_at = loop.time()
+    h.esc.opened(opened)
+    await asyncio.wait_for(h.esc.idle(), 2)
+    assert llm.at - opened_at < 0.5 and llm.facts["council"] == []
+
+
+async def test_owner_choice_during_the_council_skips_claude(opened):
+    h, llm = council_harness(0.5)
+    h.at(OPENED_AT)
+    h.esc.opened(opened)
+    await asyncio.sleep(0.05)
+    await h.esc.resolve_by_owner("e_0001", "accept_overrun")
+    await asyncio.wait_for(h.esc.idle(), 2)
+    assert llm.facts is None
+
+
+async def test_demo_mode_clock_stays_paused_through_the_council(opened):
+    h = Harness(make_app(demo_mode=True, council_wait_s=2.0))
+    h.runtime.playing = True
+    h.use_claude(FactsLLM("extend_delay_dishwasher", "r"))
+    h.at(OPENED_AT)
+    h.esc.opened(opened)
+    await asyncio.sleep(0.05)
+    assert h.runtime.paused_reason == "escalation"
+    await post_context(h.app, council_post("weather"))
+    await asyncio.wait_for(h.esc.idle(), 2)
+    assert h.runtime.paused_reason is None
