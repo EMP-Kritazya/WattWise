@@ -11,8 +11,8 @@ A **simulation in the browser** (one sim host tab) models the appliances and cus
 clock (1 sim minute per tick, 120×) and passes the hub's current state to the **engine**, which computes every number and,
 every 5 simulated minutes, returns commands that travel back through the hub to the appliances. **Fetch.ai agents** fetch live
 context (weather, prices, events) on a fixed interval. When no move inside the owner's rules and preferences can hold the cap,
-the engine **escalates** with 2–3 evaluated alternatives (plus `ask_owner`); **Claude chooses one**, the engine validates it against
-the owner's authority, and beyond it the owner confirms. Every screen updates live from **SpacetimeDB**.
+the engine **escalates** with 2–3 evaluated alternatives; **Claude chooses the best one within its authority itself** (the engine
+validates it) so the kitchen never stops for the owner; with no choice in time, the engine's safe default applies. Every screen updates live from **SpacetimeDB**.
 Proof: a year of restaurant data replayed on a real tariff.
 
 Team: **Kritazya** (engine brain, data + proof, SpacetimeDB, Azure backend) · **Suyog** (API, runtime, Claude, Fetch.ai agents,
@@ -33,7 +33,7 @@ SpacetimeDB, Convex, Microsoft Azure.
 | **context**            | Structured live data from Fetch agents: weather, prices, events, crowd effect                                                                   |
 | **decision**           | One engine action on one device, with a reason and an engine-computed effect                                                                    |
 | **escalation**         | Engine found no way inside the owner's rules and preferences to hold the cap; it offers 2–3 evaluated alternatives + `ask_owner`               |
-| **authority**          | Owner-set bounds within which Claude may resolve an escalation without asking (`ClaudeAuthority`)                                               |
+| **authority**          | Bounds within which Claude resolves every escalation itself (`ClaudeAuthority`; the Builder sends full authority, no UI)                       |
 | **proposal**           | A change suggested by the AI, applied by code only after an owner confirmation                                                                  |
 | **owner confirmation** | UI Confirm, an ASI:One card button, or a `confirm` / `yes` reply to the latest pending item (matched by code)                                   |
 | **lane**               | `without` (no control) or `with` (WattWise); two kitchens side by side, same customers                                                          |
@@ -54,7 +54,7 @@ SpacetimeDB, Convex, Microsoft Azure.
 ## Golden rules (non-negotiable)
 
 1. **The engine computes every number.** kW, kWh, $, forecasts, savings, option projections. No LLM ever produces a user-facing number; the AI quotes tool results only.
-2. **The engine decides routine moves; Claude only resolves escalations.** Claude picks one engine-computed option id. Code validates it against the owner's authority and applies it. Outside the authority → owner confirmation. No answer in time → the engine's safe default.
+2. **The engine decides routine moves; Claude only resolves escalations.** Claude picks one engine-computed option id, offered only options within its authority (never `ask_owner`). Code validates it and applies it. The owner is never asked and the clock never pauses for an escalation. No answer in time → the engine's safe default.
 3. **The engine never waits for AI.** The kitchen runs identically with Claude and every agent switched off (default options, last known context, template text).
 4. **Owner rules are hard limits.** `always_on` never commanded; `flexible` never below `min_power_pct`; `deferrable` always finishes by `must_finish_by`; the food-safety floor (refrigeration ≥ 50 %) can never be crossed, not even by escalation.
 5. **Energy is moved, never deleted.** Owed-energy ledger per flexible device, repaid the same day.
@@ -133,6 +133,6 @@ Azure Container Apps (exactly one replica per app) + Static Web Apps. Generated 
 
 ## Never
 
-Let an LLM produce a user-facing number · let Claude act outside the owner's authority without confirmation · cross the food-safety floor ·
+Let an LLM produce a user-facing number · let Claude act outside its authority · cross the food-safety floor ·
 let replay read future rows · touch an always_on device · put network calls in `engine/` · commit secrets or datasets ·
 refactor across workstreams after feature freeze.
