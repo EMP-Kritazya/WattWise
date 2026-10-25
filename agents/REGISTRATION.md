@@ -160,4 +160,4 @@ Run (each in its own window, from the repo root; `--recorded` for demo numbers):
 - Innovation Lab: both badges render on all four profiles; README has name + address (hackpack rule). Index category stays community
 - ASI:One via asi1.ai/ai/<address>: Grid answered (live_api CAISO NP15), Weather answered (live_api Berkeley), Events answered (recorded Giants game)
 - ASI:One handle search does not list the three specialists yet (only @wattwise); use the asi1.ai/ai/<address> page or Agentverse Chat with Agent
-- Concierge: ASI:One says "WattWise Concierge isn't in this chat, so it won't reply" (with @wattwise and with the address); Invite to chat and Talk to did not fix it. Open
+- Concierge: ASI:One says "WattWise Concierge isn't in this chat, so it won't reply" (with @wattwise and with the address); Invite to chat and Talk to did not fix it. Cause: the Concierge was not running. 19:12 retest with it running: it answered in ASI:One ("I can't reach the kitchen right now" = backend not reachable yet)
