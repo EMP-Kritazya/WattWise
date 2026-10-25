@@ -21,10 +21,18 @@ class Lanes:
         self.config: dict | None = None
         self.seed: int | None = None
 
-    def build(self, config: dict, seed: int) -> None:
-        """Replace both lanes. A RuleError from either leaves the previous lanes untouched."""
-        # warm_up(...) is TBD (CONTRACTS.md §3); not called until its signature exists.
-        kitchens = {lane: self._engine.Kitchen(config, self._tariff, lane, seed) for lane in LANES}
+    def build(self, config: dict, seed: int, history: dict | None = None) -> None:
+        """Replace both lanes from one shared engine id allocator.
+
+        ``Kitchen.build_lanes`` is the only construction path for a production
+        run.  Building first, warming the temporary lanes, and assigning only
+        afterwards keeps the previous run intact if construction or warm-up
+        rejects its input.
+        """
+        kitchens = self._engine.build_lanes(config, self._tariff, seed)
+        if history is not None:
+            for lane in LANES:
+                kitchens[lane].warm_up(history)
         self._kitchens, self.config, self.seed = kitchens, config, seed
 
     def step(self, minutes: int, hub_report: dict) -> dict[str, dict]:

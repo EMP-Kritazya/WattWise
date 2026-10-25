@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class ContractModel(BaseModel):
@@ -31,23 +31,25 @@ CommandAction = Literal["on", "off", "start", "delay", "reduce", "restore"]
 IssuedBy = Literal["engine", "owner"]
 AckReason = Literal["out_of_range", "job_running", "already_off", "unknown_device"]
 ReasonCode = Literal[
-    "avoid_new_peak", "stay_under_cap", "release_into_valley", "catch_up", "owner_override", "escalation_choice"
+    "avoid_new_peak", "stay_under_cap", "release_into_valley", "catch_up", "owner_override", "escalation_fallback",
+    "escalation_choice",
 ]
 DecisionStatus = Literal["executed", "undone"]
 ContextLabel = Literal["live_api", "recorded"]
 PriceStress = Literal["low", "normal", "high"]
 CrowdEffectValue = Literal["none", "small", "medium", "large"]
 CrowdEffectSetBy = Literal["claude", "owner", "default"]
-EscalationStatus = Literal["open", "resolved", "awaiting_owner", "expired_default"]
+EscalationStatus = Literal["open", "resolved", "awaiting_owner", "expired_default", "obsolete"]
 ResolvedBy = Literal["claude", "owner", "default"]
 RuleBreakKind = Literal["cap_overrun", "below_min_power", "past_deadline", "over_max_reduce", "over_max_delay"]
+WarningCode = Literal["cap_unreachable", "sim_host_offline", "hub_offline", "live_transport_down", "store_down"]
 ProposalKind = Literal["importance", "peak_cap", "authority", "undo_decision", "customer_event", "resolve_escalation"]
 ProposalStatus = Literal["pending", "confirmed", "cancelled", "expired"]
 ConfirmedVia = Literal["ui", "asi_one"]
 AgentName = Literal["concierge", "weather", "grid", "events", "claude", "engine"]
 AgentLogKind = Literal["request", "response", "post", "error"]
-PausedReason = Literal["escalation", "approval", "hub_waiting", "sim_host_offline"]
-SlowedReason = Literal["escalation"]
+PausedReason = Literal["manual", "hub_waiting", "sim_host_offline", "run_complete"]
+Phase = Literal["service", "overnight", "closed"]
 Speed = Literal[1, 30, 120, 600]
 
 
@@ -108,8 +110,10 @@ class KitchenConfig(ContractModel):
     operating_hours: OperatingHours
     location: Location
     owner_preferences: str
-    authority: ClaudeAuthority
+    # The Builder normally sends full authority. The service inserts that contract default for legacy clients that omit it.
+    authority: ClaudeAuthority | None = None
     tariff_id: str
+    run_days: int = Field(1, ge=1)
     seed: int
 
 
@@ -139,6 +143,34 @@ class Tariff(ContractModel):
     timezone: str
     energy: list[EnergyRate]
     demand: list[DemandRate]
+
+
+class WarmUpBlock(ContractModel):
+    block_start: IsoTs
+    device_id: str
+    avg_kw: float
+
+
+class MonthToDate(ContractModel):
+    month: str
+    month_peak_kw: float
+    on_peak_month_peak_kw: float | None
+    energy_kwh_month: float
+    cost_usd_month: float
+
+
+class WarmUpHistory(ContractModel):
+    """Four-week, per-device 15-minute history passed unchanged to ``Kitchen.warm_up``."""
+
+    source: Literal["nrel_comstock", "fixture_synthetic"]
+    label: Literal["calibrated_model", "simulated"]
+    dataset_id: str
+    scale: float
+    day_offset: int
+    start: IsoTs
+    end: IsoTs
+    blocks: list[WarmUpBlock]
+    month_to_date: MonthToDate | None
 
 
 class Device(ContractModel):
@@ -266,6 +298,23 @@ class Context(ContractModel):
     crowd_effect: CrowdEffect | None = None
 
 
+class Warning(ContractModel):
+    """An engine/runtime warning forwarded verbatim on the viewer websocket."""
+
+    code: WarningCode
+    message: str
+    data: dict[str, Any]
+
+    @model_validator(mode="after")
+    def _cap_warning_has_engine_targets(self) -> "Warning":
+        if self.code == "cap_unreachable":
+            required = {"unavoidable_kw", "peak_cap_kw", "target_kw"}
+            missing = sorted(required.difference(self.data))
+            if missing:
+                raise ValueError(f"cap_unreachable data missing {', '.join(missing)}")
+        return self
+
+
 class EscalationProblem(ContractModel):
     forecast_peak_kw: float
     target_kw: float
@@ -276,7 +325,7 @@ class EscalationProblem(ContractModel):
 class OptionProjection(ContractModel):
     peak_kw: float
     cost_delta_usd: float
-    max_indoor_temp_change_c: float
+    max_indoor_temp_change_c: float | None
 
 
 class RuleBreak(ContractModel):
@@ -293,16 +342,20 @@ class EscalationOption(ContractModel):
     projected: OptionProjection | None
     rule_breaks: list[RuleBreak]
     within_authority: bool
+    harm_score: float | None
+    rank: int | None
 
 
 class Escalation(ContractModel):
     escalation_id: str
     lane: Lane
     ts: IsoTs
+    updated_ts: IsoTs
     block_start: IsoTs
     problem: EscalationProblem
     options: list[EscalationOption]
     default_option_id: str
+    active_option_id: str | None
     deadline_sim_ts: IsoTs
     status: EscalationStatus
     resolved_by: ResolvedBy | None
@@ -316,10 +369,12 @@ class Meter(ContractModel):
     block_avg_kw: float
     block_start: IsoTs
     month_peak_kw: float
+    on_peak_month_peak_kw: float | None
     peak_mode: PeakMode
     peak_cap_kw: float | None
     target_kw: float
     energy_kwh_today: float
+    energy_kwh_month: float
     price_usd_per_kwh_now: float
     cost_usd_today: float
     cost_usd_month: float
@@ -336,6 +391,7 @@ class TickState(ContractModel):
     new_decisions: list[Decision]
     new_commands: list[Command]
     new_escalations: list[Escalation]
+    warnings: list[Warning]
     indoor_temp_c: float
     forecast_kw: list[float] | None
 
@@ -346,6 +402,28 @@ class LaneComparison(ContractModel):
     peak_avoided_kw: float
     month_peak_without_kw: float
     month_peak_with_kw: float
+
+
+class KitchenSnapshot(ContractModel):
+    """Pure per-lane facade read used by the runtime and AI tools (CONTRACTS.md §3)."""
+
+    tick_id: int
+    sim_ts: IsoTs
+    lane: Lane
+    control: Lane
+    peak_mode: PeakMode
+    config: KitchenConfig
+    meter: Meter
+    forecast_kw: list[float] | None
+    forecast_ts: IsoTs | None
+    devices: list[Device]
+    active_commands: list[Command]
+    owed_kwh: dict[str, float]
+    open_escalations: list[Escalation]
+    warnings: list[Warning]
+    recent_decisions: list[Decision]
+    context: Context | None
+    id_counters: dict[str, int]
 
 
 class ImportancePayload(ContractModel):
@@ -470,7 +548,7 @@ class PeakCapUpdate(ContractModel):
 
 
 class SimControlRequest(ContractModel):
-    action: Literal["play", "pause", "reset"]
+    action: Literal["play", "pause", "reset", "next_day"]
     speed: Speed | None = None
 
 
@@ -480,7 +558,9 @@ class ClockState(ContractModel):
     sim_ts: IsoTs
     tick_id: int
     paused_reason: PausedReason | None
-    slowed_reason: SlowedReason | None
+    day_index: int
+    run_days: int
+    phase: Phase
 
 
 class DeviceCommandRequest(ContractModel):
@@ -564,16 +644,15 @@ class ClockMessage(ContractModel):
     sim_ts: IsoTs
     tick_id: int
     paused_reason: PausedReason | None
-    slowed_reason: SlowedReason | None
+    day_index: int
+    run_days: int
+    phase: Phase
 
 
-class WarningMessage(ContractModel):
+class WarningMessage(Warning):
     type: Literal["warning"]
-    code: Literal["cap_unreachable", "sim_host_offline", "hub_offline", "live_transport_down", "store_down"]
-    message: str
     # per code: cap_unreachable {unavoidable_kw, peak_cap_kw} · sim_host_offline {last_tick_id} ·
-    # hub_offline {device_id, hub_id} · live_transport_down {} · store_down {}
-    data: dict[str, Any]
+    # hub_offline {device_id, hub_id} · live_transport_down {} · store_down {}. cap_unreachable also carries target_kw.
 
 
 class ChatDeltaMessage(ContractModel):

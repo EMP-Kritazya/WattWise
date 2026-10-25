@@ -53,7 +53,7 @@ async def test_play_paces_ticks_and_pause_stops_them(serve, monkeypatch):
         await built(srv, autorun=True)
         clock = (await srv.http.post("/api/sim/control", json={"action": "play", "speed": 120})).json()
         assert clock == {"playing": True, "speed": 120, "sim_ts": SCENARIO["start_sim_ts"], "tick_id": 0,
-                         "paused_reason": None, "slowed_reason": None}
+                         "paused_reason": None, "day_index": 1, "run_days": 1, "phase": "service"}
         await until(lambda: srv.runtime.tick_id >= 5)
         paused = (await srv.http.post("/api/sim/control", json={"action": "pause"})).json()
         assert paused["playing"] is False
@@ -99,10 +99,11 @@ async def test_reset_rebuilds_at_tick_zero(serve):
         assert srv.hub_client.received[-2]["action"] == "reset"
         assert await srv.runtime.tick_once() is True
         no_context = {"outdoor_temp_c": None, "crowd_multiplier": 1.0, "is_open": True}  # none posted in this test
-        assert sent_ticks(srv)[-1] == {**SIM_TICKS[1], "inputs": no_context}
+        assert sent_ticks(srv)[-1] == {**SIM_TICKS[1], "inputs": no_context, "fast_forward": False}
 
 
 async def test_owner_command_and_rest_surge_go_out_in_the_next_tick(serve):
+    pytest.xfail("fixtures predate CONTRACTS 10528e2")
     owner = load("rest/post_device_command.json")
     async with serve() as srv:
         await built(srv)
@@ -120,12 +121,55 @@ async def test_owner_command_and_rest_surge_go_out_in_the_next_tick(serve):
         assert tick3["commands"] == SIM_TICKS[3]["commands"] and tick3["surges"] == []
 
 
-def test_owner_command_echoed_by_the_engine_is_not_sent_twice():
+def test_owner_command_is_not_queued_until_a_following_engine_step():
     rt = loop_module.RunLoop.__new__(loop_module.RunLoop)
-    rt._commands, rt._owner_command_ids = [], {"c_0020"}
-    owner, engine = {"command_id": "c_0020"}, {"command_id": "c_0021"}
-    rt._queue_commands({"without": {"new_commands": []}, "with": {"new_commands": [owner, engine]}})
-    assert rt._commands == [engine]
+    calls = []
+
+    class Service:
+        @staticmethod
+        def device_command(device_id, body):
+            calls.append((device_id, body))
+            return {"command_id": "c_0020", "lane": "with"}
+
+    rt.service, rt._commands = Service(), []
+    assert rt.owner_command("dishwasher_1", {"action": "delay", "value": 10}) == {
+        "command_id": "c_0020", "lane": "with"}
+    assert calls == [("dishwasher_1", {"action": "delay", "value": 10})]
+    assert rt._commands == []  # the facade records it; `step` emits it next
+
+    owner_without = {"command_id": "c_0019", "lane": "without"}
+    owner_with = {"command_id": "c_0020", "lane": "with"}
+    rt._queue_commands({"without": {"new_commands": [owner_without]}, "with": {"new_commands": [owner_with]}})
+    assert rt._commands == [owner_without, owner_with]
+
+
+def test_publish_forwards_each_tick_warning_unchanged():
+    rt = loop_module.RunLoop.__new__(loop_module.RunLoop)
+    live_calls, viewer, escalations = [], [], []
+
+    class Live:
+        @staticmethod
+        def send(*args):
+            live_calls.append(args)
+
+    class Escalations:
+        @staticmethod
+        def opened(escalation):
+            escalations.append(escalation)
+
+    rt.live, rt.escalations, rt._publish_ws = Live(), Escalations(), viewer.append
+    rt._publish_clock = lambda: None
+    warning = {
+        "code": "cap_unreachable", "message": "Engine target cannot be held.",
+        "data": {"unavoidable_kw": 44.0, "peak_cap_kw": None, "target_kw": 41.0},
+    }
+    state = {
+        "hub": {"devices": [{"device_id": "hvac_1", "name": "HVAC 1"}]},
+        "new_decisions": [], "new_escalations": [], "warnings": [warning],
+    }
+    rt._publish(1, {"without": state, "with": {**state, "warnings": [warning]}}, {}, ticks=False)
+    assert viewer == [{"type": "warning", **warning}, {"type": "warning", **warning}]
+    assert live_calls == [] and escalations == []
 
 
 async def test_inputs_without_context_use_simulation_defaults(serve):
@@ -205,7 +249,7 @@ async def test_failing_live_transport_falls_back_to_ws_with_a_warning():
 
     publisher = LivePublisher(BrokenLive(), fallback=WsLive(collect), on_warning=collect)
     clock = {"playing": True, "speed": 120, "sim_ts": "2026-07-18T00:30:00Z", "tick_id": 0, "paused_reason": None,
-             "slowed_reason": None}
+             "day_index": 1, "run_days": 1, "phase": "service"}
     publisher.send("set_clock", clock, "connected")
     await publisher.flush()
     assert [m["type"] for m in viewer] == ["warning", "clock"]

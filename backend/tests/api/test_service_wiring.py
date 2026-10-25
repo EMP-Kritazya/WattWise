@@ -1,11 +1,16 @@
 """REST answers come from FakeKitchen + MemoryStore (not the rest fixtures), and writes land in the store."""
 
+import copy
 import json
+import sys
 import threading
 import time
+import types
 
 from api.errors import RuleError
+from api.service import FULL_AUTHORITY, KitchenService
 from api.settings import REPO_ROOT
+from store.memory import MemoryStore
 
 FIXTURES = REPO_ROOT / "contracts" / "fixtures"
 
@@ -45,10 +50,18 @@ def test_undo_updates_the_stored_decision(app, client):
     assert stored["lane"] == "with" and "explanation" in stored
 
 
-def test_owner_resolution_is_stored_as_final_state(app, client):
+def test_owner_resolution_is_stored_as_final_state(app, client, monkeypatch):
     fx = _load("rest/post_escalation_resolve.json")
-    client.post(fx["path"], json=fx["request"])
-    assert app.state.store.escalations() == [fx["response"]]
+    expected = copy.deepcopy(fx["response"])
+    expected.update(updated_ts=expected["ts"], active_option_id="accept_overrun")
+    for rank, option in enumerate(expected["options"], start=1):
+        option.update(harm_score=None if option["option_id"] == "ask_owner" else float(rank),
+                      rank=None if option["option_id"] == "ask_owner" else rank)
+    monkeypatch.setattr(app.state.service.lanes["with"], "resolve_escalation", lambda *_: copy.deepcopy(expected))
+
+    response = client.post(fx["path"], json=fx["request"])
+    assert response.status_code == 200 and response.json() == expected
+    assert app.state.store.escalations() == [expected]
 
 
 def test_same_backtest_reuses_the_run_and_unrecorded_is_501(app, client):
@@ -66,6 +79,94 @@ def test_build_kitchen_records_it(app, client):
     assert len(app.state.store.rows("kitchens")) == before + 1
     client.post("/api/kitchen", json=_load("rest/post_kitchen_422.json")["request"])
     assert len(app.state.store.rows("kitchens")) == before + 1
+
+
+def test_post_kitchen_without_authority_uses_full_authority_in_fake_mode(app, client):
+    config = copy.deepcopy(_load("rest/post_kitchen.json")["request"])
+    config.pop("authority")
+
+    response = client.post("/api/kitchen", json=config)
+
+    assert response.status_code == 200
+    assert app.state.store.latest_kitchen()["config"]["authority"] == FULL_AUTHORITY
+
+
+def test_authority_update_is_visible_to_escalation_gating(app, client):
+    disabled = {**FULL_AUTHORITY, "enabled": False}
+
+    response = client.put("/api/kitchen/authority", json=disabled)
+
+    assert response.status_code == 200
+    assert app.state.service.get_kitchen()["config"]["authority"] == disabled
+    assert app.state.service.lanes.config["authority"] == disabled
+    # The runtime reads the live with-lane snapshot, rather than the config
+    # captured when the lanes were built, before it decides whether to call
+    # Claude for an escalation.
+    assert app.state.runtime.escalations._authority() == disabled
+
+
+def test_build_injects_full_authority_and_warms_both_lanes_from_the_data_builder(monkeypatch):
+    history = {"source": "test", "blocks": []}
+    builder_calls, warm_ups, engine_configs = [], [], []
+
+    class Lane:
+        def __init__(self, lane):
+            self.lane = lane
+
+        def warm_up(self, received):
+            warm_ups.append((self.lane, received))
+
+    def build_lanes(config, tariff, seed):
+        engine_configs.append((copy.deepcopy(config), tariff, seed))
+        return {"without": Lane("without"), "with": Lane("with")}
+
+    data = types.ModuleType("data")
+    data.__path__ = []
+    warmup = types.ModuleType("data.warmup")
+
+    def build_warmup():
+        builder_calls.append(True)
+        return history
+
+    warmup.build_warmup = build_warmup
+    monkeypatch.setitem(sys.modules, "data", data)
+    monkeypatch.setitem(sys.modules, "data.warmup", warmup)
+
+    service = KitchenService(FIXTURES, types.SimpleNamespace(build_lanes=build_lanes), MemoryStore())
+    config = _load("rest/post_kitchen.json")["request"]
+    config.pop("authority")
+    original = copy.deepcopy(config)
+
+    assert service.build_kitchen(config) == {"kitchen_id": "k_01"}
+
+    assert config == original  # service defaults are not written back into the request body
+    assert builder_calls == [True]
+    assert engine_configs[0][0]["authority"] == FULL_AUTHORITY
+    assert engine_configs[0][2] == config["seed"]
+    assert warm_ups == [("without", history), ("with", history)]
+    assert service.store.latest_kitchen()["config"]["authority"] == FULL_AUTHORITY
+
+
+def test_owner_command_reaches_both_lanes_without_then_with(app, monkeypatch):
+    service = app.state.service
+    calls = []
+    without = {"command_id": "c_0019", "lane": "without"}
+    with_ = {"command_id": "c_0020", "lane": "with"}
+
+    def command_for(lane, result):
+        def owner_command(device_id, action, value):
+            calls.append((lane, device_id, action, value))
+            return result
+        return owner_command
+
+    monkeypatch.setattr(service.lanes["without"], "owner_command", command_for("without", without))
+    monkeypatch.setattr(service.lanes["with"], "owner_command", command_for("with", with_))
+
+    assert service.device_command("ice_machine_1", {"action": "start"}) == with_
+    assert calls == [
+        ("without", "ice_machine_1", "start", None),
+        ("with", "ice_machine_1", "start", None),
+    ]
 
 
 def test_concurrent_confirmations_apply_once(app):

@@ -165,7 +165,16 @@ async def test_scenario_stream_equals_server_to_hub_fixture():
         await _until(lambda: r.hub.connected)
         reports = [await r.tick(t) for t in sorted(TICKS)]
         await asyncio.wait_for(client, 3)
-        assert received == SERVER_TO_HUB
+        # CONTRACTS now includes ``fast_forward`` on every sim_tick.  The shared
+        # recording predates that field, so adapt its expectation in memory rather
+        # than editing the fixture.
+        expected = [
+            {**message, "fast_forward": False}
+            if message["type"] == "sim_tick" and "fast_forward" not in message
+            else message
+            for message in SERVER_TO_HUB
+        ]
+        assert received == expected
         assert reports == [REPORTS[t] for t in sorted(TICKS)]
         assert r.statuses == [None, "sim_host_offline"]  # never hub_waiting; offline once the client leaves
 
@@ -229,7 +238,10 @@ async def test_killing_the_host_pauses_sim_host_offline_with_warning():
 # ---------------------------------------------------------------- reconnect
 
 async def test_reconnect_resends_build_and_replays_every_past_tick():
-    replay_shape = _load("sim_tick_replay.json")
+    # The recorded hub messages predate CONTRACTS' required ``fast_forward``
+    # flag.  Keep the recording immutable and bring only this expectation
+    # forward in memory.
+    replay_shape = {**_load("sim_tick_replay.json"), "fast_forward": False}
     async with rig() as r:
         await r.build()
         client = r.fake_client()
@@ -244,7 +256,7 @@ async def test_reconnect_resends_build_and_replays_every_past_tick():
             assert await _recv(ws) == BUILD
             replayed = [await _recv(ws) for _ in range(36)]
             assert all(m.keys() == replay_shape.keys() and m["replay"] is True for m in replayed)
-            assert replayed == [{**TICKS[t], "replay": True} for t in range(1, 37)]
+            assert replayed == [{**TICKS[t], "replay": True, "fast_forward": False} for t in range(1, 37)]
             assert replayed[-1] == replay_shape
             assert r.hub.paused_reason is None
 
@@ -253,7 +265,7 @@ async def test_reconnect_resends_build_and_replays_every_past_tick():
             await _silent(ws)
             await ws.send(json.dumps(REPORTS[36]))
             live = await _recv(ws)
-            assert live == TICKS[37]
+            assert live == {**TICKS[37], "fast_forward": False}
             await asyncio.sleep(0.05)
             assert not t37.done()  # report 36 did not complete tick 37: the engine is not re-stepped
             await ws.send(json.dumps(REPORTS[37]))
