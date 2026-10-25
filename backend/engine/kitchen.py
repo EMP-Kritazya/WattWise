@@ -6,12 +6,15 @@ time comes only from HubReport `ts` and WarmUpHistory `end`.
 from __future__ import annotations
 
 import copy
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Mapping, Optional
+from types import MappingProxyType
+from typing import Any, Iterable, Mapping, Optional
 
 from contracts import (
     ClaudeAuthority,
     Device,
+    EquipmentType,
     HubReport,
     KitchenConfig,
     Meter,
@@ -22,7 +25,6 @@ from contracts import (
 )
 
 from . import rules
-from .catalog import DEFAULT_INDOOR_TEMP_C, TypeFacts, lookup, type_facts_from
 from .context import ContextState
 from .decider import target_kw
 from .forecaster import forecast_devices
@@ -40,6 +42,46 @@ FORECAST_HORIZON_MIN = 120
 
 def _plain(value: Any) -> Any:
     return value.model_dump(mode="json") if hasattr(value, "model_dump") else value
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+# equipment type facts from the catalog the runtime passes in (CONTRACTS.md section 3; ENGINE.md section 0)
+# ----------------------------------------------------------------------------------------------------------------------
+@dataclass(frozen=True)
+class TypeFacts:
+    """`category` (food-safety floor), `power_model` (crowd multiplier, job holds), `rated_kw`, `params` of one type,
+    taken per kitchen from the passed catalog; the engine keeps no module-level copy and reads no files."""
+    type_id: str
+    name: str
+    category: str
+    power_model: str
+    rated_kw: float
+    params: Mapping[str, float] = field(default_factory=dict)
+
+
+# STUB: TickState.indoor_temp_c is a required float, but a kitchen without a thermal device reports no indoor
+# temperature. Until the contract says what to send, the engine falls back to this value (design question).
+DEFAULT_INDOOR_TEMP_C = 22.5
+
+
+def type_facts_from(catalog: Iterable[Any]) -> Mapping[str, TypeFacts]:
+    """type_id -> TypeFacts for one kitchen. Entries may be EquipmentType models or plain dicts."""
+    facts: dict[str, TypeFacts] = {}
+    for entry in catalog:
+        t = entry if isinstance(entry, EquipmentType) else EquipmentType.model_validate(_plain(entry))
+        if t.type_id in facts:
+            raise RuleError(f"catalog lists type {t.type_id!r} twice")
+        facts[t.type_id] = TypeFacts(t.type_id, t.name, t.category, t.power_model, t.rated_kw,
+                                     MappingProxyType(dict(t.params)))
+    return MappingProxyType(facts)
+
+
+def lookup(facts: Mapping[str, TypeFacts], type_id: str) -> TypeFacts:
+    """An unknown type fails loudly (RuleError) rather than guessing a category: a guess could cross the food-safety floor."""
+    try:
+        return facts[type_id]
+    except KeyError:
+        raise RuleError(f"equipment type {type_id!r} is not in the catalog passed to the Kitchen") from None
 
 
 class _Unit:
