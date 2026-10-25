@@ -73,6 +73,7 @@ export const LiveComparison = __t.object("LiveComparison", {
   peakAvoidedKw: __t.f64(),
   monthPeakWithoutKw: __t.f64(),
   monthPeakWithKw: __t.f64(),
+  savedMonthUsd: __t.option(__t.f64()),
 });
 export type LiveComparison = __Infer<typeof LiveComparison>;
 

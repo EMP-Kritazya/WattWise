@@ -155,7 +155,7 @@ export function DemoBar({ onExit }: { onExit: () => void }) {
   const playing = clock?.playing ?? false;
   // From the engine's LaneComparison; the browser never subtracts lanes. $ only on a real tariff, else peak avoided (kW).
   const realTariff = useRealTariff();
-  const saved = comparison?.saved_today_usd ?? null;
+  const saved = comparison?.saved_month_usd ?? null;  // this month: demand charges bill the month's highest peak
 
   return (
     <div className={cn(GLASS, "flex flex-wrap items-center gap-3 px-3 py-2")}>
@@ -179,7 +179,7 @@ export function DemoBar({ onExit }: { onExit: () => void }) {
         +40 customers
       </Button>
       <div className="px-2 text-right">
-        <div className="text-[11px] text-white/50">{realTariff ? "Saved today" : "Peak avoided"}</div>
+        <div className="text-[11px] text-white/50">{realTariff ? "Saved this month" : "Peak avoided"}</div>
         <div className="text-lg leading-tight font-semibold text-emerald-300 tabular-nums" title={realTariff ? undefined : NO_REAL_TARIFF_HINT}>
           {realTariff ? fmtUsd(saved) : fmtKw(comparison?.peak_avoided_kw)}
         </div>

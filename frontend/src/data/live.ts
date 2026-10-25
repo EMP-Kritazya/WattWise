@@ -7,15 +7,27 @@ import { ingestViewerMessages, startLiveRows, useLive } from "./useLive";
 const FLUSH_MS = 250; // ticks arrive ~2/s per lane; render at most ~4 times per second (UI.md)
 
 /**
- * Which live source to use (UI.md "Where live data comes from"):
- *   VITE_LIVE_TRANSPORT=spacetime (default) → SpacetimeDB tables, falling back to /ws if it can't connect
- *   VITE_LIVE_TRANSPORT=ws                  → everything over /ws
- *   mock mode                               → the in-browser mock server
+ * Which live source to use (UI.md "Where live data comes from"): the one the backend publishes on, read from
+ * `GET /api/health` (`live_transport`), so a viewer can never listen where nothing is sent:
+ *   spacetime → SpacetimeDB tables, falling back to /ws if it can't connect
+ *   ws        → everything over /ws
+ *   mock mode → the in-browser mock server
+ * VITE_LIVE_TRANSPORT only decides when the health call fails. VITE_SPACETIME_URI / _DB default to the backend
+ * client's own defaults (port 3000 on this host, database `wattwise`).
  */
 const wanted = (import.meta.env.VITE_LIVE_TRANSPORT ?? "spacetime") as "spacetime" | "ws";
-const spacetimeUri: string | undefined = import.meta.env.VITE_SPACETIME_URI;
-const spacetimeDb: string | undefined = import.meta.env.VITE_SPACETIME_DB;
+const spacetimeUri: string =
+  import.meta.env.VITE_SPACETIME_URI ?? `${location.protocol === "https:" ? "wss" : "ws"}://${location.hostname}:3000`;
+const spacetimeDb: string = import.meta.env.VITE_SPACETIME_DB ?? "wattwise";
 const spacetimeToken: string | undefined = import.meta.env.VITE_SPACETIME_TOKEN;
+
+async function backendTransport(): Promise<"spacetime" | "ws"> {
+  try {
+    return (await transport.health()).live_transport;
+  } catch {
+    return wanted;
+  }
+}
 
 /** Start live data. Chat, proposals and escalation notices always come over /ws as well. Returns a stop function. */
 export function startLive(): () => void {
@@ -70,8 +82,7 @@ export function startLive(): () => void {
   );
   setSource(transport.kind === "mock" ? "mock" : "ws");
 
-  if (transport.kind !== "mock" && wanted === "spacetime" && spacetimeUri && spacetimeDb) {
-    connectSpacetime(
+  const startSpacetime = () => connectSpacetime(
       { uri: spacetimeUri, database: spacetimeDb, token: spacetimeToken },
       (tables) => {
         if (spacetimeDisabled || stopped) return;
@@ -95,6 +106,10 @@ export function startLive(): () => void {
           data: {},
         });
       });
+  if (transport.kind !== "mock") {
+    void backendTransport().then((kind) => {
+      if (kind === "spacetime" && !stopped) startSpacetime();
+    });
   }
 
   return () => {

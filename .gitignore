@@ -9,7 +9,6 @@ __pycache__/
 .pytest_cache/
 .hypothesis/
 /data/
-/dataset/
 myTestsReport/
 node_modules/
 dist/

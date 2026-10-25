@@ -619,10 +619,13 @@ dining-room temperature (shared by every HVAC unit's `physical.indoor_temp_c`). 
   "saved_today_usd": 18.4,
   "peak_avoided_kw": 6.0,
   "month_peak_without_kw": 46.0,
-  "month_peak_with_kw": 40.0
+  "month_peak_with_kw": 40.0,
+  "saved_month_usd": 412.6
 }
 ```
 
+`saved_month_usd` (added 2026-10-25, optional: null in older recordings) = without − with `meter.cost_usd_month`, the
+month-to-date bill difference: energy plus each demand charge on the month's highest 15-min peak so far.
 The browser shows these numbers; it never subtracts lanes itself.
 
 ### Proposal (AI suggestion waiting for owner confirmation)

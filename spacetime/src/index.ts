@@ -98,6 +98,7 @@ const live_comparison = table(
     peak_avoided_kw: t.f64(),
     month_peak_without_kw: t.f64(),
     month_peak_with_kw: t.f64(),
+    saved_month_usd: t.option(t.f64()).default(undefined), // month-to-date bill difference (added 2026-10-25; null in older recordings)
   }
 );
 
@@ -538,6 +539,7 @@ export const publish_ticks = spacetimedb.reducer({ payload_json: t.string() }, (
     peak_avoided_kw: num(c, 'peak_avoided_kw', w),
     month_peak_without_kw: num(c, 'month_peak_without_kw', w),
     month_peak_with_kw: num(c, 'month_peak_with_kw', w),
+    saved_month_usd: optNum(c, 'saved_month_usd', w),
   };
   if (ctx.db.live_comparison.id.find(0)) ctx.db.live_comparison.id.update(crow);
   else ctx.db.live_comparison.insert(crow);

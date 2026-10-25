@@ -254,6 +254,8 @@ export interface LaneComparison {
   peak_avoided_kw: number;
   month_peak_without_kw: number;
   month_peak_with_kw: number;
+  /** Month-to-date bill difference (without − with), engine-computed; null in older recordings. */
+  saved_month_usd?: number | null;
 }
 export type ProposalKind = "importance" | "peak_cap" | "authority" | "undo_decision" | "customer_event";
 export interface Proposal {

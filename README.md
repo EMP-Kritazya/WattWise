@@ -43,12 +43,14 @@ cd backend
 .venv/bin/uvicorn api.main:app --reload
 ```
 
-Start the frontend in another terminal. These settings explicitly connect to the
-API instead of using fixture screens. Vite proxies `/api`, `/ws`, and `/ws/hub`
-to port 8000; set `API_TARGET` if your backend uses another address.
+Start the frontend in another terminal. `VITE_MOCKS=0` connects to the API
+instead of fixture screens; the page then follows the live transport the backend
+reports on `/api/health` (SpacetimeDB or `/ws`), so the two can never disagree.
+Vite proxies `/api`, `/ws`, and `/ws/hub` to port 8000; set `API_TARGET` if your
+backend uses another address.
 
 ```sh
-VITE_MOCKS=0 VITE_LIVE_TRANSPORT=ws npm --prefix frontend run dev
+VITE_MOCKS=0 npm --prefix frontend run dev
 ```
 
 Open the frontend URL printed by Vite, build a kitchen, then keep exactly one

@@ -745,6 +745,9 @@ class LaneComparison(ContractModel):
     peak_avoided_kw: float
     month_peak_without_kw: NonNegFloat
     month_peak_with_kw: NonNegFloat
+    # Month-to-date bill difference (without - with `cost_usd_month`: energy + demand charges on the month's peaks so far).
+    # Added 2026-10-25; optional so older recordings stay valid.
+    saved_month_usd: Optional[float] = None
 
 
 # ---------------------------------------------------------------------------------------------------------------------

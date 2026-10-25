@@ -56,9 +56,11 @@ export function KpiRow() {
       <Kpi
         icon={Leaf}
         tone="var(--lane-with)"
-        label={realTariff ? "Saved today" : "Peak avoided"}
-        value={realTariff ? fmtUsd(comparison?.saved_today_usd) : fmtKw(comparison?.peak_avoided_kw)}
-        sub={realTariff ? `Peak avoided ${fmtKw(comparison?.peak_avoided_kw)}` : `Savings in $: ${NO_REAL_TARIFF.toLowerCase()}`}
+        label={realTariff ? "Saved this month" : "Peak avoided"}
+        value={realTariff ? fmtUsd(comparison?.saved_month_usd) : fmtKw(comparison?.peak_avoided_kw)}
+        sub={realTariff
+          ? `Month peak avoided ${fmtKw(comparison?.peak_avoided_kw)}`
+          : `Savings in $: ${NO_REAL_TARIFF.toLowerCase()}`}
         title={realTariff ? undefined : NO_REAL_TARIFF_HINT}
         highlight
       />

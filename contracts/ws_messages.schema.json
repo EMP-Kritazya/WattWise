@@ -2533,6 +2533,18 @@
           "minimum": 0,
           "title": "Month Peak With Kw",
           "type": "number"
+        },
+        "saved_month_usd": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Saved Month Usd"
         }
       },
       "required": [

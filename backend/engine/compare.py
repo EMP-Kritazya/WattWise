@@ -21,5 +21,6 @@ def compare_lanes(without: Any, with_: Any) -> dict:
         peak_avoided_kw=a.meter.month_peak_kw - b.meter.month_peak_kw,
         month_peak_without_kw=a.meter.month_peak_kw,
         month_peak_with_kw=b.meter.month_peak_kw,
+        saved_month_usd=a.meter.cost_usd_month - b.meter.cost_usd_month,
     )
     return comparison.model_dump(mode="json")

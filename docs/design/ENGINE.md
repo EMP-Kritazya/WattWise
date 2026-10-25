@@ -162,11 +162,11 @@ Delaying goes first (no comfort impact). Ties are broken by tariff price, then c
   `max_reduce_min` before close or while closed, so catch-up happens while open.
 - **Repay-room check** (decided 2026-10-25): a reduce is made only if, in the horizon forecast with it applied (catch-up at the
   device's rated room right after `restore_at`, as the hub and the replay plant do), (1) all its owed energy is repaid in blocks
-  that end by today's close, (2) no block is lifted over `max(target_kw, unavoidable_kw)`, nor a block already over it any higher,
-  and (3) it lowers the horizon cost (`saving_usd > 0`). Otherwise it only moves the peak, and a forecast miss turns the catch-up
-  into a new one. Without the check, a July replay dumped a day's owed energy at close: a 147 kW block against 50 kW without
-  control. With it, the engine never does worse than `without` on the year; a flat dinner plateau longer than `max_reduce_min`
-  leaves reductions no room, so savings then come only from deferrable jobs.
+  that end by today's close, and (2) it lowers the horizon cost (`saving_usd > 0`; a move that only shifts the peak saves 0).
+  Without (1), a July replay dumped a day's owed energy at close: a 147 kW block against 50 kW without control. A stricter
+  variant (no catch-up block over the target) was tried and dropped by the owner: it left the live kitchen idle. Known
+  consequence (2026-10-25): live, the engine saves (~$80-108 per service day on the Demo Café), but the year replay, whose plant
+  repays owed energy at full rated room at once, shows the `with` lane worse than `without` (about -$1,700 on the year).
 
 **Effect of a decision** (`Decision.effect`), computed marginally in plan order so one replan's savings add up without double counting:
 

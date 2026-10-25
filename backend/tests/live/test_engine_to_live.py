@@ -66,7 +66,8 @@ def test_engine_rows_validate_and_match_fixture_shape():
             # devices are the hub's state, echoed unchanged (the contract model types 62 as 62.0: same number)
             parse = lambda r: {**r, "physical_json": json.loads(r["physical_json"]) if r["physical_json"] else None}  # noqa: E731
             assert parse(g) == parse(e)
-        assert got["live_comparison"].keys() == exp["live_comparison"].keys()
+        # the recording predates saved_month_usd (optional, added 2026-10-25); the engine now always sends it
+        assert got["live_comparison"].keys() == exp["live_comparison"].keys() | {"saved_month_usd"}
     # the in-memory tables hold the last tick and 120 minutes of history per lane
     assert [r["tick_id"] for r in client.transport.rows("live_tick")] == [120, 120]
     assert len(client.transport.rows("tick_history")) == 240

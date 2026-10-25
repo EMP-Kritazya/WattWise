@@ -28,7 +28,7 @@ export function SavingsPanel() {
     >
       {/* $ only on a real tariff; until then the metered energy today (engine Meter), with the reason on hover. */}
       {realTariff ? (
-        <Stat icon={<PiggyBank className="size-4 text-[#167D74]" />} label="Saved today" value={fmtUsd(comparison?.saved_today_usd)} strong />
+        <Stat icon={<PiggyBank className="size-4 text-[#167D74]" />} label="Saved this month" value={fmtUsd(comparison?.saved_month_usd)} strong />
       ) : (
         <span title={NO_REAL_TARIFF_HINT}>
           <Stat icon={<PiggyBank className="size-4 text-[#167D74]" />} label="Energy today" value={fmtKwh(withMeter?.energy_kwh_today)} strong />

@@ -65,7 +65,8 @@ describe('fixture reducer args write the fixture rows', () => {
     callFixture('publish_ticks');
     expect(byKey(plain(h.db.live_tick.iter()), 'lane')).toEqual(byKey(tableFixture('live_tick'), 'lane'));
     expect(byKey(plain(h.db.live_device.iter()), 'key')).toEqual(byKey(tableFixture('live_device'), 'key'));
-    expect(plain(h.db.live_comparison.iter())).toEqual(tableFixture('live_comparison'));
+    // The recording predates saved_month_usd (2026-10-25, optional), so its column is null.
+    expect(plain(h.db.live_comparison.iter())).toEqual(tableFixture('live_comparison').map(r => ({ ...r, saved_month_usd: null })));
     const last2 = tableFixture('tick_history').slice(-2).map(r => ({ key: `${r.lane}:${r.ts}`, ...r }));
     expect(byKey(plain(h.db.tick_history.iter()), 'key')).toEqual(byKey(last2, 'key'));
   });

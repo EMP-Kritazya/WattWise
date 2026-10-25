@@ -17,4 +17,5 @@ export default __t.row({
   peakAvoidedKw: __t.f64().name("peak_avoided_kw"),
   monthPeakWithoutKw: __t.f64().name("month_peak_without_kw"),
   monthPeakWithKw: __t.f64().name("month_peak_with_kw"),
+  savedMonthUsd: __t.option(__t.f64()).name("saved_month_usd"),
 });

@@ -261,14 +261,9 @@ def plan(*, now: datetime, forecast: dict, devices: list[dict], target: float, t
             projected = reduce_forecast(current, did, d["rated_kw"], value, until, now, close_at)
             if projected["total_kw"][block] >= current["total_kw"][block] - 1e-9:
                 continue
-            # Repay-room check: the owed energy must come back before close, its catch-up may not lift any block over the
-            # target (or a block already over it any higher), and the move must lower the projected bill over the horizon.
-            # Otherwise it only shifts the peak, and a forecast miss turns the catch-up into a new one.
+            # Repay-room check: the owed energy must come back before close (no close-time dump), and the move, its
+            # catch-up included, must lower the projected bill over the horizon (a move that only shifts the peak saves 0).
             if projected.get("unplaced_kwh", 0.0) > current.get("unplaced_kwh", 0.0) + 1e-9:
-                continue
-            unavoidable = current.get("unavoidable_kw", [0.0] * n)
-            if any(p > max(target, unavoidable[i], c) + 1e-9
-                   for i, (p, c) in enumerate(zip(projected["total_kw"], current["total_kw"]))):
                 continue
             if horizon_cost(current, tariff, peaks) - horizon_cost(projected, tariff, peaks) <= 1e-9:
                 continue

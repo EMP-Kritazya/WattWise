@@ -96,7 +96,8 @@ function LanesLines() {
         )}
         {withoutMeter && <ReferenceLine y={withoutMeter.month_peak_kw} stroke={LANE_COLOR.without} strokeOpacity={0.4} />}
         {withMeter && <ReferenceLine y={withMeter.month_peak_kw} stroke={LANE_COLOR.with} strokeOpacity={0.4} />}
-        <Line name={`${LANE_LABEL.without} (simulated)`} dataKey="without" stroke={LANE_COLOR.without} strokeWidth={2} dot={false} isAnimationActive={false} connectNulls />
+        {/* Wider and under "with": where the lanes are equal it shows as a band around the green line, never hidden. */}
+        <Line name={`${LANE_LABEL.without} (simulated)`} dataKey="without" stroke={LANE_COLOR.without} strokeWidth={5} strokeOpacity={0.55} dot={false} isAnimationActive={false} connectNulls />
         <Line name={`${LANE_LABEL.with} (simulated)`} dataKey="with" stroke={LANE_COLOR.with} strokeWidth={2} dot={false} isAnimationActive={false} connectNulls />
         <Line name="Forecast (simulated)" dataKey="forecast" stroke={LANE_COLOR.with} strokeDasharray="5 4" dot={false} isAnimationActive={false} connectNulls />
       </LineChart>
