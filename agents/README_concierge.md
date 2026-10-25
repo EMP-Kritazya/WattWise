@@ -1,7 +1,8 @@
-![tag:innovationlab](https://img.shields.io/badge/innovationlab-3D8BD3)
-![tag:hackathon](https://img.shields.io/badge/hackathon-5F43F1)
+![tag:innovationlab](https://img.shields.io/badge/innovationlab-3D8BD3) ![tag:hackathon](https://img.shields.io/badge/hackathon-5F43F1)
 
 # WattWise Concierge: restaurant electricity bill and demand charge agent
+
+**Agent:** WattWise Concierge · `@wattwise` · `agent1qgr6vxnyeewx8rdsxpdu896v9w8cv5q4jmf4aw4244vu2r2nhqn9zt3gdsn`
 
 Lowers a restaurant's electricity demand charges by forecasting and shifting appliance load.
 

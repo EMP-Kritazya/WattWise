@@ -4,6 +4,8 @@ WeatherRequest {lat, lon, hours} → WeatherResponse {hourly[{ts, temp_c}], sour
 Live: Open-Meteo's `temperature_2m` in UTC, numbers unchanged (only the timestamps are written as `...Z`), label
 `live_api`. `--recorded` / DEMO_MODE=1: the recorded fixture, label `recorded`. A failed live call sends no reply: the
 Concierge then keeps the last known weather.
+Chat (Agent Chat Protocol, for any ASI:One user or agent): "weather in Berkeley next 6 hours" -> the same answer as plain
+text with its label. Place: coordinates or a name in the message (Open-Meteo geocoding), else the demo kitchen's location.
 
 Run:  python agents/weather.py [--recorded]      (seed: WEATHER_AGENT_SEED, or derived from FETCH_AGENT_SEED)
 """
@@ -17,12 +19,15 @@ from uagents import Context, Protocol
 
 from common import load_dotenv, load_fixture, make_agent, recorded_mode
 from models import WeatherRequest, WeatherResponse
+from public_chat import make_chat_protocol, parse_hours, resolve_location, when
 
 log = logging.getLogger("agents.weather")
 
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 SOURCE = "open-meteo"
 TIMEOUT_S = 8.0
+CHAT_DEFAULT_HOURS = 6
+CHAT_MAX_HOURS = 48
 
 
 def recorded() -> WeatherResponse:
@@ -82,13 +87,32 @@ async def on_request(ctx: Context, sender: str, req: WeatherRequest):
     await ctx.send(sender, reply)
 
 
+def chat_text(place: str, hours: int, reply: WeatherResponse | None) -> str:
+    """The reply as plain text: temperatures exactly as the source gave them, timestamps in UTC, with the label."""
+    if reply is None:
+        return f"WattWise Weather: Open-Meteo is not answering right now, so there is no forecast for {place}. Try again shortly."
+    rows = reply.hourly[:hours]
+    lines = [f"WattWise Weather: {place}, next {len(rows)} h ({reply.label}, source {reply.source}):"]
+    lines += [f"- {when(p.ts)}: {p.temp_c} °C" for p in rows]
+    return "\n".join(lines)
+
+
+async def answer_text(text: str, client: httpx.AsyncClient | None = None) -> str:
+    hours = parse_hours(text, CHAT_DEFAULT_HOURS, CHAT_MAX_HOURS)
+    lat, lon, place = await resolve_location(text, client)
+    reply = await answer(WeatherRequest(lat=lat, lon=lon, hours=hours), use_recorded=RECORDED, client=client)
+    return chat_text(place, hours, reply)
+
+
 def main() -> None:
     global RECORDED
     load_dotenv()
     RECORDED = recorded_mode()
     agent = make_agent("weather", "WattWise Weather",
-                       "Hourly outdoor temperature for a restaurant's location (Open-Meteo), for WattWise.")
+                       "Hourly outdoor temperature forecast for any location (Open-Meteo). Ask in plain text, e.g. "
+                       "'weather in Berkeley next 6 hours', or send a typed WeatherRequest.")
     agent.include(proto, publish_manifest=True)
+    agent.include(make_chat_protocol(answer_text), publish_manifest=True)
 
     @agent.on_event("startup")
     async def announce(ctx: Context):

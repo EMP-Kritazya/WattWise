@@ -26,7 +26,8 @@
   electricity cost, cafe
 - [x] Avatar uploaded (custom image)
 - [x] 10+ interactions via "Chat with Agent" / dashboard Testing (Agentverse says to reach 10 before judging discoverability)
-- [ ] Category / tag: **Innovation Lab** (badge first line of the README) + hackathon badge
+- [ ] Category / tag: **Innovation Lab** (badge first line of the README) + hackathon badge; see "Innovation Lab
+  category" below for why the index says `community` and the exact steps
 - [x] Chat Protocol listed under the agent's protocols (manifest published)
 - [x] Starter prompts: the three cold queries
 - [x] Status **active / mailbox** after the 10:57 local restart (index `last_updated` 17:52 UTC); avatar, handle, starter prompts kept
@@ -69,3 +70,86 @@ them under "Suggested AIs". Direct path that always works: `@wattwise <question>
 
 If routing misses: edit the description / README keywords, restart the agent and Connect again in the inspector so the
 profile re-publishes, wait a few minutes for re-indexing, retry in a fresh ASI:One chat. Direct check: Agentverse profile -> "Chat with Agent".
+
+## Innovation Lab category (all four agents; checked 2026-10-24)
+What the index shows is not the Innovation Lab marker. `GET /v1/search/agents/<address>` has only two `category` values
+across all of Agentverse: `fetch-ai` (Fetch-owned, `system_wide_tags: ["verified"]`) and `community` (everyone else).
+Filtering the search by `innovation-lab` / `innovationlab` / `hackathon` returns 0 agents. So `community` with empty tags is
+expected and cannot be changed by us. The hackpack defines Innovation Lab as: the README starts with the
+`tag:innovationlab` and `tag:hackathon` badges, and the README contains the agent's name and address.
+The published Concierge README had the badges (on two lines) but no address. Fixed in `README_concierge.md`: both badges
+on line 1, `**Agent:** name · handle · address` under the title. Same layout in the three new READMEs.
+
+Steps to re-publish (Concierge, then the same for each agent):
+1. Stop the agent (Ctrl+C in its window); start it again (same seed, so the same address).
+2. Open the inspector link from the log -> Connect -> **Mailbox** -> Finish (this sends description, README and handle).
+   The Concierge's published README was hand-edited in the profile UI ("lower demand charges"); the file now has that
+   wording, so the Connect overwrite loses nothing.
+3. Agentverse -> My Agents -> the agent -> Overview: the README shows the two badges at the top and the address line.
+   If it still shows the old text: Edit README in the profile, paste the file's contents, Save.
+4. Recheck the index: `curl -s https://agentverse.ai/v1/search/agents/<address>` -> `readme` starts with
+   `![tag:innovationlab]`, `status: active`, `type: mailbox`.
+
+## Public context agents: Weather, Grid, Events
+Each one runs on its own: mailbox mode, own seed (`<NAME>_AGENT_SEED`, else `FETCH_AGENT_SEED/<name>`), its typed
+protocol plus AgentChatProtocol, both with `publish_manifest=True`, README `agents/README_<name>.md`, handle
+`<NAME>_AGENT_HANDLE` (defaults below). Addresses are derived from the `agents/.env` seed (the one that gives the live
+Concierge `agent1qgr6v...`), so they are final as long as that seed is not changed.
+
+Run (each in its own window, from the repo root; `--recorded` for demo numbers):
+`agents/.venv/Scripts/python agents/weather.py` · `agents/grid.py` · `agents/events.py`
+(ports 8002 / 8003 / 8004; `AGENT_MAILBOX=0` = local endpoint only, not visible on Agentverse)
+
+### WattWise Weather
+- [x] Address: `agent1qgdzu482km7p9zaqftz2xt33xqsy8mghmdje0xqtxqxjsscj8x6ny7xlym6`
+- [x] Running; log shows the address and the inspector link (live mode, terminal tab, 2026-10-24 local)
+- [x] Inspector -> Connect -> Mailbox -> Finish; log: "Successfully registered as mailbox agent in Agentverse", "Registration on Almanac API successful"
+- [x] Profile name **WattWise Weather**, handle `@wattwiseweather`, README `README_weather.md` (badges + address visible)
+- [ ] Category: Innovation Lab (README badges, see above); Discovery -> My Keywords: weather forecast, temperature forecast,
+  hourly forecast, Open-Meteo, outdoor temperature
+- [x] Protocols: `wattwise-weather` 0.1.0 + AgentChatProtocol 0.3.0
+- [ ] Starter prompts: "weather in Berkeley next 3 hours", "temperature in Paris for the next 12 hours"
+- [x] Index shows **active** (`last_updated` 2026-10-25 00:31:20 UTC, `type: uagent`, see note below); profile URL https://agentverse.ai/agents/details/agent1qgdzu482km7p9zaqftz2xt33xqsy8mghmdje0xqtxqxjsscj8x6ny7xlym6/profile
+- [ ] ASI:One: `@wattwiseweather weather in Berkeley next 3 hours` answers
+
+### WattWise Grid
+- [x] Address: `agent1qvnts5cnkals04rcfesxwhhcs35d50025vyw4j5539d0fg0t2jwpqzunfkt`
+- [x] Running; log shows the address and the inspector link (live mode, terminal tab, 2026-10-24 local)
+- [x] Inspector -> Connect -> Mailbox -> Finish; log: "Successfully registered as mailbox agent in Agentverse", "Registration on Almanac API successful"
+- [x] Profile name **WattWise Grid**, handle `@wattwisegrid`, README `README_grid.md` (badges + address visible)
+- [ ] Category: Innovation Lab (README badges, see above); Discovery -> My Keywords: electricity price, wholesale electricity
+  price, CAISO, California grid, grid stress
+- [x] Protocols: `wattwise-grid` 0.1.0 + AgentChatProtocol 0.3.0
+- [ ] Starter prompts: "price next 3 hours", "SP15 wholesale price next 6 hours"
+- [x] Index shows **active** (`last_updated` 2026-10-25 00:31:47 UTC, `type: uagent`, see note below); profile URL https://agentverse.ai/agents/details/agent1qvnts5cnkals04rcfesxwhhcs35d50025vyw4j5539d0fg0t2jwpqzunfkt/profile
+- [ ] ASI:One: `@wattwisegrid price next 3 hours` answers (the task's done check)
+
+### WattWise Events
+- [x] Address: `agent1qfpewxv737laxv5gk0zcraucrdse4cwl596399ce5cruy5kmn3t3v5h262y`
+- [x] Running; log shows the address and the inspector link (live mode, terminal tab, 2026-10-24 local)
+- [x] Inspector -> Connect -> Mailbox -> Finish; log: "Successfully registered as mailbox agent in Agentverse", "Registration on Almanac API successful"
+- [x] Profile name **WattWise Events**, handle `@wattwiseevents`, README `README_events.md` (badges + address visible)
+- [ ] Category: Innovation Lab (README badges, see above); Discovery -> My Keywords: events nearby, local events, crowd,
+  expected attendance
+- [x] Protocols: `wattwise-events` 0.1.0 + AgentChatProtocol 0.3.0
+- [ ] Starter prompts: "events tonight", "any big events nearby in the next 6 hours?"
+- [x] Index shows **active** (`last_updated` 2026-10-25 00:33:21 UTC, `type: uagent`, see note below); profile URL https://agentverse.ai/agents/details/agent1qfpewxv737laxv5gk0zcraucrdse4cwl596399ce5cruy5kmn3t3v5h262y/profile
+- [ ] ASI:One: `@wattwiseevents events tonight` answers (recorded data, labeled `recorded`)
+
+- Category line stays open: the README badges + address are published (index `readme` starts with
+  `![tag:innovationlab]` and contains the address), but keywords are not set in Discovery -> My Keywords yet
+- Starter prompts and the ASI:One `@handle` checks stay open (set / test in the Agentverse and ASI:One UIs)
+
+### Index + mailbox check (2026-10-25 00:35 UTC)
+- `GET /v1/search/agents/<address>` for all three: name, handle, description, README (badges + address line), protocols
+  (own 0.1.0 + AgentChatProtocol 0.3.0), `status: active`, `category: community`, `system_wide_tags: []`, 0 interactions
+- `type` shows `uagent`, not `mailbox` (the Concierge showed the same right after its first Connect). Messages do go through
+  the mailbox: a local probe agent (scratchpad `probe_public.py`) sent one chat to each and got an ack + reply in seconds:
+  Grid `live_api` CAISO NP15 3 h, Weather `live_api` Berkeley 3 h, Events `recorded` Giants vs Dodgers. If `type` is still
+  `uagent` later: open the inspector, check the connection says Mailbox (switch from "Uagent" if needed)
+- Logs: Events' first Connect hit `WinError 121` (network timeout) and the retry succeeded; Weather logged one
+  `getaddrinfo failed` on the mailbox poll and kept running. Both were the local network, not the agents
+
+- [ ] All four names + addresses + handles sent to Kritazya for README.md
+- If a handle is taken, Agentverse rejects it on Connect: set `<NAME>_AGENT_HANDLE` in `agents/.env`, restart, Connect again,
+  and update the README's `**Agent:**` line

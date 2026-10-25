@@ -17,6 +17,8 @@ FIXTURES_DIR = AGENTS_DIR.parent / "contracts" / "fixtures" / "agents"
 
 # name → default local port (the Concierge keeps 8001)
 PORTS = {"weather": 8002, "grid": 8003, "events": 8004}
+# name → default Agentverse @handle (max 20 chars), so ASI:One users can call the agent directly; `<NAME>_AGENT_HANDLE` wins.
+HANDLES = {"weather": "wattwiseweather", "grid": "wattwisegrid", "events": "wattwiseevents"}
 
 
 def load_dotenv(path: Path = AGENTS_DIR / ".env") -> None:
@@ -62,7 +64,9 @@ def agent_address(name: str) -> str | None:
 
 
 def make_agent(name: str, display_name: str, description: str):
-    """A context agent: mailbox mode by default (Agentverse); AGENT_MAILBOX=0 → local HTTP endpoint only."""
+    """A context agent: mailbox mode by default (Agentverse); AGENT_MAILBOX=0 → local HTTP endpoint only.
+
+    The profile (description, agents/README_<name>.md, handle) is sent to Agentverse on the inspector's Connect."""
     from uagents import Agent
 
     seed = agent_seed(name)
@@ -77,5 +81,7 @@ def make_agent(name: str, display_name: str, description: str):
         mailbox=mailbox,
         endpoint=None if mailbox else [f"http://127.0.0.1:{port}/submit"],
         description=description,
+        readme_path=str(AGENTS_DIR / f"README_{name}.md"),
+        handle=os.environ.get(f"{name.upper()}_AGENT_HANDLE", HANDLES[name]),
         publish_agent_details=True,
     )

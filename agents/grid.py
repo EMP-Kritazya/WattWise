@@ -4,6 +4,8 @@ PriceRequest {region, hours} → PriceResponse {hourly[{ts, usd_per_kwh}], stres
 Live: CAISO day-ahead LMP (PRC_LMP, DAM) at the region's trading hub, from the current hour. CAISO publishes $/MWh; the
 only change is the unit shift to $/kWh (an exact decimal move, no rounding). CAISO slow, blocked or empty → the recorded
 fixture, labeled `recorded` (never a live label on recorded numbers). `--recorded` / DEMO_MODE=1: always the fixture.
+Chat (Agent Chat Protocol, for any ASI:One user or agent): "price next 3 hours" (NP15 by default; "SP15" / "ZP26" in the
+message pick that hub) -> the same answer as plain text with its label.
 
 Run:  python agents/grid.py [--recorded]      (seed: GRID_AGENT_SEED, or derived from FETCH_AGENT_SEED)
 """
@@ -22,6 +24,7 @@ from uagents import Context, Protocol
 
 from common import load_dotenv, load_fixture, make_agent, recorded_mode
 from models import PriceRequest, PriceResponse
+from public_chat import make_chat_protocol, parse_hours, when
 
 log = logging.getLogger("agents.grid")
 
@@ -29,6 +32,9 @@ OASIS_URL = "https://oasis.caiso.com/oasisapi/SingleZip"
 SOURCE = "caiso"
 TIMEOUT_S = 8.0
 NODES = {"caiso_np15": "TH_NP15_GEN-APND", "caiso_sp15": "TH_SP15_GEN-APND", "caiso_zp26": "TH_ZP26_GEN-APND"}
+CHAT_DEFAULT_REGION = "caiso_np15"
+CHAT_DEFAULT_HOURS = 6
+CHAT_MAX_HOURS = 24
 
 # STUB: stress thresholds on the window's highest LMP ($/MWh). CONTRACTS.md defines `stress` (low | normal | high) but not
 # how to derive it from prices; contract question for Kritazya.
@@ -116,13 +122,41 @@ async def on_request(ctx: Context, sender: str, req: PriceRequest):
     await ctx.send(sender, await answer(req, use_recorded=RECORDED))
 
 
+def parse_region(text: str) -> str:
+    """"SP15" / "ZP26" / "NP15" in the message -> that CAISO hub; otherwise NP15."""
+    lowered = text.lower()
+    for region in NODES:
+        if region.removeprefix("caiso_") in lowered:
+            return region
+    return CHAT_DEFAULT_REGION
+
+
+def chat_text(region: str, hours: int, reply: PriceResponse) -> str:
+    """The reply as plain text: prices exactly as the agent returns them ($/kWh), timestamps in UTC, with the label."""
+    rows = reply.hourly[:hours]
+    hub = region.removeprefix("caiso_").upper()
+    lines = [f"WattWise Grid: CAISO {hub} next {len(rows)} h ({reply.label}, source {reply.source}, day-ahead LMP):"]
+    lines += [f"- {when(p.ts)}: {p.usd_per_kwh} $/kWh" for p in rows]
+    lines.append(f"Grid stress: {reply.stress}.")
+    return "\n".join(lines)
+
+
+async def answer_text(text: str, client: httpx.AsyncClient | None = None, now: datetime | None = None) -> str:
+    region = parse_region(text)
+    hours = parse_hours(text, CHAT_DEFAULT_HOURS, CHAT_MAX_HOURS)
+    reply = await answer(PriceRequest(region=region, hours=hours), use_recorded=RECORDED, client=client, now=now)
+    return chat_text(region, hours, reply)
+
+
 def main() -> None:
     global RECORDED
     load_dotenv()
     RECORDED = recorded_mode()
     agent = make_agent("grid", "WattWise Grid",
-                       "Hourly CAISO wholesale electricity prices and grid stress for a restaurant, for WattWise.")
+                       "Hourly California (CAISO) wholesale electricity prices and grid stress. Ask in plain text, e.g. "
+                       "'price next 3 hours', or send a typed PriceRequest.")
     agent.include(proto, publish_manifest=True)
+    agent.include(make_chat_protocol(answer_text), publish_manifest=True)
 
     @agent.on_event("startup")
     async def announce(ctx: Context):
