@@ -45,6 +45,8 @@ fixtures** that let the other two build without you, and the **backtest** that p
 **C. Engine** — design: `docs/design/ENGINE.md` (draft; internals are yours to decide)
 - [x] Decide and document (ENGINE.md, CONTRACTS.md, Main_Gaps.md C + I): warm-up = ComStock `WarmUpHistory` · `minimize` target = highest peak of the previous 4 same weekdays · power-only planning model (no HVAC thermal model this build) · escalate when a block within 30 min can't be held; fallback applied at once; harm ranking
 - [ ] Run `contract-sync` then `fixture-builder` for the 2026-10-24 contract changes (Meter, TickState warnings, Escalation, Command, ClockState, WarmUpHistory, SpacetimeDB columns) and send the team notice
+- [ ] Multi-day runs + fake history (Main_Gaps J, G56–G60): `contract-sync` → `fixture-builder` (`history/`, `scenario/demo_cafe_multiday/`, `generate.py --days N`) → team notice
+- [ ] Engine build loop per module: `engine-test-author` → `engine-builder` → pytest → `engine-math-verifier`; then `engine-edge-hunter` until clean; `architecture-reviewer`
 - [ ] Meter (+ hand test): energy, 15-min blocks, month peak, energy price now, cost today/month on the tariff
 - [ ] `step(1, hub_report)` on fixture HubReports; acks consumed; decisions only on `tick_id % 5 == 0`; Commands out in `new_commands`
 - [ ] Context (`set_context`), forecaster, decider, rules (limits are hard: e.g. `must_finish_by`), ledger, undo, `what_if`, `compare_lanes`
