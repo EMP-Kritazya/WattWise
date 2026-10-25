@@ -305,6 +305,7 @@ class FakeEsp32:
     def report(self):
         if not self.plugged:
             return
+        self.store.heartbeat(self.hub_id)  # every 5 s on the board; with each reading here
         self.seconds += 2
         for row in self.store.device_map():
             if row["hub_id"] != self.hub_id:

@@ -38,6 +38,16 @@ class Store(ABC):
     def commands_for_hub(self, hub_id: str) -> list[dict]:
         """`commands:forDevice`: the hub's queued / sent Commands, oldest first, as Command shapes."""
 
+    @abstractmethod
+    def failed_commands(self, hub_id: str, since_ms: float) -> list[dict]:
+        """`commands:failed`: the hub's failed Commands (nacked, or still queued / sent 15 s after enqueue) enqueued at
+        or after `since_ms` (real epoch ms), oldest first, one per failed row."""
+
+    # ------------------------------------------------------------ hubs (liveness)
+    @abstractmethod
+    def hub_status(self) -> list[dict]:
+        """`hubs:status`: {hub_id, last_seen, firmware, status: online | offline (last_seen older than 30 s)}."""
+
     # ------------------------------------------------------------ device bridge (readings, device map)
     @abstractmethod
     def report_reading(self, reading: dict) -> None:

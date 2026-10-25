@@ -11,6 +11,14 @@ so nothing is labelled measured (contract question for Kritazya).
 No new reading for a mapped device for 30 real seconds → that device falls back to simulated (no more `ingest_reading`)
 and one `hub_offline` warning `{device_id, hub_id}` goes out. A clock pause longer than that does not count.
 
+Liveness decided in Convex (`convex/liveness.ts`, a cron every 10 s; the memory store mirrors it), read every
+`LIVENESS_POLL_S` by the background task, `esp32` only (in `sim_bridge` the browser hub is the hub and no board heartbeats):
+- `hubs:status` says a hub is offline (no heartbeat for 30 s) → each of its devices goes offline as above, one
+  `hub_offline` warning each. A new reading brings it back.
+- `commands:failed` lists a bridged command (nacked, or not acked 15 s after enqueue) → it is enqueued once more, same
+  command; failed again → its device falls back to simulated until the next kitchen build (no more readings ingested,
+  its Commands no longer go to the hub) and one `hub_offline` warning goes out.
+
 The tick path (`before_step`, `after_step`, `ack_writes`) does no I/O beyond store calls that only queue (the Convex store
 batches; the memory store is in process). Readings are read back by a background task (`poll_once` every `POLL_S`).
 
@@ -34,6 +42,7 @@ log = logging.getLogger("runtime.device_bridge")
 MODES = ("off", "sim_bridge", "esp32")
 HUB_TIMEOUT_S = 30.0
 POLL_S = 0.5
+LIVENESS_POLL_S = 5.0
 BLOCK_MIN = 15
 
 
@@ -45,11 +54,18 @@ def _iso(dt: datetime) -> str:
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def hub_offline_warning(device_id: str, hub_id: str) -> dict:
+_OFFLINE_WHY = {
+    "reading": "No reading from {hub_id} for {device_id} for 30 s. It is simulated again.",
+    "hub": "{hub_id} has not been seen for 30 s. {device_id} is simulated again.",
+    "command": "{hub_id} did not execute a command for {device_id}, even after a retry. It is simulated again.",
+}
+
+
+def hub_offline_warning(device_id: str, hub_id: str, why: str = "reading") -> dict:
     return {
         "type": "warning",
         "code": "hub_offline",
-        "message": f"No reading from {hub_id} for {device_id} for {HUB_TIMEOUT_S:.0f} s. It is simulated again.",
+        "message": _OFFLINE_WHY[why].format(device_id=device_id, hub_id=hub_id),
         "data": {"device_id": device_id, "hub_id": hub_id},
     }
 
@@ -62,8 +78,10 @@ class DeviceBridge:
         *,
         on_warning: Callable[[dict], Any] | None = None,
         clock: Callable[[], float] = time.monotonic,
+        wall_clock: Callable[[], float] = time.time,
         timeout_s: float = HUB_TIMEOUT_S,
         poll_s: float = POLL_S,
+        liveness_poll_s: float = LIVENESS_POLL_S,
     ):
         if mode not in MODES:
             raise ValueError(f"HARDWARE={mode!r}; expected one of {MODES}")
@@ -71,8 +89,10 @@ class DeviceBridge:
         self.store = store
         self._on_warning = on_warning
         self._clock = clock
+        self._wall_clock = wall_clock  # real epoch s: `commands:failed.since_ms` is Convex `_creationTime`
         self._timeout_s = timeout_s
         self._poll_s = poll_s
+        self._liveness_poll_s = liveness_poll_s
         self._map: dict[str, dict] = {}  # device_id → device_map row
         self._bridged: dict[str, str] = {}  # command_id → hub_id (with-lane commands enqueued for a hub)
         self._latest: dict[str, dict] = {}  # device_id → newest Reading read back
@@ -80,6 +100,11 @@ class DeviceBridge:
         self._last_seen: dict[str, float] = {}  # device_id → clock() when a new Reading was last read back
         self._status: dict[str, str] = {}  # device_id → waiting | live | offline
         self._last_step_at: float | None = None
+        self._sent: dict[str, tuple[dict, str, str]] = {}  # esp32: command_id → (command, lane, hub_id)
+        self._failed_rows: dict[str, int] = {}  # command_id → failed rows already handled (1: retried, 2: gave up)
+        self._dropped: set[str] = set()  # devices simulated again after a command failed twice (until the next build)
+        self._since_ms = 0.0  # kitchen build time, real epoch ms
+        self._last_liveness_at: float | None = None
         self._task: asyncio.Task | None = None
 
     @property
@@ -105,6 +130,9 @@ class DeviceBridge:
         self._last_seen = {d: now for d in self._map}
         self._status = {d: "waiting" for d in self._map}
         self._last_step_at = None
+        self._sent, self._failed_rows, self._dropped = {}, {}, set()
+        self._since_ms = self._wall_clock() * 1000
+        self._last_liveness_at = None
 
     async def reset(self, device_ids: set[str] | None = None) -> None:
         """New kitchen: reload `device_map` from the store (Convex: a query, so off the event loop)."""
@@ -120,7 +148,7 @@ class DeviceBridge:
 
     def hub_id_for(self, lane: str, device_id: str) -> str | None:
         """The Convex hub a Command goes to (`commands:enqueue.hub_id`): mapped `with`-lane devices only."""
-        if not self.enabled or lane != "with" or device_id not in self._map:
+        if not self.enabled or lane != "with" or device_id not in self._map or device_id in self._dropped:
             return None
         return self._map[device_id]["hub_id"]
 
@@ -129,6 +157,8 @@ class DeviceBridge:
         hub_id = self.hub_id_for(lane, command["device_id"])
         if hub_id is not None:
             self._bridged[command["command_id"]] = hub_id
+            if self.mode == "esp32":
+                self._sent[command["command_id"]] = (copy.deepcopy(command), lane, hub_id)
         return hub_id
 
     # ------------------------------------------------------------ tick path
@@ -213,9 +243,59 @@ class DeviceBridge:
                     continue
                 self._latest[device_id] = reading
                 self._last_seen[device_id] = now
+                if device_id in self._dropped:
+                    continue
                 if self._status.get(device_id) != "live":
                     log.info("device bridge: %s live on %s", device_id, hub_id)
                 self._status[device_id] = "live"
+        if self.mode == "esp32" and (self._last_liveness_at is None
+                                     or now - self._last_liveness_at >= self._liveness_poll_s):
+            self._last_liveness_at = now
+            self.check_liveness()
+
+    def check_liveness(self) -> None:
+        """esp32: Convex's liveness view → offline devices, one retry per failed command, then simulated (blocking)."""
+        try:
+            offline = {h["hub_id"] for h in self.store.hub_status() if h["status"] == "offline"}
+        except Exception:
+            log.exception("hubs:status failed")
+            offline = set()
+        for device_id, row in self._map.items():
+            if row["hub_id"] in offline and self._status[device_id] != "offline":
+                self._go_offline(device_id, "hub")
+        for hub_id in sorted({hub_id for _, _, hub_id in self._sent.values()}):
+            try:
+                failed = self.store.failed_commands(hub_id, self._since_ms)
+            except Exception:
+                log.exception("commands:failed failed for %s", hub_id)
+                continue
+            counts: dict[str, int] = {}
+            for command in failed:
+                counts[command["command_id"]] = counts.get(command["command_id"], 0) + 1
+            for command_id, n in counts.items():
+                if command_id not in self._sent or n <= self._failed_rows.get(command_id, 0):
+                    continue
+                self._failed_rows[command_id] = n
+                command, lane, hub_id = self._sent[command_id]
+                device_id = command["device_id"]
+                if device_id in self._dropped:
+                    continue
+                if n == 1:
+                    log.warning("command %s for %s failed on %s; retrying once", command_id, device_id, hub_id)
+                    try:
+                        self.store.record_command(copy.deepcopy(command), lane, hub_id)
+                    except Exception:
+                        log.exception("retry of %s could not be enqueued", command_id)
+                else:
+                    self._dropped.add(device_id)
+                    if self._status[device_id] != "offline":  # already warned (no reading, hub offline)
+                        self._go_offline(device_id, "command")
+
+    def _go_offline(self, device_id: str, why: str) -> None:
+        hub_id = self._map[device_id]["hub_id"]
+        self._status[device_id] = "offline"
+        log.warning("hub_offline (%s): %s on %s; back to simulated", why, device_id, hub_id)
+        self._warn(hub_offline_warning(device_id, hub_id, why))
 
     def start(self) -> None:
         if self.enabled and (self._task is None or self._task.done()):

@@ -17,7 +17,10 @@ for the whole round trip (measured: ~300 ms main-thread stalls per call), which 
 Same functions, same args; any object with `mutation` / `query` (e.g. `convex.ConvexClient`) can be passed as `client`.
 
 Not in CONTRACTS.md §6 yet (contract questions): batch:apply, kitchens:record, escalations:record, deviceBlocks:record,
-contextSnapshots:record, devices:latest, devices:map, devices:mapChannel.
+contextSnapshots:record, devices:latest, devices:map, devices:mapChannel, commands:failed, hubs:status.
+
+Liveness runs in Convex (`convex/crons.ts` → `liveness:sweep` every 10 s); `failed_commands` and `hub_status` read its
+result directly, with the mirror (same rules, `MemoryStore`) as fallback.
 """
 
 from __future__ import annotations
@@ -25,6 +28,7 @@ from __future__ import annotations
 import concurrent.futures
 import logging
 import threading
+import time
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
@@ -38,6 +42,7 @@ log = logging.getLogger("store.convex")
 FLUSH_S = 1.0
 CALL_TIMEOUT_S = 10.0
 BATCH_MAX = 100
+HUB_STATUS_BUCKET_S = 5
 STORE_DOWN_WARNING = {
     "type": "warning",
     "code": "store_down",
@@ -267,6 +272,17 @@ class ConvexStore(Store):
 
     def commands_for_hub(self, hub_id: str) -> list[dict]:
         return self._read("commands:forDevice", {"hub_id": hub_id}, lambda: self._mirror.commands_for_hub(hub_id))
+
+    def failed_commands(self, hub_id: str, since_ms: float) -> list[dict]:
+        return self._read("commands:failed", {"hub_id": hub_id, "since_ms": since_ms},
+                          lambda: self._mirror.failed_commands(hub_id, since_ms))
+
+    # ------------------------------------------------------------ hubs (liveness)
+
+    def hub_status(self) -> list[dict]:
+        # `at`: a fresh answer every HUB_STATUS_BUCKET_S (Convex caches a query while the rows it read are unchanged).
+        at = int(time.time() // HUB_STATUS_BUCKET_S * HUB_STATUS_BUCKET_S)
+        return self._read("hubs:status", {"at": at}, self._mirror.hub_status)
 
     # ------------------------------------------------------------ device bridge
 
