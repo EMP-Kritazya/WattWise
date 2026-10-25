@@ -124,7 +124,11 @@ Codes and `data` in section 2 (ws `warning`). The engine emits only `cap_unreach
   "may_go_below_min_power": false }
 ```
 Engine marks each escalation option `within_authority` against these. The refrigeration food-safety floor (50 %) is never
-crossable, whatever the authority says. `enabled: false` → every escalation goes to the owner.
+crossable, whatever the authority says. `enabled: false` → Claude chooses nothing and the engine's default applies.
+**Full authority (Oct 24):** the Builder no longer shows these settings; it always sends
+`{ "enabled": true, "max_cap_overrun_kw": 1000, "max_extra_delay_min": 0, "max_extra_reduce_min": 1440, "may_go_below_min_power": false }`
+(the peak may run over the cap and flexible units stay reduced longer, but deadlines and minimum power stay hard). Claude is
+offered only the `within_authority` options, never `ask_owner`, so escalations never wait for the owner and never pause the clock.
 
 ### Device (live state of one unit)
 ```json
