@@ -284,3 +284,115 @@ async def test_hub_offline_reaches_viewers(serve, monkeypatch):
             clock.now += 0.5
             await srv.runtime.tick_once()
         assert sent == [hub_offline_warning("dishwasher_1", "esp32_1")]
+
+
+# ---------------------------------------------------------------- HARDWARE=esp32 through the run loop (fake ESP32 on the store)
+
+
+class FakeEsp32:
+    """What firmware/src/main.cpp does against Convex, done on the store: devices:report every 2 s per mapped channel,
+    commands:forDevice → execute → commands:ack. `unplug()` stops it, like pulling the board's WiFi."""
+
+    def __init__(self, store, hub_id="esp32_1"):
+        self.store, self.hub_id, self.plugged = store, hub_id, True
+        self.seconds = 0
+        self.raw_w = 5.8
+        self.executed = []
+
+    def unplug(self):
+        self.plugged = False
+
+    def report(self):
+        if not self.plugged:
+            return
+        self.seconds += 2
+        for row in self.store.device_map():
+            if row["hub_id"] != self.hub_id:
+                continue
+            ts = f"2026-10-24T12:{self.seconds // 60:02d}:{self.seconds % 60:02d}Z"  # real UTC, not sim time
+            self.store.report_reading({"hub_id": self.hub_id, "channel": row["channel"], "device_id": row["device_id"],
+                                       "ts": ts, "raw_w": self.raw_w, "scale": row["scale"],
+                                       "power_kw": self.raw_w * row["scale"] / 1000})
+
+    def execute_commands(self):
+        if not self.plugged:
+            return
+        for command in self.store.commands_for_hub(self.hub_id):
+            self.executed.append(command)
+            self.store.ack_command(command["command_id"], True, command["value"], None)
+
+
+async def test_loop_esp32_measured_round_trip(serve, monkeypatch):
+    async with serve(hardware="esp32") as srv:
+        await built(srv)
+        rt, store = srv.runtime, srv.app.state.store
+        seeded = {t: len(store.rows(t)) for t in ("readings", "device_blocks", "commands")}
+        esp32 = FakeEsp32(store)
+        kitchen = srv.app.state.service.lanes["with"]
+        ingested = []
+        original_ingest = kitchen.ingest_reading
+        monkeypatch.setattr(kitchen, "ingest_reading", lambda r: (ingested.append(copy.deepcopy(r)), original_ingest(r))[1])
+        lanes = srv.app.state.service.lanes
+        stepped_sources = []
+        original_step = lanes.step
+        monkeypatch.setattr(lanes, "step", lambda m, r: (stepped_sources.append(r["reports"]["with"]["source"]),
+                                                         original_step(m, r))[1])
+
+        esp32.report()
+        rt.bridge.poll_once()
+        for tick in range(1, 38):
+            assert await rt.tick_once() is True
+            await rt.flush()  # commands:enqueue reaches the store
+            esp32.execute_commands()
+            if tick % 4 == 0:  # 0.5 s ticks, a reading every 2 s
+                esp32.report()
+            rt.bridge.poll_once()
+        await rt.flush()
+
+        # The board's own readings, each handed to the with lane once; nothing relayed from the browser hub.
+        readings = store.rows("readings")[seeded["readings"]:]
+        assert readings and all(r["ts"].startswith("2026-10-24T12:") for r in readings)
+        assert ingested == readings
+        assert set(stepped_sources) == {"mixed"}
+        assert rt.bridge.measured_kw() == {"dishwasher_1": 5.8}
+
+        # The with-lane dishwasher command went to esp32_1; the board executed it once and its ack stands.
+        commands = store.rows("commands")[seeded["commands"]:]
+        dishwasher = [c for c in commands if c["device_id"] == "dishwasher_1" and c["lane"] == "with"]
+        assert [(c["command_id"], c["hub_id"], c["delivery"]) for c in dishwasher] == [("c_0001", "esp32_1", "acked")]
+        assert [c["command_id"] for c in esp32.executed] == ["c_0001"]
+        assert all(c["hub_id"] is None for c in commands if c not in dishwasher)
+        assert rt.bridge.ack_writes(next(r for r in REPORTS if r["tick_id"] == 36)) == []  # the board acks itself
+
+        # Measured 15-min blocks for the mapped device on the with lane only.
+        blocks = store.rows("device_blocks")[seeded["device_blocks"]:]
+        measured = [b for b in blocks if b["source"] == "measured"]
+        assert measured and all((b["lane"], b["device_id"]) == ("with", "dishwasher_1") for b in measured)
+        assert all(b["avg_kw"] == 5.8 for b in measured)
+
+
+async def test_loop_esp32_unplugged_falls_back_to_simulated(serve, monkeypatch):
+    async with serve(hardware="esp32") as srv:
+        await built(srv)
+        rt, store = srv.runtime, srv.app.state.store
+        clock, sent = Clock(), []
+        rt.bridge._clock, rt.bridge._on_warning = clock, sent.append
+        rt.bridge.load_map(store.device_map(), {"dishwasher_1"})
+        esp32 = FakeEsp32(store)
+        lanes = srv.app.state.service.lanes
+        sources = []
+        original_step = lanes.step
+        monkeypatch.setattr(lanes, "step", lambda m, r: (sources.append(r["reports"]["with"]["source"]),
+                                                         original_step(m, r))[1])
+        esp32.report()
+        rt.bridge.poll_once()
+        await rt.tick_once()
+        assert sources == ["mixed"]
+        esp32.unplug()
+        for _ in range(62):  # 31 real seconds with no new reading
+            clock.now += 0.5
+            rt.bridge.poll_once()
+            await rt.tick_once()
+        assert sent == [hub_offline_warning("dishwasher_1", "esp32_1")]
+        assert sources[-1] == "simulated"
+        assert rt.bridge.measured_kw() == {}
