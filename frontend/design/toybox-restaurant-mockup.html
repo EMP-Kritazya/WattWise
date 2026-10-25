@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WattWise Toy Box restaurant</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#1b1c20;color:#ece8e0;font-family:Nunito,system-ui,sans-serif;padding:32px 20px 60px}
+  .intro{max-width:1200px;margin:0 auto 20px}
+  .intro h1{font:600 22px Fredoka;margin-bottom:6px}
+  .intro p{font-size:14px;color:#a4a19a;line-height:1.55;max-width:920px}
+  .frame{max-width:1200px;margin:0 auto 18px;border-radius:16px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.45)}
+  .frame svg{display:block;width:100%;height:auto}
+  .cap{max-width:1200px;margin:0 auto 40px;font-size:13px;color:#a4a19a}
+</style>
+</head>
+<body>
+<div class="intro">
+  <h1>Demo Café · Toy Box restaurant + demand charge</h1>
+  <p>Your current restaurant layout (kitchen, cold storage, dish room, office with the hub, dining room with the bar, roof units), redrawn as a toy-like miniature. The moment shown: a judge added 40 customers; WattWise turned the HVAC down and held the dishwasher; the gauge shows With under the cap and Without (ghost needle) over it, and the card shows what that peak would cost: the $67 demand charge.</p>
+</div>
+<div class="frame" id="f"></div>
+<p class="cap">Static mockup in SVG; the real version is the three.js floor with this palette, toon materials and ink outlines. Numbers are illustrative, not engine output.</p>
+
+<script>
+const f = n => n.toFixed(1);
+const P = (o, x, y, z = 0) => [o.x + (x - y) * o.u * 0.866, o.y + (x + y) * o.u * 0.5 - z * o.u];
+const pts = a => a.map(p => p.map(f).join(',')).join(' ');
+const hex = c => { const n = parseInt(c.slice(1), 16); return [n >> 16, (n >> 8) & 255, n & 255]; };
+const shade = (c, k) => '#' + hex(c).map(v => Math.max(0, Math.min(255, Math.round(v * k))).toString(16).padStart(2, '0')).join('');
+const mix = (a, b, k) => { const A = hex(a), B = hex(b); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * k).toString(16).padStart(2, '0')).join(''); };
+const INK = '#22223B';
+const poly = (p, fill, sw = 1.4, stroke = INK) => `<polygon points="${pts(p)}" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" stroke-linejoin="round"/>`;
+function box(o, x, y, z, w, d, h, c, sw = 1.4, stroke = INK) {
+  const a = (X, Y, Z) => P(o, X, Y, Z);
+  return poly([a(x, y + d, z), a(x + w, y + d, z), a(x + w, y + d, z + h), a(x, y + d, z + h)], shade(c, 0.82), sw, stroke)
+    + poly([a(x + w, y, z), a(x + w, y + d, z), a(x + w, y + d, z + h), a(x + w, y, z + h)], shade(c, 0.92), sw, stroke)
+    + poly([a(x, y, z + h), a(x + w, y, z + h), a(x + w, y + d, z + h), a(x, y + d, z + h)], c, sw, stroke);
+}
+const faceL = (o, x0, x1, yy, z0, z1) => [P(o, x0, yy, z0), P(o, x1, yy, z0), P(o, x1, yy, z1), P(o, x0, yy, z1)];
+const iell = (o, x, y, z, r, attrs) => { const [cx, cy] = P(o, x, y, z); return `<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(r * o.u * 1.2247)}" ry="${f(r * o.u * 0.7071)}" ${attrs}/>`; };
+function cyl(o, x, y, r, z0, h, c) {
+  const [cx, cb] = P(o, x, y, z0), ct = cb - h * o.u, rx = r * o.u * 1.2247, ry = r * o.u * 0.7071;
+  return `<path d="M${f(cx - rx)},${f(ct)} L${f(cx - rx)},${f(cb)} A${f(rx)},${f(ry)} 0 0 0 ${f(cx + rx)},${f(cb)} L${f(cx + rx)},${f(ct)} Z" fill="${shade(c, 0.86)}" stroke="${INK}" stroke-width="1.4"/>`
+    + `<ellipse cx="${f(cx)}" cy="${f(ct)}" rx="${f(rx)}" ry="${f(ry)}" fill="${c}" stroke="${INK}" stroke-width="1.4"/>`;
+}
+
+/* ---------- palette ---------- */
+const C = {
+  bg: '#FFF6E9', slab: '#E8B89A', wall: '#FFF1E2', inner: '#FFE7D1',
+  floors: { kitchen: ['#F7D9C4', '#F1C9AE'], cold: ['#DCEBF7', '#CDE0F1'], dish: ['#DDF2E3', '#CBE8D4'], office: ['#EADFF6', '#E2D4F2'], pad: ['#DCD6CE', '#D3CCC3'] },
+  plank: '#F3D3A6', plankLine: '#E2BC88',
+  run: '#FF6B6B', ww: '#2EC4B6', held: '#FFB703', off: '#D9D4CC',
+  app: { fryer: '#FFB4A2', grill: '#FFD6A5', oven: '#E5989B', reach: '#BDE0FE', walk: '#A9D6F5', freezer: '#C3CEF6', dish: '#A2D2FF', heater: '#FFC8DD', ice: '#CDEAC0', hvac: '#E9EDC9' },
+  wood: '#C98B5E', darkWood: '#9C6644', steel: '#E9E4F0', chair: '#F4A261', leaf: '#8BC34A', pot: '#D88C5A',
+  people: ['#6C8EBF', '#E07A5F', '#81B29A', '#F2CC8F', '#9D8189', '#5E60CE'],
+};
+const DIM = 0.32; // how far untouched things fade toward the background
+
+/* ---------- the restaurant (same plan as frontend/src/components/live/floor/plan.ts) ---------- */
+const o = { x: 372, y: 160, u: 26 };
+const out = [];
+// slab + roof pad
+out.push(box(o, -0.45, -0.45, -0.55, 21.9, 13.9, 0.55, C.slab, 1.6));
+out.push(box(o, 21.7, 5.3, -0.4, 2.8, 7.4, 0.55, shade(C.slab, 0.92), 1.6));
+// floors
+const ROOMS = [['kitchen', 0, 0, 10, 7], ['cold', 10, 0, 5, 5], ['dish', 15, 0, 6, 5], ['office', 0, 7, 5, 6], ['pad', 21.8, 5.4, 2.6, 7.2]];
+for (const [k, x0, y0, w, d] of ROOMS) for (let i = 0; i < w; i += 1) for (let j = 0; j < d; j += 1) {
+  const W = Math.min(1, w - i), D = Math.min(1, d - j);
+  out.push(poly([P(o, x0 + i, y0 + j, k === 'pad' ? 0.15 : 0), P(o, x0 + i + W, y0 + j, k === 'pad' ? 0.15 : 0), P(o, x0 + i + W, y0 + j + D, k === 'pad' ? 0.15 : 0), P(o, x0 + i, y0 + j + D, k === 'pad' ? 0.15 : 0)], C.floors[k][(Math.floor(i) + Math.floor(j)) % 2], 0));
+}
+for (const [x0, y0, w, d] of [[10, 5, 11, 8], [5, 7, 5, 6]]) {
+  out.push(poly([P(o, x0, y0), P(o, x0 + w, y0), P(o, x0 + w, y0 + d), P(o, x0, y0 + d)], C.plank, 0));
+  for (let i = 0.7; i < w; i += 0.7) out.push(`<line x1="${f(P(o, x0 + i, y0)[0])}" y1="${f(P(o, x0 + i, y0)[1])}" x2="${f(P(o, x0 + i, y0 + d)[0])}" y2="${f(P(o, x0 + i, y0 + d)[1])}" stroke="${C.plankLine}" stroke-width="1"/>`);
+}
+// back walls with windows
+out.push(box(o, -0.22, -0.22, 0, 21.22, 0.22, 2.2, C.wall, 1.6));
+out.push(box(o, -0.22, 0, 0, 0.22, 13, 2.2, C.wall, 1.6));
+for (const [a, b] of [[11.2, 13.6], [16.3, 19.4]]) out.push(poly(faceL(o, a, b, 0.002, 1.05, 1.85), '#BFE3FF', 1.2));
+for (const [a, b] of [[8.2, 10.8], [11.3, 12.6]]) out.push(poly([P(o, 0.002, a, 0.85), P(o, 0.002, b, 0.85), P(o, 0.002, b, 1.75), P(o, 0.002, a, 1.75)], '#BFE3FF', 1.2));
+// room labels on the floor
+const label = (x, y, t) => { const [lx, ly] = P(o, x, y); return `<text x="${f(lx)}" y="${f(ly)}" font-family="Fredoka" font-size="11" font-weight="600" fill="${INK}" opacity=".38" letter-spacing="1">${t}</text>`; };
+out.push(label(0.5, 6.6, 'KITCHEN'), label(10.4, 4.6, 'COLD STORAGE'), label(15.4, 4.6, 'DISH ROOM'), label(0.4, 12.6, 'OFFICE · HUB'), label(14.2, 12.6, 'DINING ROOM'), label(22.0, 12.4, 'ROOF'));
+
+// cables from the hub to every appliance (drawn on the floor, under everything)
+const HUB = [1.95, 9.95];
+const items = [];
+const A = (id, type, x, y, w, d, h, state = 'run') => ({ id, type, x, y, w, d, h, state });
+const apps = [
+  A('fryer', 'fryer', 0.6, 0.3, 1.5, 1.25, 1.0), A('grill', 'grill', 2.5, 0.3, 1.7, 1.25, 0.95), A('oven', 'oven', 4.6, 0.3, 1.7, 1.25, 1.35),
+  A('reach', 'reach', 2.4, 5.6, 1.1, 0.9, 1.9), A('walk', 'walk', 10.4, 0.4, 2.4, 2.3, 2.2), A('freezer', 'freezer', 13.1, 0.4, 1.4, 1.2, 1.7),
+  A('dish', 'dish', 15.5, 0.4, 1.6, 1.3, 1.45, 'held'), A('ice', 'ice', 19.4, 0.4, 1.2, 1.1, 1.5, 'off'),
+  A('hvac1', 'hvac', 22.3, 5.9, 1.8, 1.8, 1.15, 'red'), A('hvac2', 'hvac', 22.3, 8.6, 1.8, 1.8, 1.15, 'red'),
+];
+const changed = new Set(['dish', 'hvac1', 'hvac2']);
+for (const a of [...apps, { id: 'heater', x: 17.55, y: 0.65, w: 1.0, d: 1.0 }]) {
+  const [hx, hy] = P(o, HUB[0], HUB[1], 0.02), [tx, ty] = P(o, a.x + a.w / 2, a.y + a.d + 0.1, 0.02), ch = changed.has(a.id);
+  out.push(`<path d="M${f(hx)},${f(hy)} Q${f((hx + tx) / 2)},${f(Math.max(hy, ty) + 14)} ${f(tx)},${f(ty)}" fill="none" stroke="${ch ? C.ww : '#C9A68E'}" stroke-width="${ch ? 2.4 : 1.1}" ${ch ? 'stroke-dasharray="6 5"' : ''} opacity="${ch ? 1 : 0.35}"/>`);
+}
+
+// appliances
+function appliance(a) {
+  const ch = changed.has(a.id);
+  let c = C.app[a.type];
+  if (a.state === 'held') c = mix(c, C.off, 0.5);
+  if (a.state === 'off') c = C.off;
+  if (!ch) c = mix(c, C.bg, DIM * 0.6);
+  const g = [];
+  if (a.state === 'red' || a.state === 'held') g.push(iell(o, a.x + a.w / 2, a.y + a.d / 2, 0.01, Math.max(a.w, a.d) * 0.78, `fill="${a.state === 'red' ? C.ww : C.held}" opacity=".22"`));
+  if (a.state === 'red' || a.state === 'held') g.push(iell(o, a.x + a.w / 2, a.y + a.d / 2, 0.01, Math.max(a.w, a.d) * 0.62, `fill="none" stroke="${a.state === 'red' ? C.ww : C.held}" stroke-width="3" ${a.state === 'held' ? 'stroke-dasharray="7 5"' : ''}`));
+  g.push(box(o, a.x, a.y, 0, a.w, a.d, a.h, c, ch ? 2.6 : 1.4, ch ? (a.state === 'held' ? '#C98A00' : '#159A8E') : INK));
+  const dk = shade(c, 0.6), run = a.state === 'run' || a.state === 'red';
+  if (a.type === 'fryer') for (const dx of [0.2, 0.8]) g.push(poly([P(o, a.x + dx, a.y + 0.25, a.h), P(o, a.x + dx + 0.5, a.y + 0.25, a.h), P(o, a.x + dx + 0.5, a.y + 0.95, a.h), P(o, a.x + dx, a.y + 0.95, a.h)], run ? '#FFCF70' : dk, 1));
+  if (a.type === 'grill') for (const [dx, dy] of [[0.45, 0.35], [1.2, 0.35], [0.45, 0.9], [1.2, 0.9]]) g.push(iell(o, a.x + dx, a.y + dy, a.h, 0.2, `fill="none" stroke="${run ? C.run : dk}" stroke-width="2.4"`));
+  if (a.type === 'oven') { g.push(poly(faceL(o, a.x + 0.2, a.x + a.w - 0.2, a.y + a.d, 0.3, 0.95), run ? '#FF9F5A' : dk, 1.2)); g.push(poly(faceL(o, a.x + 0.2, a.x + a.w - 0.2, a.y + a.d, 1.08, 1.18), dk, 1)); }
+  if (a.type === 'reach' || a.type === 'freezer') { g.push(poly(faceL(o, a.x + 0.12, a.x + a.w - 0.12, a.y + a.d, 0.15, a.h - 0.15), a.type === 'reach' ? '#E8F4FF' : shade(c, 0.85), 1.2)); g.push(poly(faceL(o, a.x + a.w - 0.3, a.x + a.w - 0.24, a.y + a.d, a.h * 0.4, a.h * 0.7), INK, 0)); }
+  if (a.type === 'walk') { g.push(poly(faceL(o, a.x + 0.6, a.x + 1.6, a.y + a.d, 0, 1.8), shade(c, 0.78), 1.4)); g.push(poly(faceL(o, a.x + 1.4, a.x + 1.48, a.y + a.d, 0.8, 1.1), INK, 0)); }
+  if (a.type === 'dish') { g.push(poly(faceL(o, a.x + 0.15, a.x + a.w - 0.15, a.y + a.d, 0.25, 1.1), shade(c, 0.78), 1.2)); g.push(poly(faceL(o, a.x + 0.4, a.x + a.w - 0.4, a.y + a.d, 1.0, 1.06), INK, 0)); }
+  if (a.type === 'ice') g.push(poly(faceL(o, a.x + 0.15, a.x + a.w - 0.15, a.y + a.d, 0.15, 0.7), shade(c, 0.75), 1.2));
+  if (a.type === 'hvac') {
+    const [cx, cy] = P(o, a.x + a.w / 2, a.y + a.d / 2, a.h), rx = 0.62 * o.u * 1.22, ry = 0.62 * o.u * 0.7;
+    g.push(`<ellipse cx="${f(cx)}" cy="${f(cy)}" rx="${f(rx)}" ry="${f(ry)}" fill="${shade(c, 0.62)}" stroke="${INK}" stroke-width="1.2"/>`);
+    for (let b = 0; b < 4; b++) { const an = b * Math.PI / 2 + 0.3; g.push(`<line x1="${f(cx)}" y1="${f(cy)}" x2="${f(cx + Math.cos(an) * rx * 0.9)}" y2="${f(cy + Math.sin(an) * ry * 0.9)}" stroke="${shade(c, 1.12)}" stroke-width="3.4" stroke-linecap="round"/>`); }
+  }
+  if (a.state !== 'off') { const [lx, ly] = P(o, a.x + a.w, a.y + a.d, a.h - 0.18); g.push(`<circle cx="${f(lx - 7)}" cy="${f(ly - 1)}" r="4" fill="${a.state === 'held' ? C.held : a.state === 'red' ? C.ww : C.run}" stroke="${INK}" stroke-width="1"/>`); }
+  if (a.state === 'held') { const [bx, by] = P(o, a.x + a.w / 2, a.y + a.d / 2, a.h + 0.55); g.push(`<circle cx="${f(bx)}" cy="${f(by)}" r="11" fill="#fff" stroke="${INK}" stroke-width="1.8"/><path d="M${f(bx)},${f(by - 6)} L${f(bx)},${f(by)} L${f(bx + 4.5)},${f(by + 3)}" stroke="${INK}" stroke-width="2" fill="none" stroke-linecap="round"/>`); }
+  return g.join('');
+}
+for (const a of apps) items.push({ k: a.x + a.w / 2 + a.y + a.d / 2, s: appliance(a) });
+items.push({ k: 17.55 + 0.65 + 1, s: cyl(o, 18.05, 1.15, 0.5, 0, 1.9, mix(C.app.heater, C.bg, DIM * 0.6)) });
+
+// low inner walls (cut-away dollhouse)
+const T = 0.22, IW = [[0, 7, 5, 7], [5, 7, 6.5, 7], [8.5, 7, 10, 7], [10, 0, 10, 3.6], [10, 4.6, 10, 7], [15, 0, 15, 5], [10, 5, 15, 5], [15, 5, 17, 5], [18.5, 5, 21, 5], [5, 7, 5, 9], [5, 10, 5, 13]];
+for (const [x0, y0, x1, y1] of IW) {
+  const b = y0 === y1 ? [x0, y0 - T / 2, x1 - x0, T] : [x0 - T / 2, y0, T, y1 - y0];
+  items.push({ k: b[0] + b[2] / 2 + b[1] + b[3] / 2 - 0.3, s: box(o, b[0], b[1], 0, b[2], b[3], 0.9, C.inner, 1.3) });
+}
+// furniture: prep island, bar, desk with the hub, host stand, plants
+items.push({ k: 3.2 + 2.1 + 3.4 + 0.6, s: box(o, 3.2, 3.4, 0, 4.2, 1.2, 0.9, mix(C.steel, C.bg, DIM * 0.5), 1.4) });
+items.push({ k: 11 + 3.25 + 5.35 + 0.4, s: box(o, 11, 5.35, 0, 6.5, 0.8, 1.05, C.darkWood, 1.4) });
+items.push({ k: 0.8 + 1.4 + 8.6 + 0.55, s: box(o, 0.8, 8.6, 0, 2.8, 1.1, 0.75, C.wood, 1.4) + box(o, 1.5, 8.8, 0.75, 0.9, 0.55, 0.32, INK, 1.4)
+  + (() => { const [lx, ly] = P(o, 2.4, 9.35, 0.95); return `<circle cx="${f(lx - 6)}" cy="${f(ly)}" r="3.5" fill="${C.ww}"/>`; })() });
+items.push({ k: 20.1 + 0.35 + 12.1 + 0.25, s: box(o, 20.1, 12.1, 0, 0.7, 0.5, 1.1, C.darkWood, 1.4) });
+for (const [x, y] of [[19.4, 5.45], [10.3, 12.3], [4.1, 12.2]]) items.push({ k: x + y + 0.5, s: box(o, x, y, 0, 0.5, 0.5, 0.45, C.pot, 1.2) + box(o, x - 0.1, y - 0.1, 0.45, 0.7, 0.7, 0.6, C.leaf, 1.2) });
+
+// dining tables, chairs, pendant light glow, diners
+const TABLES = [[11.4, 7.4], [13.9, 7.4], [16.4, 7.4], [18.9, 7.4], [11.4, 10.4], [13.9, 10.4], [16.4, 10.4], [18.9, 10.4], [6.0, 8.6], [8.4, 8.6], [6.0, 11.2], [8.4, 11.2]];
+const rnd = i => { const s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
+TABLES.forEach(([tx, ty], ti) => {
+  const spots = [[tx + 0.29, ty - 0.56], [tx + 0.29, ty + 1.14], [tx - 0.56, ty + 0.29], [tx + 1.14, ty + 0.29]];
+  spots.forEach(([cx, cy], si) => {
+    const seated = rnd(ti * 4 + si) < 0.55;
+    let s = box(o, cx, cy, 0, 0.42, 0.42, 0.42, C.chair, 1.1);
+    if (seated) { const col = C.people[(ti * 4 + si) % C.people.length]; s += box(o, cx + 0.06, cy + 0.06, 0.42, 0.3, 0.3, 0.42, col, 1.1);
+      const [hx, hy] = P(o, cx + 0.21, cy + 0.21, 1.02); s += `<circle cx="${f(hx)}" cy="${f(hy)}" r="${f(o.u * 0.17)}" fill="#F6D2B8" stroke="${INK}" stroke-width="1.1"/>`; }
+    items.push({ k: cx + cy + 0.42, s });
+  });
+  items.push({ k: tx + ty + 1, s: iell(o, tx + 0.5, ty + 0.5, 0.01, 0.95, `fill="#FFE08A" opacity=".45"`) + box(o, tx, ty, 0, 1, 1, 0.72, C.wood, 1.3) });
+});
+// guests arriving at the door (the +40)
+for (let i = 0; i < 7; i++) { const x = 21.2 + (i % 2) * 0.45, y = 12.8 - Math.floor(i / 2) * 0.5 + 1.0; const col = C.people[(i + 2) % C.people.length];
+  items.push({ k: x + y + 0.3, s: box(o, x, y, 0, 0.3, 0.3, 0.55, col, 1.1) + (() => { const [hx, hy] = P(o, x + 0.15, y + 0.15, 0.78); return `<circle cx="${f(hx)}" cy="${f(hy)}" r="${f(o.u * 0.16)}" fill="#F6D2B8" stroke="${INK}" stroke-width="1.1"/>`; })() }); }
+items.sort((p, q) => p.k - q.k).forEach(it => out.push(it.s));
+
+// ---------- overlays ----------
+const pin = (ax, ay, x, y, w, title, body, color) => `<line x1="${f(ax)}" y1="${f(ay)}" x2="${f(x + w / 2)}" y2="${f(y + 60)}" stroke="${INK}" stroke-width="1.6"/><circle cx="${f(ax)}" cy="${f(ay)}" r="4" fill="${INK}"/>`
+  + `<rect x="${x}" y="${y}" width="${w}" height="60" rx="14" fill="#fff" stroke="${INK}" stroke-width="2"/><rect x="${x}" y="${y}" width="10" height="60" rx="5" fill="${color}"/>`
+  + `<text x="${x + 22}" y="${y + 25}" font-family="Fredoka" font-size="15.5" font-weight="600" fill="${INK}">${title}</text><text x="${x + 22}" y="${y + 45}" font-family="Nunito" font-size="12.5" font-weight="700" fill="#6c6461">${body}</text>`;
+const d1 = P(o, 16.3, 1.05, 1.9), h1 = P(o, 23.2, 9.5, 1.25);
+out.push(pin(d1[0], d1[1], 525, 28, 240, 'Dishwasher held 20 min', '−6 kW · still done by 9:30', C.held));
+out.push(pin(h1[0], h1[1], 600, 590, 250, 'HVAC 1 + 2 turned to 45%', 'Dining room stays 23 °C', C.ww).replace(`y2="${f(590 + 60)}"`, `y2="590"`));
+
+let s = out.join('');
+s += `<text x="34" y="52" font-family="Fredoka" font-size="30" font-weight="700" fill="${INK}">Demo Café</text>`;
+s += `<text x="34" y="76" font-family="Nunito" font-size="14" font-weight="700" fill="#8a7f78">Fri 6:42 PM · simulated · Marina, San Francisco</text>`;
+s += `<g><rect x="34" y="92" width="292" height="40" rx="20" fill="${INK}"/><circle cx="56" cy="112" r="6" fill="#FFB703"/><text x="72" y="117" font-family="Fredoka" font-size="15" font-weight="600" fill="#FFF6E9">+40 customers from Table 3</text></g>`;
+
+// right column: gauge, demand charge, Claude
+const X = 900;
+s += `<rect x="${X}" y="24" width="276" height="250" rx="22" fill="#fff" stroke="${INK}" stroke-width="2"/>`;
+s += `<text x="${X + 22}" y="54" font-family="Fredoka" font-size="15" font-weight="600" fill="${INK}">15-minute peak</text>`;
+const gx = X + 138, gy = 200, R = 92, ang = kw => Math.PI - Math.min(60, kw) / 60 * Math.PI;
+const arc = (a0, a1, r) => `M${f(gx + Math.cos(a0) * r)},${f(gy - Math.sin(a0) * r)} A${r},${r} 0 0 1 ${f(gx + Math.cos(a1) * r)},${f(gy - Math.sin(a1) * r)}`;
+s += `<path d="${arc(Math.PI, ang(40), R)}" stroke="#E9E4F0" stroke-width="20" fill="none"/><path d="${arc(ang(40), 0, R)}" stroke="#FF6B6B" stroke-width="20" fill="none"/>`;
+s += `<line x1="${gx}" y1="${gy}" x2="${f(gx + Math.cos(ang(47.5)) * (R - 4))}" y2="${f(gy - Math.sin(ang(47.5)) * (R - 4))}" stroke="#B9B3C4" stroke-width="5" stroke-linecap="round" stroke-dasharray="6 6"/>`;
+s += `<line x1="${gx}" y1="${gy}" x2="${f(gx + Math.cos(ang(37.9)) * (R - 4))}" y2="${f(gy - Math.sin(ang(37.9)) * (R - 4))}" stroke="${INK}" stroke-width="6" stroke-linecap="round"/><circle cx="${gx}" cy="${gy}" r="9" fill="${INK}"/>`;
+s += `<text x="${f(gx + Math.cos(ang(40)) * (R + 22))}" y="${f(gy - Math.sin(ang(40)) * (R + 22))}" text-anchor="middle" font-family="Fredoka" font-size="12" font-weight="600" fill="#FF6B6B">cap 40</text>`;
+s += `<text x="${gx}" y="${gy + 34}" text-anchor="middle" font-family="Fredoka" font-size="30" font-weight="700" fill="${INK}">37.9 kW</text>`;
+s += `<text x="${gx}" y="${gy + 54}" text-anchor="middle" font-family="Nunito" font-size="12" font-weight="800" fill="#8a7f78">with WattWise · ghost needle = without</text>`;
+
+s += `<rect x="${X}" y="290" width="276" height="196" rx="22" fill="#fff" stroke="${INK}" stroke-width="2"/>`;
+s += `<text x="${X + 22}" y="320" font-family="Fredoka" font-size="15" font-weight="600" fill="${INK}">This month's demand charge</text>`;
+s += `<rect x="${X + 16}" y="334" width="244" height="64" rx="14" fill="#FFE3E0"/><text x="${X + 30}" y="356" font-family="Nunito" font-size="12.5" font-weight="800" fill="#B23A3A">WITHOUT · new peak 47.5 kW</text>`;
+s += `<text x="${X + 30}" y="388" font-family="Fredoka" font-size="28" font-weight="700" fill="#D64545">+$67.20</text>`;
+s += `<rect x="${X + 16}" y="406" width="244" height="64" rx="14" fill="#DDF6F3"/><text x="${X + 30}" y="428" font-family="Nunito" font-size="12.5" font-weight="800" fill="#127A70">WITH · held at 37.9 kW</text>`;
+s += `<text x="${X + 30}" y="460" font-family="Fredoka" font-size="28" font-weight="700" fill="#159A8E">$0 extra</text>`;
+
+s += `<rect x="${X}" y="502" width="276" height="148" rx="22" fill="${C.ww}" stroke="${INK}" stroke-width="2"/>`;
+s += `<text x="${X + 22}" y="532" font-family="Fredoka" font-size="15" font-weight="600" fill="#08332f">Claude chose 3 of 3</text>`;
+s += `<foreignObject x="${X + 22}" y="542" width="236" height="104"><div xmlns="http://www.w3.org/1999/xhtml" style="font:700 14px Nunito;line-height:1.4;color:#08332f">“Hold the dishwasher 20 more minutes. Dinner peaks at 7, it costs nothing and stays inside your limits.”</div></foreignObject>`;
+
+document.getElementById('f').innerHTML = `<svg viewBox="0 0 1200 675" xmlns="http://www.w3.org/2000/svg"><rect width="1200" height="675" fill="${C.bg}"/>${s}</svg>`;
+</script>
+</body>
+</html>
