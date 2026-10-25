@@ -36,8 +36,10 @@ One data hook hides the switch. Until the backend exists, `src/mocks` serves the
   the rules allow. *Hard limit* → slider/input in **kW**, helper line: "Your highest 15-minute average power. Demand charges are based on this."
   Sends `peak_mode` + `peak_cap_kw` (CONTRACTS.md KitchenConfig).
 - Location (preset "Marina, San Francisco"), owner preferences (free text), operating hours, tariff (preset), seed (hidden in demo mode).
+- **Run for**: segmented control `1 day | 3 days | 1 week | 2 weeks` → `KitchenConfig.run_days` (1 · 3 · 7 · 14). Helper line:
+  "Each day runs from open to close; the closed hours fast-forward so fridges and freezers keep billing."
 - **Claude's authority**: toggle + max cap overrun (kW), max extra delay (min), max extra reduce (min); food-safety note ("never below 50 % for refrigeration, whatever you set").
-- "Build kitchen" → `POST /api/kitchen` → shows a short "warming up 21 days of history…" state → Live screen.
+- "Build kitchen" → `POST /api/kitchen` → shows a short "warming up 4 weeks of history…" state → Live screen.
 
 ### 2. Live Simulation (the main demo screen)
 Layout: top bar · a centred **view toggle `Charts | Simulation`** · the selected view · decision feed + escalation card (right rail) ·
@@ -46,7 +48,8 @@ chat drawer (slide-in). The toggle is a per-viewer preference (remembered locall
   live every tick.
 - **Simulation view**: the kitchen floor below. In the sim host tab it renders the appliances' own React state (the hub's current
   state, re-rendering when a Command changes it); in every other tab the same components render the `live_device` rows.
-- **Top bar:** sim clock + day, play/pause, speed (1× / 30× / 120× / 600×), `+20 customers` and `+40 customers` buttons,
+- **Top bar:** sim clock + weekday and date, **`Day 2 of 7`** (`live_clock.day_index` / `run_days`), a **phase chip**
+  (`Service` / `Overnight ⏩` / `Closed`, from `live_clock.phase`), play/pause, speed (1× / 30× / 120× / 600×), `+20 customers` and `+40 customers` buttons,
   customers/hour now. Surge buttons call the SpacetimeDB reducer `request_surge` so a judge's phone can add customers to
   the shared kitchen (REST `/api/events/customers` when `LIVE_TRANSPORT=ws`).
 - **Kitchen floor (Simulation view, from `useDevices()`):** one tile per device: icon, name, live kW, % of rated, state (on / reduced / waiting / running), importance badge,
@@ -65,7 +68,14 @@ chat drawer (slide-in). The toggle is a per-viewer preference (remembered locall
 - **Context strip:** outdoor temp now and next hours, price now + sparkline + stress, nearby events, crowd effect; each with its label.
 - **Escalation card:** problem (forecast peak vs cap), options with engine numbers and rule breaks, `within authority` badges.
   States: *Claude is choosing…* → *Claude chose X: rationale* (or *Waiting for you* with option buttons when outside authority,
-  or *Default applied* at the deadline). Clock shows "paused — escalation" in demo mode.
+  or *Default applied* at the deadline). The clock never pauses or slows for an escalation (the engine's fallback is already
+  applied; `active_option_id` shows what is in force).
+- **Overnight** (`phase: overnight`): dim the floor and show a "Closed — fast-forwarding to 10:00" overlay with the sim clock;
+  no per-tick animation (the hub re-renders once per 15 sim min; viewers get one row per 15-min block). Charts keep drawing the
+  block rows so the night's always-on load is visible. Surge buttons are disabled (held until open).
+- **End of day / run complete** (`phase: closed`, `paused_reason: run_complete`): a summary card from the last `live_tick` rows
+  and `live_comparison` (energy today, cost today, month peak per lane, saved today, peak avoided; no browser math), and a
+  **`Continue +1 day`** button → `POST /api/sim/control {action: "next_day"}`. Play is disabled while closed.
 - **Warning banners:** `hub_offline`, `live_transport_down`, `store_down` show a short plain message.
   `cap_unreachable` → "Your always-on equipment alone needs 44 kW. Raise the cap or change an importance."
 

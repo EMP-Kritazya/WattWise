@@ -27,9 +27,11 @@ it never decides and never computes numbers.
 | Fake sim host | `fakes/fake_hub_client.py` | Connects to `/ws/hub` and answers every `sim_tick` from `contracts/fixtures/hub_protocol/hub_to_server.jsonl`, so the loop runs with no browser. `HUB_IMPL=browser\|fake` |
 
 ## Kitchen lifecycle
-1. `POST /api/kitchen` with KitchenConfig → build two engine Kitchens (`control="without"` and `"with"`), call
-   `warm_up(...)` (source TBD, engine), send `sim_build` to the sim host, `reset_all` on SpacetimeDB, save the config to Convex `kitchens`.
+1. `POST /api/kitchen` with KitchenConfig → build both lanes with `Kitchen.build_lanes`, call `warm_up(history)` once per lane
+   (WarmUpHistory: `data.warmup.build_warmup(...)`, or `contracts/fixtures/history/warmup_demo_cafe.json` until the ComStock
+   extract exists; missing → skip), send `sim_build` to the sim host, `reset_all` on SpacetimeDB, save the config to Convex `kitchens`.
 2. `POST /api/sim/control {play, speed}` → start the clock. No sim host connected → stays paused with `sim_host_offline`.
+   The run lasts `config.run_days` service days (Day lifecycle below).
 3. Settings changes (importance, peak cap) are applied to **both** lanes' configs only where it matters:
    importance and cap affect only the `with` lane's decisions; the `without` lane ignores them.
 
@@ -57,10 +59,20 @@ every real tick (0.5 s × 120 / speed; one tick = 1 sim minute):
 - Speeds: 1×, 30×, 120× (default), 600×. Pause / reset. Speed only changes the real interval; a tick is always 1 sim minute.
 - Commands produced at tick *n* reach the appliances in tick *n + 1* (one sim minute later). Command acks go to Convex `commands`.
 - Sim host disconnects → pause (`sim_host_offline`) + warning; on reconnect re-send `sim_build` and resume.
-- **Escalation clock:** while an escalation is open, outside demo mode drop the send interval to `ESCALATION_SPEED`
-  (default 1×; `slowed_reason = "escalation"`) and restore the owner's speed when it resolves or expires; the engine applies the
-  default at the deadline. **Demo mode:** pause instead (`paused_reason = "escalation"`) and resume when it resolves.
-  Rationale and the early-escalation rule: ARCHITECTURE.md → Time.
+- **Escalations never change the clock** (Main_Gaps Q1, dropped): the engine applies its fallback when the escalation opens and
+  Claude answers asynchronously. Rationale and the early-escalation rule: ARCHITECTURE.md → Time.
+- **Day lifecycle** (CONTRACTS.md section 8). The loop tracks `day_index`, `run_days` and `phase` in ClockState:
+  - `service`: ticks at `speed` with `inputs.is_open: true` until local `close`.
+  - At close: if `day_index < run_days` → `phase: overnight`; else → `phase: closed`, `playing: false`,
+    `paused_reason: run_complete`, and nothing more is sent.
+  - `overnight`: ticks back to back (no sleep; each still waits for its `hub_report`) with `inputs.is_open: false` and
+    `sim_tick.fast_forward: true`, until local `open`; then `day_index += 1`, `phase: service`, back to `speed`. Every tick is
+    stepped on both lanes as usual (so closed-hours load is metered and billed).
+    Publish `publish_ticks` and `set_clock` once per closed 15-min block during `overnight`, not per tick; `/ws` `tick` messages
+    likewise. The Convex store buffer is unchanged.
+  - `POST /api/sim/control {action: "next_day"}` (only when `paused_reason` is `run_complete`, else 422): `run_days += 1`, then
+    `overnight` → next `service` day. `reset` restarts the kitchen from tick 0 (warm-up again).
+  - Surges requested during `overnight` or `closed` are held until the next `service` tick.
 - Never call the AI inside the loop. Explanations are queued.
 
 ## Handling decisions

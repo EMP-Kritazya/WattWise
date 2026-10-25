@@ -21,7 +21,7 @@ and record them here.
 (a California county for a PG&E rate) so the lunch rush lands at the right local hour against the tariff's time-of-use
 windows. Check and record the dataset's timestamp convention (zone, standard vs daylight time, interval start vs end).
 Convert to UTC inside; display in the restaurant's local zone (America/Los_Angeles for a California county).
-Record dataset id, county and convention in DECISIONS.md #13.
+Record dataset id, county and convention in the table below.
 
 | Field | Value (fill at download) |
 |---|---|
@@ -29,6 +29,34 @@ Record dataset id, county and convention in DECISIONS.md #13.
 | County | |
 | Timestamp zone + convention | |
 | Electricity column names used | |
+
+## Real data in the live product (not only on the Proof screen)
+The same ComStock restaurant and the same URDB tariff feed the live demo, so the live kitchen is "today" in a real, calibrated
+month rather than a cold start. One dataset, one tariff, four places:
+
+| Where | How | Label on screen |
+|---|---|---|
+| **Live bill** | Once the URDB rate is chosen it replaces `demo_tariff_v1` in `Kitchen(config, tariff)` for the live run *and* the backtest, so every live $ is on a real, named rate | tariff name + `urdb` |
+| **Warm-up = "the restaurant's last 4 weeks"** | `backend/data/warmup.py` builds `WarmUpHistory`: the 4 weeks before the scenario start, from ComStock, scaled to the Demo Café (`scale`) and spread onto its devices by the recipe below. The forecaster's weekday × time-of-day curve and the `minimize` target (highest peak of the previous 4 same weekdays) come from it | `calibrated_model` |
+| **Month to date** | The engine meters the history days of the current month on the tariff, so the run starts with a real-shaped month peak and cost: a lunch spike earlier in the month has already set a demand charge, and tonight the engine must not beat it | `calibrated_model` |
+| **The pitch's "Pain" beat** | Last month's `without` Bill from the backtest: the one 15-min block that set the demand charge, in $ (after `backtest-auditor`) | `calibrated_model` + `urdb` |
+
+Rules for the live use:
+- **Calendar alignment.** ComStock is one weather year (record it below); the sim calendar is 2026. `day_offset` = the whole number of
+  days (a multiple of 7) that maps the dataset year onto the sim dates with weekdays aligned (e.g. sim Fri 17 Jul 2026 ↔ the dataset's
+  nearest Friday in mid-July). One offset for the whole window. Holidays in the dataset are kept, not hidden.
+- **Scale.** `scale` = Demo Café reference peak ÷ ComStock building's peak for the same month (kept in `assumptions.yaml` as `live_scale`),
+  applied before the device recipe. The live ratio (ENGINE.md section 3) absorbs the remaining gap between the sim and the history.
+- **Region.** The demo kitchen is in the Marina, San Francisco: pick the ComStock county and the URDB rate in PG&E territory
+  (e.g. San Francisco County + a PG&E commercial rate with a monthly and a peak-period demand charge, which the Meter's
+  `month_peak_kw` / `on_peak_month_peak_kw` already model).
+- **Files.** The raw dataset stays out of git (`data/`, gitignored); `warmup.py` reads a processed per-device extract built once by
+  `python -m data.build_warmup` (also in the backend image build). Missing file → the engine runs without warm-up; nothing blocks.
+- **Honesty.** Warm-up and month-to-date are a calibrated model of a restaurant, never "your past bill"; the live tick-by-tick load is
+  `simulated`.
+- **Until the ComStock extract exists:** the fixture builder's fake 2-month history (`contracts/fixtures/history/`, 2026-05-17 →
+  2026-07-17 17:30 local, `source: fixture_synthetic`, `label: simulated`) stands in, in the same `WarmUpHistory` shape. Its
+  fake June/July `BacktestResult` (`rest/get_backtest.json`) is for building the Proof screen only; it is never shown as savings.
 
 ## Distributing historical load onto devices (engine code, never AI)
 A fixed recipe. Same input → same output. Devices always sum to the original value exactly.
@@ -55,8 +83,8 @@ Shares and windows are **assumptions**: keep them in `backtest/assumptions.yaml`
 ## Replay and backtest
 - The replay feeds the kitchen one 15-min row at a time → no peeking by construction.
 - Replay step = 15 minutes; the decider runs on **every** step (live mode runs it every 5 sim minutes).
-- First 3 weeks = warm-up history, not scored. So **January is scored from day 22 and labeled "partial"** on the Proof
-  screen. "All 12 months" means 11 full months + partial January.
+- First 4 weeks = warm-up history, not scored (the forecaster and the `minimize` target both use the previous 4 weeks).
+  So **January is scored from day 29 and labeled "partial"** on the Proof screen. "All 12 months" means 11 full months + partial January.
 - Run each month three ways through the **same** loop and bill them with the **same** tariff function:
 
 | Policy | What it does |

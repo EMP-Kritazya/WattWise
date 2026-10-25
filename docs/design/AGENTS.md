@@ -27,7 +27,7 @@ three context agents (the senses) and the **Concierge** (the owner's chat door, 
 | **Weather** | Hourly outdoor temperature for the kitchen's location | Open-Meteo | Periodic (every `CONTEXT_INTERVAL_S`, default 600 real s) |
 | **Grid** | Hourly electricity prices + stress level | CAISO price data | On request |
 | **Events** (tier 2) | Events within 5 km in the next 12 h with expected attendance | Events API chosen at the event | On request |
-Message models: CONTRACTS.md section 7. Tariff stays a fixed decision (DECISIONS.md), not an agent.
+Message models: CONTRACTS.md section 7. Tariff stays a fixed engine input (CONTRACTS.md Tariff), not an agent.
 
 ## Concierge loops
 - **Context loop** (periodic, every `CONTEXT_INTERVAL_S` = 600 real s by default, and on kitchen build; never per tick): request Weather, Grid, Events → reshape → `POST /api/context` →

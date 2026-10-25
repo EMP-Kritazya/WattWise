@@ -77,6 +77,21 @@ The rules (limits, food-safety floor, deadlines) are enforced by the engine befo
 - One stream drives both lanes, so the two kitchens see the same customers.
 - Customers → orders (cooking load) and dirty racks (dishwasher trigger).
 
+## Closed hours and multi-day runs
+A run is several days (`config.run_days`); the closed hours are simulated too, at max speed (CONTRACTS.md section 8, Day lifecycle).
+The simulation reads only `sim_tick.inputs.is_open` and keeps every appliance's state across midnight and across days.
+| `is_open: false` | Behaviour |
+|---|---|
+| Customers | none arrive; orders in progress finish |
+| Cooking (`demand_driven`: fryer, oven, grill) | off (0 kW) 15 min after close; preheat from 30 min before open (`idle_kw`) |
+| Lights (`fixed`) | 10 % of `rated_kw` (night/security lighting) |
+| Refrigeration (`cycling`: walk-in, reach-in, freezer) | keeps cycling at `duty_idle_pct` (no door openings) |
+| Ice machine, dishwasher (`job`) | jobs still trigger and run (ice refills overnight; last dishwasher cycle after close) |
+| Water heater (`cycling`) | standby duty |
+| HVAC (`thermal`) | setback: setpoint + 4 °C while closed, back to `setpoint_c` 30 min before open |
+`sim_tick.fast_forward: true` (always with `is_open: false`): step and report exactly as usual, but do not re-render appliance
+React state per tick (update the view once per 15 sim minutes). Physics and reports are identical with or without it.
+
 ## Hub (simulated ESP32)
 - Applies the tick's Commands first (each to its `lane`), then the kitchen steps, then the hub builds one HubReport per lane:
   every appliance's `reading()`, `total_kw` = exact sum, `power_pct`, `physical`, `customers_per_hour`, `ts = sim_ts + minutes`.

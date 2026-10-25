@@ -53,7 +53,8 @@ periodically, and the Concierge is the owner's chat door in ASI:One. **Convex** 
 - [ ] `agent/tools.py` (CONTRACTS.md §4) as thin wrappers over the facade; `agent/templates.py` fallbacks; chat streaming (`chat_delta`, `chat_done`)
 - [ ] `runtime/escalations.py`: send open escalations to Claude with options + context + preferences + authority; enum-constrained `choose_escalation_option`; `resolve_escalation(..., "claude", rationale)`; Proposal when `awaiting_owner`; 8 s timeout → leave for the engine's default; demo mode pauses the clock
 - [ ] Proposals + owner confirmation (UI Confirm, ASI:One button, `confirm` / `yes` matched by code)
-- [ ] Clock slowdown while an escalation is open (`slowed_reason`, `ESCALATION_SPEED`) — **build last; Kritazya may drop it**
+- [ ] ~~Clock slowdown while an escalation is open~~ **dropped** (Main_Gaps Q1): the clock never slows; the engine's fallback applies at once
+- [ ] Day lifecycle in `runtime/loop.py` (API.md "Day lifecycle", CONTRACTS.md §8): `run_days`, ClockState `day_index` / `run_days` / `phase`, overnight ticks at max speed with `fast_forward: true` + `is_open: false`, block-rate publishing overnight, `paused_reason: run_complete`, `sim/control` action `next_day`; warm-up from `fixtures/history/warmup_demo_cafe.json` until ComStock
 
 **D. Fetch.ai** — design: `docs/design/AGENTS.md`
 - [ ] Weather + Grid agents (live + `--recorded`), Events (tier 2); Concierge periodic context loop every `CONTEXT_INTERVAL_S` (600 s) → `POST /api/context` unchanged; agent log → `POST /api/agent-log`
