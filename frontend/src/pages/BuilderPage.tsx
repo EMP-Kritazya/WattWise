@@ -22,7 +22,16 @@ const CATEGORIES: { id: Category; label: string }[] = [
   { id: "other", label: "Other" },
 ];
 const MAX_COUNT = 5;
-const PRESET_COUNT = 1; // "Demo Café": one of each type
+/**
+ * "Demo Café": the kitchen of the team's recorded demo (contracts/fixtures/facade/kitchen.json), so KITCHEN_IMPL=fake can
+ * build it: one of each type except two HVAC units, the dishwasher finishing by 19:30, and the owner's preference.
+ */
+const DEMO_CAFE = {
+  count: 1,
+  counts: { hvac: 2 } as Record<string, number>,
+  units: { dishwasher_1: { importance: "deferrable", limits: { max_delay_min: 60, must_finish_by: "19:30" } } } as Record<string, UnitSetting>,
+  preferences: "Keep the dining room comfortable during dinner service.",
+};
 
 const LOCATIONS = [{ label: "Marina, San Francisco", lat: 37.8, lon: -122.44 }];
 /**
@@ -78,7 +87,7 @@ export function BuilderPage() {
   const [close, setClose] = useState("22:00");
   const [seed, setSeed] = useState("42");
   const [locationIdx, setLocationIdx] = useState(0);
-  const [preferences, setPreferences] = useState("");
+  const [preferences, setPreferences] = useState(DEMO_CAFE.preferences);
   // Per-unit overrides keyed by device id (`<type_id>_<n>`); units without one use the type's defaults.
   const [units, setUnits] = useState<Record<string, UnitSetting>>({});
   const [building, setBuilding] = useState(false);
@@ -89,7 +98,9 @@ export function BuilderPage() {
       (types) => {
         setCatalog(types);
         setStoreCatalog(types);
-        setCounts(Object.fromEntries(types.map((t) => [t.type_id, PRESET_COUNT])));
+        setCounts(Object.fromEntries(types.map((t) => [t.type_id, DEMO_CAFE.counts[t.type_id] ?? DEMO_CAFE.count])));
+        const known = new Set(types.map((t) => t.type_id));
+        setUnits(Object.fromEntries(Object.entries(DEMO_CAFE.units).filter(([id]) => known.has(id.replace(/_\d+$/, "")))));
       },
       (err) => setError(errorMessage(err)),
     );
@@ -111,15 +122,22 @@ export function BuilderPage() {
   const capKw = Number(peakCap);
   const capValid = peakCap !== "" && Number.isFinite(capKw) && capKw > 0;
 
+  /** The setting KitchenConfig sends for a type: what all its units share, else the type's default. */
+  const typeSetting = (t: EquipmentType): UnitSetting => {
+    const settings = unitList.filter((u) => u.type.type_id === t.type_id).map((u) => u.setting);
+    return settings.length > 0 && settings.every((s) => sameSetting(s, settings[0])) ? settings[0] : typeDefault(t);
+  };
+
   async function build() {
     if (!catalog) return;
+    const sent = Object.fromEntries(catalog.map((t) => [t.type_id, typeSetting(t)]));
     const config: KitchenConfig = {
       name,
       equipment: catalog.map((t) => ({
         type_id: t.type_id,
         count: counts[t.type_id] ?? 0,
-        importance: t.default_importance,
-        limits: limitsFor(t, t.default_importance, close),
+        importance: sent[t.type_id].importance,
+        limits: structuredClone(sent[t.type_id].limits),
       })),
       peak_mode: "cap",
       peak_cap_kw: capKw,
@@ -135,8 +153,8 @@ export function BuilderPage() {
     clearRun();
     try {
       await transport.createKitchen(config);
-      // KitchenConfig sets importance per type; units that differ are set one by one once they exist.
-      const overrides = unitList.filter((u) => !sameSetting(u.setting, typeDefault(u.type)));
+      // KitchenConfig sets importance per type; units that differ from their type's setting are set one by one once they exist.
+      const overrides = unitList.filter((u) => !sameSetting(u.setting, sent[u.type.type_id]));
       await Promise.all(overrides.map((u) => transport.setImportance(u.id, u.setting)));
       setKitchen(await transport.getKitchen());
       navigate("/live");
@@ -342,7 +360,7 @@ function UnitRow({ name, type: t, setting, close, onChange }: { name: string; ty
           </label>
           <label className="flex items-center gap-2">
             <span className="text-muted-foreground">Max</span>
-            <Input type="number" min={0} step={5} className="h-7 w-16" value={flex.max_reduce_min} onChange={(e) => onChange({ ...setting, limits: { ...flex, max_reduce_min: Number(e.target.value) || 0 } })} />
+            <Input type="number" min={0} step={5} className="h-7 w-16" aria-label={`${name} max reduce minutes`} value={flex.max_reduce_min} onChange={(e) => onChange({ ...setting, limits: { ...flex, max_reduce_min: Number(e.target.value) || 0 } })} />
             <span className="text-muted-foreground">min</span>
           </label>
           {floor > 0 && <span className="text-[11px] text-muted-foreground sm:col-span-2">Food safety: never below {floor}%.</span>}
@@ -352,12 +370,12 @@ function UnitRow({ name, type: t, setting, close, onChange }: { name: string; ty
         <div className="flex flex-wrap items-center gap-3 text-xs">
           <label className="flex items-center gap-2">
             <span className="text-muted-foreground">Delay up to</span>
-            <Input type="number" min={0} step={5} className="h-7 w-16" value={def.max_delay_min} onChange={(e) => onChange({ ...setting, limits: { ...def, max_delay_min: Number(e.target.value) || 0 } })} />
+            <Input type="number" min={0} step={5} className="h-7 w-16" aria-label={`${name} max delay minutes`} value={def.max_delay_min} onChange={(e) => onChange({ ...setting, limits: { ...def, max_delay_min: Number(e.target.value) || 0 } })} />
             <span className="text-muted-foreground">min</span>
           </label>
           <label className="flex items-center gap-2">
             <span className="text-muted-foreground">Finish by</span>
-            <Input type="time" className="h-7 w-28" value={def.must_finish_by} onChange={(e) => onChange({ ...setting, limits: { ...def, must_finish_by: e.target.value } })} />
+            <Input type="time" className="h-7 w-28" aria-label={`${name} finish by`} value={def.must_finish_by} onChange={(e) => onChange({ ...setting, limits: { ...def, must_finish_by: e.target.value } })} />
           </label>
         </div>
       )}

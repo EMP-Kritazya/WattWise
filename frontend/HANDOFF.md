@@ -18,8 +18,11 @@ Branch from `ashirwad` (`0db6689`) with Suyog's branch merged in, as planned:
 - End to end (`integrate-api` + `integrate-web` in `.claude/launch.json`, `/sim` host tab open, fake kitchen, Claude off): the clock
   ran through the tick-60 escalation without pausing and stopped at 7:30 PM, the end of the recording; no owner text, no dialog.
 - **Known gaps, not from the merge:**
-  - The Builder cannot build the fake's recorded kitchen: the catalog defaults the dishwasher to `must_finish_by` 15:30, the
-    recording has 19:30 (plus 2 HVAC and a preference text). For a fake run, `POST /api/kitchen` with the recorded config.
+  - ~~The Builder cannot build the fake's recorded kitchen~~ Fixed: the "Demo Café" preset is now the recorded kitchen (2 HVAC,
+    dishwasher finishing by 19:30, the owner preference), and `KitchenConfig` sends, per type, the setting all its units share
+    (else the type default); only units that differ are patched with `PUT …/importance` afterwards. Verified against
+    `KITCHEN_IMPL=fake`: Build kitchen with the untouched preset → `/live`. Any edit still fails on the fake (it only knows the
+    recording); that is the fake's STUB limit.
   - `GET /api/escalations?status=open` returns 500 in fake mode: Suyog's models need the new contract fields (`updated_ts`,
     `active_option_id`, `harm_score`, `rank`) the old recordings lack. Clears when Kritazya's regenerated fixtures land.
   - The Dashboard escalation card stays "Claude is choosing…" when Claude is off; showing `active_option_id` (the engine's
