@@ -97,8 +97,8 @@ export function SimControls({ embedded = false }: { embedded?: boolean }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <span className="flex items-center gap-1.5 rounded-xl border-2 border-[#22223B] bg-[#FFF0BA] px-2.5 py-1.5 text-sm font-bold tabular-nums" title="Customers per hour (simulated)">
-          <Users className="size-4 text-muted-foreground" />
+        <span className="flex items-center gap-1.5 rounded-xl border-2 border-[#22223B] bg-[#FFF0BA] px-2.5 py-1.5 text-sm font-bold text-[#22223B] tabular-nums" title="Customers per hour (simulated)">
+          <Users className="size-4 text-[#6B687B]" />
           {latest?.customers_per_hour ?? "–"}
           <span className="text-xs text-muted-foreground">/ h</span>
         </span>

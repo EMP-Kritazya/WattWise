@@ -1,53 +1,51 @@
 import type { ReactNode } from "react";
-import { Gauge, PiggyBank, Receipt, TrendingDown, type LucideIcon } from "lucide-react";
+import { PiggyBank, TrendingDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useDashboardStore as useSim } from "@/data";
 import { fmtKw, fmtUsd } from "@/lib/format";
+import { transport } from "@/transport";
 
 /**
- * How much WattWise is saving, beside the live floor. Savings and peak avoided are the engine's LaneComparison; the
- * month peaks and bills are each lane's own meter, shown side by side. The browser never subtracts lanes (UI.md).
+ * One slim line above the live floor: what WattWise is saving (the engine's LaneComparison) and the 15-minute demand of
+ * each lane against the cap (each lane's own meter, side by side). The browser never subtracts lanes (UI.md). Month peaks
+ * and bills live on Dashboard.
  */
 export function SavingsPanel() {
   const comparison = useSim((s) => s.comparison);
-  const without = useSim((s) => s.latest.without?.meter);
-  const withLane = useSim((s) => s.latest.with?.meter);
+  const latest = useSim((s) => s.latest);
+  const connection = useSim((s) => s.connection);
+  const withMeter = latest.with?.meter;
+  const withoutMeter = latest.without?.meter;
+  const over = (m?: { block_avg_kw: number; target_kw: number }) => m != null && m.block_avg_kw > m.target_kw;
 
   return (
-    <section
-      aria-label="Money saved by WattWise"
+    <div
+      aria-label="What WattWise is saving"
       aria-live="polite"
-      className="rounded-[22px] border-2 border-[#22223B] bg-[#69C9BF] px-3 py-2.5 text-[#22223B] shadow-[0_4px_0_#22223B]"
+      className="flex shrink-0 flex-wrap items-center gap-x-5 gap-y-1 border-b-2 border-[#22223B] bg-[#FFF6E9] px-4 py-2 text-[#22223B]"
     >
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-x-2">
-        <h2 className="flex items-center gap-2 font-['Fredoka',sans-serif] text-base font-bold">
-          <PiggyBank className="size-4" /> What WattWise is saving
-        </h2>
-        <span className="text-[10px] font-extrabold tracking-[0.16em] uppercase opacity-70">Simulated · not measured savings</span>
-      </div>
-      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-        <Tile icon={PiggyBank} label="Saved today" value={fmtUsd(comparison?.saved_today_usd)} highlight />
-        <Tile icon={TrendingDown} label="Peak avoided" value={fmtKw(comparison?.peak_avoided_kw)} />
-        <Tile
-          icon={Gauge}
-          label="Month peak"
-          value={fmtKw(comparison?.month_peak_with_kw)}
-          sub={<>Without WattWise {fmtKw(comparison?.month_peak_without_kw)}</>}
-        />
-        <Tile icon={Receipt} label="Bill this month" value={fmtUsd(withLane?.cost_usd_month)} sub={<>Without WattWise {fmtUsd(without?.cost_usd_month)}</>} />
-      </div>
-    </section>
+      <Stat icon={<PiggyBank className="size-4 text-[#167D74]" />} label="Saved today" value={fmtUsd(comparison?.saved_today_usd)} strong />
+      <Stat icon={<TrendingDown className="size-4 text-[#167D74]" />} label="Peak avoided" value={fmtKw(comparison?.peak_avoided_kw)} />
+      <span className="hidden h-5 w-px bg-[#22223B]/20 sm:block" />
+      <span className="text-xs text-[#6B687B]">15-min demand</span>
+      <Stat dot="#34d399" label="With" value={fmtKw(withMeter?.block_avg_kw)} alert={over(withMeter)} />
+      <Stat dot="#f87171" label="Without" value={fmtKw(withoutMeter?.block_avg_kw)} alert={over(withoutMeter)} />
+      <Stat label="Cap" value={fmtKw(withMeter?.target_kw)} />
+      <span className="ml-auto text-[10px] font-extrabold tracking-[0.14em] text-[#6B687B] uppercase" role="status">
+        {connection !== "open" ? "Connection lost · last readings" : !latest.with ? "Waiting for hub readings" : "Simulated"}
+        {transport.kind === "mock" ? " · mock data" : ""}
+      </span>
+    </div>
   );
 }
 
-function Tile({ icon: Icon, label, value, sub, highlight }: { icon: LucideIcon; label: string; value: string; sub?: ReactNode; highlight?: boolean }) {
+function Stat({ icon, dot, label, value, strong, alert }: { icon?: ReactNode; dot?: string; label: string; value: string; strong?: boolean; alert?: boolean }) {
   return (
-    <div className={highlight ? "rounded-2xl border-2 border-[#22223B] bg-white px-3 py-1.5" : "rounded-2xl bg-white/85 px-3 py-1.5"}>
-      <div className="flex items-center gap-1.5 text-[10px] font-extrabold tracking-wide uppercase opacity-70">
-        <Icon className="size-3.5" />
-        {label}
-      </div>
-      <div className="font-['Fredoka',sans-serif] text-xl font-bold tabular-nums">{value}</div>
-      {sub && <div className="truncate text-[11px] font-semibold opacity-75 tabular-nums">{sub}</div>}
-    </div>
+    <span className="flex items-baseline gap-1.5 whitespace-nowrap" title={alert ? "Above the cap" : undefined}>
+      {icon && <span className="self-center">{icon}</span>}
+      {dot && <span className="size-2 self-center rounded-full" style={{ background: dot }} />}
+      <span className="text-xs text-[#6B687B]">{label}</span>
+      <span className={cn("font-['Fredoka',sans-serif] font-bold tabular-nums", strong ? "text-lg" : "text-base", alert && "text-[#C93658]")}>{value}</span>
+    </span>
   );
 }

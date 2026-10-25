@@ -6,6 +6,7 @@ import { ToneMappingMode } from "postprocessing";
 import { Box3, Vector3, type Group, type OrthographicCamera } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { Box, Crosshair, Eye, Focus, List, Map as MapIcon, Maximize2, Store, Tags, type LucideIcon } from "lucide-react";
+import { SavingsPanel } from "@/components/live/SavingsPanel";
 import { SimControls } from "@/components/live/SimControls";
 import { WarningBanner } from "@/components/live/WarningBanner";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ import { BACKGROUND, STATE_HEX } from "./palette";
 import { placeDevices, type Placement } from "./plan";
 import { Restaurant } from "./Restaurant";
 import type { DecisionSpotlight } from "./Device3D";
-import { DemandSummary, OperationsPanel } from "./OperationsPanel";
+import { OperationsPanel } from "./OperationsPanel";
 import { ToyBoxRail } from "./ToyBoxRail";
 
 type Vec3 = [number, number, number];
@@ -140,7 +141,7 @@ export function LiveFloor({ demo, onDemoChange, className }: { demo: boolean; on
 
   // Reserve a small inset for labels; operational information lives outside the canvas.
   // With labels on, leave headroom above the building for the stacked appliance labels; the legend sits at the bottom.
-  const padding = useMemo(() => ({ top: labels && mode !== "compare" ? 130 : 20, bottom: 44, left: 16, right: 16 }), [labels, mode]);
+  const padding = useMemo(() => ({ top: labels && mode !== "compare" ? 90 : 20, bottom: 44, left: 16, right: 16 }), [labels, mode]);
   const container = useRef<HTMLDivElement>(null);
   const [wide, setWide] = useState(false);
   useEffect(() => {
@@ -261,8 +262,8 @@ export function LiveFloor({ demo, onDemoChange, className }: { demo: boolean; on
             </div>
           </details>{" "}
           {!demo && (
-            <Button size="sm" variant="ghost" className="h-8" title="Full-screen demo mode" onClick={() => onDemoChange(true)}>
-              <Maximize2 /> <span className="max-xl:sr-only">Demo mode</span>
+            <Button size="sm" className="h-8" title="Full-screen demo mode" onClick={() => onDemoChange(true)}>
+              <Maximize2 /> Demo mode
             </Button>
           )}
         </div>
@@ -273,7 +274,7 @@ export function LiveFloor({ demo, onDemoChange, className }: { demo: boolean; on
           <WarningBanner />
         </div>
       )}
-      {!demo && <DemandSummary />}
+      {!demo && <SavingsPanel />}
       <div
         className={cn(
           "grid min-h-0",

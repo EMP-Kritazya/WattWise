@@ -5,7 +5,6 @@ import { fmtAction, fmtKw, fmtSimTime } from "@/lib/format";
 import { IMPORTANCE_LABEL, STATUS_LABEL } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { useDashboardStore as useSim } from "@/data";
-import { transport } from "@/transport";
 import type { HubDeviceReading, Lane } from "@/types";
 import { DeviceDetails } from "./DeviceDetails";
 
@@ -40,48 +39,6 @@ export function ReadingStatus({ reading }: { reading?: HubDeviceReading }) {
       <Icon className="size-3.5" />
       {text}
     </span>
-  );
-}
-
-export function DemandSummary() {
-  const latest = useSim((s) => s.latest);
-  const connection = useSim((s) => s.connection);
-  const clock = useSim((s) => s.clock);
-  return (
-    <div className="shrink-0 border-b-2 border-[#22223B] bg-[#FFF6E9] px-4 py-2 text-[#22223B]">
-      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-2 text-xs text-[#6B687B] max-lg:hidden">
-        <span>15-minute demand · the monthly maximum drives demand charges</span>
-        <span role="status">
-          {connection !== "open"
-            ? "Connection lost · showing last received readings"
-            : !latest.with
-              ? "Waiting for hub readings"
-              : clock?.playing
-                ? "Simulation running"
-                : "Simulation paused"}{" "}
-          · {transport.kind === "mock" ? "Mock data" : "Simulated"}
-        </span>
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        {(["without", "with"] as const).map((lane) => {
-          const meter = latest[lane]?.meter;
-          return (
-            <div key={lane} className="min-w-0 border-l-2 pl-3" style={{ borderColor: lane === "with" ? "#34d399" : "#f87171" }}>
-              <div className="text-xs font-bold text-[#5B5968]">{lane === "with" ? "With WattWise" : "Without WattWise"}</div>
-              <div className="text-lg font-semibold tabular-nums sm:text-xl">{fmtKw(meter?.block_avg_kw)}</div>
-              <div className={cn("text-xs", meter && meter.block_avg_kw > meter.target_kw ? "text-[#C93658]" : "text-[#6B687B]")}>
-                {!meter ? "Waiting for data" : meter.block_avg_kw > meter.target_kw ? "Above target" : "Within target"}
-              </div>
-            </div>
-          );
-        })}
-        <div className="border-l-2 border-[#22223B]/20 pl-3">
-          <div className="text-xs font-bold text-[#5B5968]">Owner’s peak cap</div>
-          <div className="text-lg font-semibold tabular-nums sm:text-xl">{fmtKw(latest.with?.meter.target_kw)}</div>
-          <div className="text-xs text-[#6B687B]">Target for both lanes</div>
-        </div>
-      </div>
-    </div>
   );
 }
 

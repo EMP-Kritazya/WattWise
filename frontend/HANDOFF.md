@@ -7,7 +7,10 @@ and run `npm run build` and `npm test` (in `frontend/`) before calling anything 
 - From tablet width up (≥768 px) the Live tab fills exactly the window below the top bar (`--topbar-h`, set by `TopBar`
   in `App.tsx`); nothing scrolls. Phones keep the scrolling layout.
 - The controls card is gone: clock, Play/Pause, speed, reset, customers/h and +20/+40 sit in the floor's dark header bar
-  (`SimControls embedded`), around the 3D view. The savings strip and the demand strip are compact.
+  (`SimControls embedded`), around the 3D view. Demo mode is the prominent green button there.
+- The savings card and the demand strip became one slim line inside the floor frame (`SavingsPanel`): saved today, peak
+  avoided, 15-min demand with / without, cap, and the simulated label. Month peak and bill stay on Dashboard;
+  `DemandSummary` was removed. The label band above the building shrank (top inset 130 → 90 px), so the restaurant draws bigger.
 - Laptop width: floor and appliance list side by side, both filling the height (the list scrolls inside itself). Tablet
   width: a Floor / Appliances switch in the header shows one at a time; "Locate appliance on floor" switches back.
 - Camera: the settled starting view is the furthest out. Orthographic views lock `minZoom` to the fitted zoom (up to 6× in);

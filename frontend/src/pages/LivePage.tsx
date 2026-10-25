@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { LiveFloor } from "@/components/live/floor/LiveFloor";
-import { SavingsPanel } from "@/components/live/SavingsPanel";
 import { WarningBanner } from "@/components/live/WarningBanner";
 import { Button } from "@/components/ui/button";
 import { useDashboardStore as useSim } from "@/data";
 import { transport } from "@/transport";
 
 /**
- * The Live Simulation tab: what WattWise is saving, then the 3D floor with its controls. From tablet width up it fills
+ * The Live Simulation tab: the 3D floor with its controls and one line of savings and demand. From tablet width up it fills
  * exactly the window below the top bar (`--topbar-h`), so nothing scrolls. The owner's numbers live on Dashboard.
  */
 export function LivePage() {
@@ -49,9 +48,8 @@ export function LivePage() {
 
   return (
     <div className="flex min-w-0 flex-col gap-3 p-3 md:h-[calc(100dvh-var(--topbar-h,72px))] md:overflow-hidden xl:px-4">
-      <div className="flex shrink-0 flex-col gap-3">
+      <div className="flex shrink-0 flex-col gap-3 empty:hidden">
         <WarningBanner />
-        <SavingsPanel />
       </div>
       <LiveFloor className="md:min-h-0 md:flex-1" demo={demo} onDemoChange={setDemoMode} />
     </div>
