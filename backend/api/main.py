@@ -13,7 +13,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, FastAPI, Header, HTTPException, Query, Request, WebSocket
 from pydantic import BaseModel
 
-from agent.claude_agent import ClaudeAgent, create_llm
+from agent.claude_agent import ClaudeAgent, create_asi1_llm, create_llm
 from agent.proposals import ProposalBook
 from agent.tools import AgentTools
 from runtime.device_bridge import DeviceBridge
@@ -293,6 +293,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.agent = ClaudeAgent(
         tools, create_llm(settings.claude_provider, settings.anthropic_api_key, settings.anthropic_model),
         publish=broadcaster.send_soon, timezone=service.tariff["timezone"], engine_rule_error=engine.RuleError,
+        fallback=create_asi1_llm(settings.asi1_api_key, settings.asi1_model),
     )
     runtime.escalations.agent = app.state.agent  # Claude off (no key) → escalations wait for the owner or the default
     install_error_handlers(app, engine.RuleError)

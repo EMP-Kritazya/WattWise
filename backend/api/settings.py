@@ -39,7 +39,9 @@ class Settings:
     sim_start_ts: str = DEFAULT_SIM_START_TS
     claude_provider: str = "anthropic"
     anthropic_model: str | None = None  # None → agent/claude_agent.py DEFAULT_MODEL
-    anthropic_api_key: str | None = field(default=None, repr=False)  # None → Claude off, template text
+    anthropic_api_key: str | None = field(default=None, repr=False)  # None → Claude off (ASI:One, then templates)
+    asi1_model: str | None = None  # None → agent/llm.py ASI1_DEFAULT_MODEL ("asi1")
+    asi1_api_key: str | None = field(default=None, repr=False)  # None → no ASI:One fallback for chat / explanations
     demo_mode: bool = False  # DEMO_MODE=1: the clock pauses while Claude decides an escalation
     council_wait_s: float = 0.0  # COUNCIL_WAIT_S (default 5 from the env, 0 in tests): wait for the council's context
     fixtures_dir: Path = field(default_factory=lambda: REPO_ROOT / "contracts" / "fixtures")
@@ -58,6 +60,8 @@ class Settings:
             claude_provider=_choice("CLAUDE_PROVIDER", "anthropic"),
             anthropic_model=os.environ.get("ANTHROPIC_MODEL") or None,
             anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY") or None,
+            asi1_model=os.environ.get("ASI1_MODEL") or None,
+            asi1_api_key=os.environ.get("ASI1_API_KEY") or None,
             demo_mode=os.environ.get("DEMO_MODE") == "1",
             council_wait_s=float(os.environ.get("COUNCIL_WAIT_S", "5")),
             fixtures_dir=Path(os.environ.get("FIXTURES_DIR", REPO_ROOT / "contracts" / "fixtures")),

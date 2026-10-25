@@ -1,12 +1,12 @@
 """The Claude agent the dashboard chat and the Concierge share (API.md "AI agent", AGENTS.md "Claude").
 
-Anthropic SDK with tool use over `agent/tools.py`: the model reads engine numbers through tools and changes state only
-through the two bounded tools; every other change is a `propose_*` Proposal. `CLAUDE_PROVIDER=anthropic` (default) |
-`foundry` (STUB); model from `ANTHROPIC_MODEL`. With no `ANTHROPIC_API_KEY` (or a failed / slow call) everything falls
-back to `agent/templates.py`: the kitchen runs identically with Claude off.
+Tool use over `agent/tools.py`: the model reads engine numbers through tools and changes state only through the two
+bounded tools; every other change is a `propose_*` Proposal. The models live in `agent/llm.py`. Chat and explanations
+try Claude, then ASI:One (`ASI1_API_KEY`), then `agent/templates.py`; escalations are Claude only (else the engine's
+default). The kitchen runs identically with every model off. Both models' text is "ai"; the log names which answered.
 
 - `start_chat(message)` → `{chat_id}`; the reply streams on `/ws` as `chat_delta` messages, then one `chat_done`.
-- `explain_decision(decision, device_name)` → (text, "ai" | "template"), 3 s timeout.
+- `explain_decision(decision, device_name)` → (text, "ai" | "template"), 3 s timeout per model.
 - `decide_escalation(escalation, council=[...])` → the engine's resolved Escalation, or None (8 s timeout, no choice):
   the engine's default then applies at the deadline. `council` names the Context parts the context agents posted for this
   escalation's window; the rationale cites them by source with numbers copied from the context. Used by
@@ -18,23 +18,20 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Protocol
+from typing import Callable
 
 from api.errors import NoKitchenError, NotFoundError, NotRecordedError, RuleError
 
 from . import templates
+from .llm import LLM, OnText, Turn, create_asi1_llm, create_llm  # noqa: F401 (re-exported for callers and tests)
 from .tools import CHAT_TOOLS, ESCALATION_TOOLS, AgentTools, ToolInputError
 
 log = logging.getLogger("agent.claude")
 
-DEFAULT_MODEL = "claude-opus-5-5"
-PROVIDERS = ("anthropic", "foundry")
-MAX_TOKENS = 16000
 MAX_TURNS = 8  # model turns per answer (each tool round trip is one)
-EXPLAIN_TIMEOUT_S = 3.0
+EXPLAIN_TIMEOUT_S = 3.0  # per model
+CHAT_TIMEOUT_S = 30.0  # per model
 ESCALATION_TIMEOUT_S = 8.0
-FALLBACK_BETA = "server-side-fallback-2026-07-01"  # on a refusal the API re-runs the request on a fallback model
 EXPLAIN_TOOLS = ("explain_decision", "get_forecast", "get_context")
 # Run on the event loop, not a worker thread: they publish through the run loop's live port.
 LOOP_TOOLS = ("set_crowd_effect",)
@@ -69,86 +66,22 @@ empty, cite no agent."""
 COUNCIL_AGENTS = {"weather": "Weather agent", "prices": "Grid agent", "events": "Events agent"}
 
 
-# ---------------------------------------------------------------- the model behind one interface
-
-
-@dataclass
-class Turn:
-    content: list[Any]  # the assistant's content blocks, passed back unchanged on the next request
-    tool_uses: list[tuple[str, str, dict]] = field(default_factory=list)  # (tool_use_id, name, input)
-    stop_reason: str | None = None
-
-    @property
-    def text(self) -> str:
-        return "".join(_field(b, "text") or "" for b in self.content if _field(b, "type") == "text")
-
-
-def _field(block: Any, name: str) -> Any:
-    return block.get(name) if isinstance(block, dict) else getattr(block, name, None)
-
-
-OnText = Callable[[str], Awaitable[None]]
-
-
-class LLM(Protocol):
-    async def turn(self, *, system: str, messages: list[dict], tools: list[dict], effort: str,
-                   on_text: OnText | None = None) -> Turn: ...
-
-
-class AnthropicLLM:
-    """One streamed Messages API call per turn (anthropic >= 2.3)."""
-
-    def __init__(self, client: Any, model: str):
-        self._client = client  # anthropic.AsyncAnthropic
-        self.model = model
-
-    async def turn(self, *, system: str, messages: list[dict], tools: list[dict], effort: str,
-                   on_text: OnText | None = None) -> Turn:
-        async with self._client.beta.messages.stream(
-            model=self.model,
-            max_tokens=MAX_TOKENS,
-            system=system,
-            messages=messages,
-            tools=tools,
-            output_config={"effort": effort},
-            betas=[FALLBACK_BETA],
-            fallbacks="default",
-        ) as stream:
-            async for event in stream:
-                if event.type == "text" and on_text is not None:
-                    await on_text(event.text)
-            message = await stream.get_final_message()
-        uses = [(b.id, b.name, b.input) for b in message.content if b.type == "tool_use"]
-        return Turn(list(message.content), uses, message.stop_reason)
-
-
-def create_llm(provider: str, api_key: str | None, model: str | None) -> LLM | None:
-    """None = Claude off (templates). Logged once, never raised: the kitchen runs without Claude."""
-    if provider not in PROVIDERS:
-        raise ValueError(f"CLAUDE_PROVIDER={provider!r}; expected one of {PROVIDERS}")
-    if provider == "foundry":
-        log.warning("STUB: CLAUDE_PROVIDER=foundry is not built yet; Claude is off (template text)")
-        return None
-    if not api_key:
-        log.info("no ANTHROPIC_API_KEY; Claude is off (template text)")
-        return None
-    try:
-        import anthropic
-    except ImportError:
-        log.warning("the anthropic package is not installed; Claude is off (template text)")
-        return None
-    return AnthropicLLM(anthropic.AsyncAnthropic(api_key=api_key), model or DEFAULT_MODEL)
-
-
 # ---------------------------------------------------------------- the agent
+
+
+def _label(llm: LLM) -> str:
+    """Which model answered, for the log ("asi1 (asi1)"); explanation_source is "ai" either way."""
+    return f"{getattr(llm, 'name', type(llm).__name__)} ({getattr(llm, 'model', '?')})"
 
 
 class ClaudeAgent:
     def __init__(self, tools: AgentTools, llm: LLM | None, *, publish: Callable[[dict], None], timezone: str = "UTC",
-                 engine_rule_error: type[Exception] = RuleError):
+                 engine_rule_error: type[Exception] = RuleError, fallback: LLM | None = None):
         self._tools = tools
         self._tool_errors = (*TOOL_ERRORS, engine_rule_error)
-        self._llm = llm
+        self._llm = llm  # Claude: chat, explanations and escalations
+        self._fallback = fallback  # ASI:One: chat and explanations only, when Claude is off, fails or times out
+        self._text_models = [m for m in (llm, fallback) if m is not None]
         self._publish = publish  # one /ws message
         self._system = SYSTEM_PROMPT.format(timezone=timezone)
         self._chat_count = 0
@@ -156,6 +89,7 @@ class ClaudeAgent:
 
     @property
     def enabled(self) -> bool:
+        """Claude is on: escalations go to it (ASI:One never decides them)."""
         return self._llm is not None
 
     # ------------------------------------------------------------ chat
@@ -187,16 +121,20 @@ class ClaudeAgent:
             streamed = True
             await on_text(text)
 
-        if self._llm is not None:
+        for llm in self._text_models:
             try:
-                text = await self._run(self._system, [{"role": "user", "content": message}], CHAT_TOOLS,
-                                       effort="low", on_text=forward)
-                return text, "ai"
+                text = await asyncio.wait_for(
+                    self._run(llm, self._system, [{"role": "user", "content": message}], CHAT_TOOLS,
+                              effort="low", on_text=forward),
+                    CHAT_TIMEOUT_S)
             except Exception:
-                log.exception("chat failed; answering with template text")
-                if streamed:
+                log.warning("chat via %s failed or timed out", _label(llm), exc_info=True)
+                if streamed:  # the owner already saw part of this answer: no second model on top of it
                     await on_text(" " + templates.CHAT_FAILED)
                     return templates.CHAT_FAILED, "template"
+                continue
+            log.info("chat answered by %s", _label(llm))
+            return text, "ai"
         text = templates.chat_reply(await self._meter())
         await on_text(text)
         return text, "template"
@@ -215,19 +153,21 @@ class ClaudeAgent:
     # ------------------------------------------------------------ explanations
 
     async def explain_decision(self, decision: dict, device_name: str) -> tuple[str, str]:
-        template = templates.explain_decision(decision, device_name)
-        if self._llm is None:
-            return template, "template"
         prompt = (f"Explain this decision about {device_name} to the owner in one sentence:\n"
                   f"{json.dumps(decision)}")
-        try:
-            text = await asyncio.wait_for(
-                self._run(self._system, [{"role": "user", "content": prompt}], EXPLAIN_TOOLS, effort="low"),
-                EXPLAIN_TIMEOUT_S)
-        except Exception:  # timeout or API error: the template stays
-            log.info("explanation for %s fell back to the template", decision.get("decision_id"))
-            return template, "template"
-        return (text.strip(), "ai") if text.strip() else (template, "template")
+        for llm in self._text_models:
+            try:
+                text = await asyncio.wait_for(
+                    self._run(llm, self._system, [{"role": "user", "content": prompt}], EXPLAIN_TOOLS, effort="low"),
+                    EXPLAIN_TIMEOUT_S)
+            except Exception:  # timeout or API error: the next model, then the template
+                log.info("explanation for %s via %s failed or timed out", decision.get("decision_id"), _label(llm))
+                continue
+            if text.strip():
+                log.info("explanation for %s by %s", decision.get("decision_id"), _label(llm))
+                return text.strip(), "ai"
+        log.info("explanation for %s fell back to the template", decision.get("decision_id"))
+        return templates.explain_decision(decision, device_name), "template"
 
     # ------------------------------------------------------------ escalations
 
@@ -243,7 +183,7 @@ class ClaudeAgent:
                      "owner_preferences": config.get("owner_preferences"), "authority": config.get("authority"),
                      "council": [COUNCIL_AGENTS[p] for p in council or () if p in COUNCIL_AGENTS]}
             await asyncio.wait_for(
-                self._run(self._system + ESCALATION_PROMPT, [{"role": "user", "content": json.dumps(facts)}],
+                self._run(self._llm, self._system + ESCALATION_PROMPT, [{"role": "user", "content": json.dumps(facts)}],
                           ESCALATION_TOOLS, effort="medium", escalation=escalation, chosen=chosen),
                 ESCALATION_TIMEOUT_S)
         except Exception:
@@ -253,12 +193,12 @@ class ClaudeAgent:
 
     # ------------------------------------------------------------ the tool loop
 
-    async def _run(self, system: str, messages: list[dict], allowed: tuple[str, ...], *, effort: str,
+    async def _run(self, llm: LLM, system: str, messages: list[dict], allowed: tuple[str, ...], *, effort: str,
                    on_text: OnText | None = None, escalation: dict | None = None, chosen: dict | None = None) -> str:
         tools = AgentTools.schemas(allowed, escalation)
         text = []
         for _ in range(MAX_TURNS):
-            turn = await self._llm.turn(system=system, messages=messages, tools=tools, effort=effort, on_text=on_text)
+            turn = await llm.turn(system=system, messages=messages, tools=tools, effort=effort, on_text=on_text)
             text.append(turn.text)
             messages.append({"role": "assistant", "content": turn.content})
             if turn.stop_reason == "pause_turn":
