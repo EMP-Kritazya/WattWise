@@ -56,11 +56,9 @@ export function DemandSummary() {
             ? "Connection lost · showing last received readings"
             : !latest.with
               ? "Waiting for hub readings"
-              : clock?.paused_reason === "escalation"
-                ? "Paused · your decision needed"
-                : clock?.playing
-                  ? "Simulation running"
-                  : "Simulation paused"}{" "}
+              : clock?.playing
+                ? "Simulation running"
+                : "Simulation paused"}{" "}
           · {transport.kind === "mock" ? "Mock data" : "Simulated"}
         </span>
       </div>

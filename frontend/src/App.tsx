@@ -1,13 +1,14 @@
 import { useEffect } from "react";
-import { BrowserRouter, Navigate, NavLink, Route, Routes } from "react-router";
-import { ChartColumn, ChefHat, LayoutDashboard, Leaf, Microscope, Network } from "lucide-react";
+import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes } from "react-router";
+import { ChartColumn, ChefHat, LayoutDashboard, Leaf, Microscope, MonitorPlay, Network } from "lucide-react";
 import { ChatDrawer } from "@/components/ChatDrawer";
-import { EscalationDialog } from "@/components/live/EscalationDialog";
+import { SectionTabs, type SectionTab } from "@/components/SectionTabs";
 import { StatusBar } from "@/components/StatusBar";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { AgentNetworkPage } from "@/pages/AgentNetworkPage";
 import { BuilderPage } from "@/pages/BuilderPage";
+import { DashboardPage } from "@/pages/DashboardPage";
 import { EvalLabPage } from "@/pages/EvalLabPage";
 import { LivePage } from "@/pages/LivePage";
 import { ProofPage } from "@/pages/ProofPage";
@@ -16,12 +17,20 @@ import { startLive } from "@/data";
 import { useDashboardStore as useSim } from "@/data";
 import { transport } from "@/transport";
 
+// The four top tabs. Dashboard and Proof & Agents each hold two screens, switched by sub-tabs.
 const NAV = [
-  { to: "/live", label: "Live", icon: LayoutDashboard },
-  { to: "/agents", label: "Agent Network", icon: Network },
-  { to: "/builder", label: "Kitchen Builder", icon: ChefHat },
-  { to: "/proof", label: "Proof", icon: ChartColumn },
+  { to: "/live", label: "Live Simulation", icon: MonitorPlay },
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/eval", label: "Evaluation Lab", icon: Microscope },
+  { to: "/proof", label: "Proof & Agents", icon: ChartColumn },
+];
+const DASHBOARD_TABS: SectionTab[] = [
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/dashboard/builder", label: "Kitchen Builder", icon: ChefHat },
+];
+const PROOF_TABS: SectionTab[] = [
+  { to: "/proof", label: "Proof", icon: ChartColumn },
+  { to: "/proof/agents", label: "Agent Network", icon: Network },
 ];
 
 export default function App() {
@@ -39,27 +48,38 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <div className="flex min-h-screen bg-transparent">
-        <Sidebar />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <TopBar />
-          <main className="flex-1">
-            <Routes>
-              <Route path="/" element={<Navigate to="/builder" replace />} />
-              <Route path="/builder" element={<BuilderPage />} />
-              <Route path="/live" element={<LivePage />} />
-              <Route path="/agents" element={<AgentNetworkPage />} />
-              <Route path="/proof" element={<ProofPage />} />
-              <Route path="/eval" element={<EvalLabPage />} />
-              <Route path="/sim" element={<SimHostPage />} />
-            </Routes>
-            {/* On every screen: a waiting escalation pauses the clock, so the owner must always see it. */}
-            <EscalationDialog />
-          </main>
-          <StatusBar className="border-t-2 border-[#22223B] bg-[#FFF1E2] px-4 py-2 lg:hidden" />
-        </div>
-      </div>
+      <Routes>
+        <Route element={<Shell />}>
+          <Route path="/" element={<Navigate to="/live" replace />} />
+          <Route path="/live" element={<LivePage />} />
+          <Route path="/dashboard" element={<SectionTabs tabs={DASHBOARD_TABS} label="Dashboard sections" />}>
+            <Route index element={<DashboardPage />} />
+            <Route path="builder" element={<BuilderPage />} />
+          </Route>
+          <Route path="/eval" element={<EvalLabPage />} />
+          <Route path="/proof" element={<SectionTabs tabs={PROOF_TABS} label="Proof sections" />}>
+            <Route index element={<ProofPage />} />
+            <Route path="agents" element={<AgentNetworkPage />} />
+          </Route>
+          <Route path="/sim" element={<SimHostPage />} />
+          {/* Old addresses still work. */}
+          <Route path="/builder" element={<Navigate to="/dashboard/builder" replace />} />
+          <Route path="/agents" element={<Navigate to="/proof/agents" replace />} />
+        </Route>
+      </Routes>
     </BrowserRouter>
+  );
+}
+
+/** The top bar with the four tabs above every screen. Claude resolves escalations itself, so no decision dialog. */
+function Shell() {
+  return (
+    <div className="flex min-h-screen flex-col bg-transparent">
+      <TopBar />
+      <main className="min-w-0 flex-1">
+        <Outlet />
+      </main>
+    </div>
   );
 }
 
@@ -87,23 +107,17 @@ function MockBadge() {
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
   cn(
-    "flex items-center gap-2.5 rounded-xl border-2 border-transparent px-3 py-2 text-sm font-extrabold text-muted-foreground transition-all hover:bg-accent hover:text-foreground",
+    "flex items-center gap-2 rounded-xl border-2 border-transparent px-3 py-2 text-sm font-extrabold whitespace-nowrap text-muted-foreground transition-all hover:bg-accent hover:text-foreground",
     isActive && "border-[#22223B] bg-primary text-[#22223B] shadow-[0_3px_0_#22223B]",
   );
 
-/** Large screens: brand, kitchen, navigation, and the connection status at the bottom. */
-function Sidebar() {
+/** Brand, the four tabs, kitchen and connection status, and the assistant, at every width. */
+function TopBar() {
   const kitchenName = useSim((s) => s.kitchen?.config.name);
   return (
-    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col gap-6 border-r-2 border-[#22223B] bg-[#FFF1E2]/95 px-3 py-5 lg:flex">
-      <div className="px-2">
-        <Brand />
-      </div>
-      <div className="rounded-2xl border-2 border-[#22223B] bg-white px-3 py-2.5 shadow-[0_3px_0_#22223B]">
-        <div className="text-[11px] tracking-wide text-muted-foreground uppercase">Kitchen</div>
-        <div className="mt-0.5 truncate font-medium">{kitchenName ?? "Not built yet"}</div>
-      </div>
-      <nav className="flex flex-col gap-1">
+    <header className="sticky top-0 z-30 flex flex-wrap items-center gap-x-5 gap-y-2 border-b-2 border-[#22223B] bg-[#FFF1E2]/95 px-4 py-3 backdrop-blur sm:px-6">
+      <Brand />
+      <nav aria-label="Main" className="order-last flex w-full gap-1 overflow-x-auto lg:order-none lg:w-auto">
         {NAV.map(({ to, label, icon: Icon }) => (
           <NavLink key={to} to={to} className={navClass}>
             <Icon className="size-4" />
@@ -111,29 +125,12 @@ function Sidebar() {
           </NavLink>
         ))}
       </nav>
-      <div className="mt-auto flex flex-col gap-3 px-2">
+      <div className="ml-auto flex items-center gap-3">
         <MockBadge />
-        <StatusBar className="flex-col items-start gap-y-0.5" />
-      </div>
-    </aside>
-  );
-}
-
-/** Small screens: everything from the sidebar in one row. */
-function TopBar() {
-  return (
-    <header className="sticky top-0 z-30 flex flex-wrap items-center gap-x-4 gap-y-2 border-b-2 border-[#22223B] bg-[#FFF1E2]/95 px-4 py-3 backdrop-blur lg:hidden">
-      <Brand />
-      <nav className="flex gap-1">
-        {NAV.map(({ to, label, icon: Icon }) => (
-          <NavLink key={to} to={to} className={navClass}>
-            <Icon className="size-4" />
-            <span className="hidden sm:inline">{label}</span>
-          </NavLink>
-        ))}
-      </nav>
-      <div className="ml-auto flex items-center gap-2">
-        <MockBadge />
+        <div className="hidden text-right leading-tight sm:block">
+          <div className="max-w-40 truncate text-sm font-bold">{kitchenName ?? "No kitchen yet"}</div>
+          <StatusBar className="justify-end" />
+        </div>
         <ChatDrawer />
       </div>
     </header>
