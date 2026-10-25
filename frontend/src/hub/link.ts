@@ -46,9 +46,12 @@ export class HubLink {
     const socket = new WebSocket(url);
     this.connection = {
       send: (message) => socket.send(JSON.stringify(message)),
-      close: () => socket.close(),
+      close: () => { if (socket.readyState === WebSocket.OPEN) socket.close(); },
     };
-    socket.addEventListener("open", () => socket.send(JSON.stringify(HELLO)));
+    socket.addEventListener("open", () => {
+      if (version !== this.connectionVersion) { socket.close(); return; }
+      socket.send(JSON.stringify(HELLO));
+    });
     socket.addEventListener("message", (event) => {
       if (version !== this.connectionVersion) return;
       try {
@@ -58,6 +61,7 @@ export class HubLink {
       }
     });
     socket.addEventListener("error", () => {
+      if (version !== this.connectionVersion) return;
       useHubStatus.setState({ connection: "error", message: "Could not reach /ws/hub" });
     });
     socket.addEventListener("close", () => {

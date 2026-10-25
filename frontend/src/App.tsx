@@ -13,6 +13,7 @@ import { EvalLabPage } from "@/pages/EvalLabPage";
 import { LivePage } from "@/pages/LivePage";
 import { ProofPage } from "@/pages/ProofPage";
 import { SimHostPage } from "@/pages/SimHostPage";
+import { HtmlOverlays } from "@/components/live/floor/HtmlOverlay";
 import { startLive } from "@/data";
 import { useDashboardStore as useSim } from "@/data";
 import { transport } from "@/transport";
@@ -48,6 +49,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <HtmlOverlays />
       <Routes>
         <Route element={<Shell />}>
           <Route path="/" element={<Navigate to="/live" replace />} />
@@ -75,9 +77,7 @@ export default function App() {
 /** The top bar with the four tabs above every screen. Claude resolves escalations itself, so no decision dialog. */
 function Shell() {
   const onLive = useLocation().pathname === "/live";
-  // Live Simulation stays mounted once visited: hidden on other tabs, its 3D render loop paused. Unmounting the 3D floor makes
-  // drei's <Html> labels unmount their own React roots during React 19's commit, which throws (removeChild NotFoundError).
-  // Kept mounted, nothing is torn down, and coming back to Live is instant.
+  // Keep the floor mounted and pause its render loop on other tabs so returning to Live is instant.
   const [liveVisited, setLiveVisited] = useState(onLive);
   useEffect(() => {
     if (onLive) setLiveVisited(true);

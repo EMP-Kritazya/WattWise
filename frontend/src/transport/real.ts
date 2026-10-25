@@ -54,14 +54,17 @@ export const realTransport: Transport = {
     const setStatus = (s: ConnectionStatus) => onStatus(s);
 
     const connect = () => {
+      if (stopped) return;
       setStatus("connecting");
       const scheme = location.protocol === "https:" ? "wss" : "ws";
       socket = new WebSocket(`${scheme}://${location.host}/ws`);
       socket.onopen = () => {
+        if (stopped) { socket?.close(); return; }
         retryMs = 500;
         setStatus("open");
       };
       socket.onmessage = (ev) => {
+        if (stopped) return;
         try {
           onMessage(JSON.parse(ev.data) as WsMessage);
         } catch (err) {
@@ -69,19 +72,21 @@ export const realTransport: Transport = {
         }
       };
       socket.onclose = () => {
-        setStatus("closed");
         if (stopped) return;
+        setStatus("closed");
         // Back off up to 5 s so a restarting API server doesn't get hammered.
         retryTimer = setTimeout(connect, retryMs);
         retryMs = Math.min(retryMs * 2, 5000);
       };
     };
 
-    connect();
+    // StrictMode immediately cleans up its first effect. Let it cancel before opening a socket.
+    retryTimer = setTimeout(connect, 0);
     return () => {
       stopped = true;
       clearTimeout(retryTimer);
-      socket?.close();
+      if (socket?.readyState === WebSocket.OPEN) socket.close();
+      // A pending handshake closes in onopen; closing CONNECTING sockets emits a browser error.
     };
   },
 };

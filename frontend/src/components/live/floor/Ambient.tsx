@@ -1,6 +1,7 @@
+import { Html } from "./HtmlOverlay";
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Html, Line, RoundedBox } from "@react-three/drei";
+import { Line, RoundedBox } from "@react-three/drei";
 import { Color, DoubleSide, Object3D, type Group, type InstancedMesh } from "three";
 import type { Line2 } from "three-stdlib";
 import { Cpu } from "lucide-react";

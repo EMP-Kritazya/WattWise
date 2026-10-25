@@ -1,5 +1,6 @@
+import { Html } from "./HtmlOverlay";
 import { memo, useMemo } from "react";
-import { Html, RoundedBox } from "@react-three/drei";
+import { RoundedBox } from "@react-three/drei";
 import { Furniture } from "./Furniture";
 import { FLOOR, INK, INNER_WALL, PROP, SLAB, WALL, WINDOW } from "./palette";
 import { BACK_WALLS, PROPS, ROOMS, WALLS, WINDOWS, type Box } from "./plan";

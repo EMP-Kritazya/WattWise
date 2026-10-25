@@ -309,7 +309,7 @@ export function LiveFloor({
           style={{ background: BACKGROUND }}
         >
           <Canvas
-            shadows
+            shadows="percentage"
             orthographic
             frameloop={active ? "always" : "never"}
             dpr={[1, 1.5]}

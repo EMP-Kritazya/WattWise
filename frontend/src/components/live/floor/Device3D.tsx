@@ -1,5 +1,6 @@
+import { Html } from "./HtmlOverlay";
 import { forwardRef, useState } from "react";
-import { Billboard, Edges, Html, Line, RoundedBox } from "@react-three/drei";
+import { Billboard, Edges, Line, RoundedBox } from "@react-three/drei";
 import { Color, DoubleSide, type Group } from "three";
 import { ArrowDownToLine, Clock } from "lucide-react";
 import type { DeviceMeta } from "@/hooks/useDeviceMeta";
