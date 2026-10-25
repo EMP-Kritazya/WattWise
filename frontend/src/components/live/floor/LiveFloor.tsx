@@ -47,7 +47,7 @@ interface Limits {
 }
 
 /** Orthographic views: direction from the target toward the camera, and how far the viewer may orbit. */
-const ORTHO_VIEWS: Record<"iso" | "top", { dir: Vector3; limits: Limits }> = {
+export const ORTHO_VIEWS: Record<"iso" | "top", { dir: Vector3; limits: Limits }> = {
   // A 3/4 view turned toward the dining room (azimuth ≈ 27°, elevation ≈ 31°): its ~1.9:1 silhouette suits the wide stage.
   iso: { dir: new Vector3(20, 28, 40).normalize(), limits: { minPolar: 0.55, maxPolar: 1.2, minAzimuth: 0.25, maxAzimuth: 1.35 } },
   // Straight down, back wall at the top of the screen (the tiny z keeps the orientation defined).
@@ -477,7 +477,7 @@ function stagePoints(stage: Group | null): Vector3[] {
   return out;
 }
 
-function CameraRig({
+export function CameraRig({
   stage,
   fitKey,
   frames,

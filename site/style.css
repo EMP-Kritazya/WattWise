@@ -1,0 +1,32 @@
+/* Shared Toy Box look for the WattWise site (same palette as the app's Live floor and the pitch deck). */
+:root {
+  --ink: #22223B; --bg: #F3ECE0; --cream: #FFF6E9; --paper: #FFFBF5; --peach: #FFF1E2; --surface: #FFFFFF;
+  --teal: #168F84; --teal-soft: #DFF6F3; --coral: #E43F62; --coral-soft: #FDE4EA; --butter: #FFF0BA;
+  --sage: #CDEAC0; --muted: #5B5968; --line: #22223B; --shadow: #22223B;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #F4EFE6; --bg: #17161F; --cream: #201F2B; --paper: #24232F; --peach: #2E2733; --surface: #262533;
+    --teal: #3CC2B4; --teal-soft: #173B39; --coral: #FF6F8C; --coral-soft: #3A2030; --butter: #4A4226;
+    --sage: #2C4A2A; --muted: #B4B0C0; --line: #4B4960; --shadow: #0B0B12;
+  }
+}
+:root[data-theme="dark"] {
+  --ink: #F4EFE6; --bg: #17161F; --cream: #201F2B; --paper: #24232F; --peach: #2E2733; --surface: #262533;
+  --teal: #3CC2B4; --teal-soft: #173B39; --coral: #FF6F8C; --coral-soft: #3A2030; --butter: #4A4226;
+  --sage: #2C4A2A; --muted: #B4B0C0; --line: #4B4960; --shadow: #0B0B12;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: var(--bg); color: var(--ink); font-family: "Nunito", system-ui, sans-serif; }
+h1, h2, h3, .brand { font-family: "Fredoka", "Nunito", system-ui, sans-serif; }
+a { color: var(--teal); }
+.top { display: flex; align-items: center; justify-content: space-between; padding: 14px 24px; max-width: 1360px; margin: 0 auto; }
+.brand { display: flex; align-items: center; gap: 10px; font-size: 24px; font-weight: 700; color: var(--ink); text-decoration: none; }
+.logo { width: 38px; height: 38px; border-radius: 12px; background: var(--teal); display: grid; place-items: center;
+        border: 3px solid var(--line); box-shadow: 3px 3px 0 var(--shadow); font-size: 20px; }
+.links { display: flex; gap: 8px; }
+.links a { font-weight: 800; color: var(--ink); text-decoration: none; padding: 8px 14px; border-radius: 12px; border: 3px solid transparent; }
+.links a[aria-current="page"], .links a:hover { border-color: var(--line); background: var(--surface); }
+.card { background: var(--surface); border: 3px solid var(--line); border-radius: 22px; box-shadow: 5px 5px 0 var(--shadow); }
+.kicker { font-size: 13px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; color: var(--teal); }
+@media (max-width: 640px) { .top { padding: 12px 16px; } }

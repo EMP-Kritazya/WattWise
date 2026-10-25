@@ -1,0 +1,3 @@
+/* The showcase build has its own Vite root, so point Tailwind at the app sources explicitly. */
+@import "../index.css";
+@source "../";

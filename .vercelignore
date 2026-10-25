@@ -1,0 +1,9 @@
+backend
+agents
+convex
+firmware
+spacetime
+docs
+data
+**/node_modules
+**/.venv
