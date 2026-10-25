@@ -116,6 +116,7 @@ async def test_events_chat_recorded(monkeypatch):
         "WattWise Events: near Marina, San Francisco, next 12 h (recorded, source demo_events):",
         f"- {item['name']} at {item['venue']}, {events.local_and_utc(item['start'])}, {item['distance_km']} km away, "
         f"expected attendance {item['expected_attendance']}",
+        "Crowd effect: medium (recorded): Game ends 22:00, 1.8 km away",
     ]
 
 

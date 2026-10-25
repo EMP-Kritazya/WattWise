@@ -19,6 +19,8 @@ Input:  @wattwiseevents events tonight
 Output: WattWise Events: near Marina, San Francisco, next 12 h (live_api, source ticketmaster):
         - San Francisco Giants vs. Los Angeles Dodgers at Oracle Park, 2026-10-24 19:05 PDT (2026-10-25 02:05 UTC),
           4.21 km away, attendance not published
+        ...
+        Crowd effect: medium (set by claude): <Claude's short reason, quoting the event data>
 ```
 
 Example prompts:
@@ -29,6 +31,11 @@ Example prompts:
 - concerts or games near the restaurant next 24 hours
 
 Hours: 1 to 24 (default 12). Start times in local time (America/Los_Angeles) with UTC next to them.
+
+The last line is the crowd effect: how much these events should raise a nearby restaurant's traffic, as a category
+(`none`, `small`, `medium`, `large`). Claude picks it from the event list (structured output, an enum); it is never an
+attendance number. Recorded events get the recorded crowd effect. Without `ANTHROPIC_API_KEY`, or if Claude fails, the
+line says "not classified".
 
 ## Call it from your agent (typed messages, uAgents)
 
@@ -65,7 +72,7 @@ reply, status = await ctx.send_and_receive(EVENTS_ADDRESS,
 ## Limitations
 
 - No attendance: Ticketmaster does not publish it, and the agent never estimates it (chat says "attendance not
-  published").
+  published"). The crowd effect category stands in for it.
 - Typed `EventsResponse` replies are still the recorded event (label `recorded`): the contract requires
   `expected_attendance` as a number, which Ticketmaster does not give. Live events reach chat replies only, for now.
 - Chat looks up events near the demo location (Marina, San Francisco) only; a place named in the message is not used yet.

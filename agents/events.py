@@ -6,7 +6,9 @@ source `ticketmaster`, label `live_api`. Ticketmaster publishes no attendance, a
 No key, timeout, HTTP error or rate limit → the recorded event, label `recorded`, logged as an error.
 `--recorded` / DEMO_MODE=1: the recorded fixture (the scripted Giants game the demo needs), label `recorded`.
 Chat (Agent Chat Protocol, for any ASI:One user or agent): "events tonight" -> the events as plain text with their label,
-start in local time (America/Los_Angeles) next to UTC.
+start in local time (America/Los_Angeles) next to UTC, then the crowd effect: a category (none | small | medium | large)
+that Claude picks from the events through crowd.py, never an attendance number. Recorded events get the recorded crowd
+effect; Claude off or failing -> "not classified".
 
 Run:  python agents/events.py [--recorded]      (seed: EVENTS_AGENT_SEED, or derived from FETCH_AGENT_SEED)
 """
@@ -16,7 +18,7 @@ from __future__ import annotations
 import logging
 import math
 import os
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -24,6 +26,7 @@ import httpx
 from uagents import Context, Protocol
 
 from common import load_dotenv, load_fixture, make_agent, recorded_mode
+from crowd import Classifier, create_classifier, recorded_classifier
 from models import EventsRequest, EventsResponse
 from public_chat import DEFAULT_LAT, DEFAULT_LON, DEFAULT_PLACE, make_chat_protocol, parse_hours, when
 
@@ -134,6 +137,7 @@ async def answer(req: EventsRequest, *, use_recorded: bool) -> EventsResponse:
 
 proto = Protocol(name="wattwise-events", version="0.1.0")
 RECORDED = False
+CLASSIFY: Classifier | None = None  # set in main(); None = Claude off
 
 
 @proto.on_message(EventsRequest, replies=EventsResponse)
@@ -160,25 +164,42 @@ def event_line(e: ListedEvent) -> str:
     return f"- {e.name} at {venue}, {local_and_utc(e.start)}, {distance}, {attendance}"
 
 
-def chat_text(hours: int, reply: EventsListing) -> str:
-    """The reply as plain text: every event as the source gave it, start in local time and UTC, with the label."""
+async def crowd_line(reply: EventsListing, classify: Classifier | None) -> str:
+    """The crowd effect for these events: a category with Claude's reason (or the recorded one), never a number."""
+    if reply.label == "recorded":  # the recorded crowd effect belongs to the recorded event
+        classify, set_by = recorded_classifier, "recorded"
+    else:
+        set_by = "set by claude"
+    crowd = await classify({"items": [asdict(e) for e in reply.items]}) if classify is not None else None
+    if crowd is None:
+        return "Crowd effect: not classified right now (Claude unavailable)."
+    return f"Crowd effect: {crowd['value']} ({set_by}): {crowd['reason']}"
+
+
+def chat_text(hours: int, reply: EventsListing, crowd: str | None = None) -> str:
+    """The reply as plain text: every event as the source gave it, start in local time and UTC, with the label, then
+    the crowd effect line."""
     head = f"WattWise Events: near {DEFAULT_PLACE}, next {hours} h ({reply.label}, source {reply.source})"
     if not reply.items:
         return head + ": no events found."
-    return "\n".join([head + ":"] + [event_line(e) for e in reply.items])
+    return "\n".join([head + ":"] + [event_line(e) for e in reply.items] + ([crowd] if crowd else []))
 
 
-async def answer_text(text: str, client: httpx.AsyncClient | None = None, now: datetime | None = None) -> str:
+async def answer_text(text: str, client: httpx.AsyncClient | None = None, now: datetime | None = None,
+                      classify: Classifier | None = None) -> str:
     # STUB: chat always asks for the demo location; a place named in the message is not looked up yet.
     hours = parse_hours(text, CHAT_DEFAULT_HOURS, CHAT_MAX_HOURS)
     req = EventsRequest(lat=DEFAULT_LAT, lon=DEFAULT_LON, radius_km=CHAT_RADIUS_KM, window_h=hours)
-    return chat_text(hours, await listing(req, use_recorded=RECORDED, client=client, now=now))
+    reply = await listing(req, use_recorded=RECORDED, client=client, now=now)
+    crowd = await crowd_line(reply, classify or CLASSIFY) if reply.items else None
+    return chat_text(hours, reply, crowd)
 
 
 def main() -> None:
-    global RECORDED
+    global RECORDED, CLASSIFY
     load_dotenv()
     RECORDED = recorded_mode()
+    CLASSIFY = create_classifier(RECORDED)
     logging.getLogger("httpx").setLevel(logging.WARNING)  # its INFO line prints the request URL, apikey included
     agent = make_agent("events", "WattWise Events",
                        "Events near a restaurant in the next hours (Ticketmaster, live; recorded demo data for San "

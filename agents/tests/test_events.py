@@ -103,13 +103,53 @@ async def test_typed_reply_keeps_the_recorded_event_until_attendance_may_be_null
 async def test_live_chat_shows_local_and_utc_time_and_no_attendance(monkeypatch):
     monkeypatch.setenv("TICKETMASTER_API_KEY", "test-key")
     monkeypatch.setattr(events, "RECORDED", False)
-    text = await events.answer_text("events tonight", client=client(lambda r: httpx.Response(200, json=SAMPLE)), now=NOW)
+    seen = []
+
+    async def classify(evts):
+        seen.append(evts)
+        return {"value": "large", "reason": "Giants game at Oracle Park, 4.21 km"}
+
+    text = await events.answer_text("events tonight", client=client(lambda r: httpx.Response(200, json=SAMPLE)), now=NOW,
+                                    classify=classify)
     assert text.splitlines() == [
         "WattWise Events: near Marina, San Francisco, next 12 h (live_api, source ticketmaster):",
         "- San Francisco Giants vs. Los Angeles Dodgers at Oracle Park, 2026-10-24 19:05 PDT (2026-10-25 02:05 UTC), "
         "4.21 km away, attendance not published",
         "- Late Night Jazz at Black Cat, 2026-10-24 22:30 PDT (2026-10-25 05:30 UTC), 2.6 km away, attendance not published",
+        "Crowd effect: large (set by claude): Giants game at Oracle Park, 4.21 km",
     ]
+    # Claude sees the live events unchanged, attendance null: nothing estimated on the way
+    assert seen[0]["items"][0] == {"name": "San Francisco Giants vs. Los Angeles Dodgers", "venue": "Oracle Park",
+                                   "start": "2026-10-25T02:05:00Z", "distance_km": 4.21, "expected_attendance": None}
+
+
+async def test_crowd_not_classified_when_claude_is_off_or_fails():
+    live = events.from_ticketmaster(SAMPLE)
+
+    async def fails(evts):
+        return None
+
+    for classify in (None, fails):
+        assert await events.crowd_line(live, classify) == "Crowd effect: not classified right now (Claude unavailable)."
+
+
+async def test_recorded_events_get_the_recorded_crowd_effect_not_claude():
+    async def claude(evts):
+        raise AssertionError("recorded events are not sent to Claude")
+
+    assert await events.crowd_line(RECORDED, claude) == "Crowd effect: medium (recorded): Game ends 22:00, 1.8 km away"
+
+
+async def test_no_events_means_no_crowd_line(monkeypatch):
+    monkeypatch.setenv("TICKETMASTER_API_KEY", "test-key")
+    monkeypatch.setattr(events, "RECORDED", False)
+
+    async def classify(evts):
+        raise AssertionError("nothing to classify")
+
+    text = await events.answer_text("events tonight", client=client(lambda r: httpx.Response(200, json={})), now=NOW,
+                                    classify=classify)
+    assert text == "WattWise Events: near Marina, San Francisco, next 12 h (live_api, source ticketmaster): no events found."
 
 
 def test_missing_fields_say_not_published():
