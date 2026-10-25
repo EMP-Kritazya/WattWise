@@ -3,6 +3,24 @@
 You are taking over Ashirwad's work on **WattWise** (Cal Hacks 13.0, Oct 23–25 2026). Work carefully, keep the existing code style,
 and run `npm run build` and `npm test` (in `frontend/`) before calling anything done.
 
+## ⭐ Oct 25: 3D floor fills its frame + nicer Toy Box look (`integrate/ashirwad-suyog`, worktree `~/Downloads/WattWise-integrate`)
+Ashirwad: "too much blank space, the model is small; research and make the 3D model better, same theme".
+Measured in the isometric view (744×399 canvas): the restaurant drew only 220×167 px. Causes:
+1. `CameraRig` frames the hard-coded `SINGLE_BOX` (31.3×19 projected units) but the meshes project to 24.5×16, so ~25% is empty.
+2. Insets eat the height: 90 px on top for the label stack + 44 px at the bottom for the legend (of 399).
+3. The 43° isometric azimuth makes a squarish diamond; the canvas is ~2:1 wide, so the sides stay empty.
+Done (committed; build + tests pass; verified in the browser in With and Side by side, tablet and laptop widths):
+- `CameraRig` fits what the stage draws (`stagePoints`: visible meshes' world bbox corners inside `<group ref={stage}>`),
+  not `SINGLE_BOX` (removed). Insets: top 64 px with labels (16 without), bottom 14, sides 12. `fitKey` re-fits on compare.
+- Isometric dir `(20, 28, 40)`: azimuth ≈ 27°, elevation ≈ 31°, ~1.9:1 silhouette for the wide stage.
+- Result on a 744×399 canvas: restaurant drawn 587×314 px (79 % × 79 %), was 220×167 px.
+- `Scenery`: the spec's building slab (`SLAB` #E8B89A, `RoundedBox`, ink outline, `STAGE` bounds) + `Greenery` (front
+  sidewalk, 3 toy trees, 5 potted bushes on free slab; hidden in Equipment focus). `ContactShadows` under each slab (frames=1).
+- Legend moved to a compact 2×2 card in the top-right corner (empty in the 3/4 view).
+- `TiltShift2` (blur 0.06, taper 0.6) added. **N8AO was tried and removed**: with `multisampling={4}` it blanked the frame on
+  a fresh load.
+Verify by measuring drawn px in the browser (`_roots.get(canvas).store` from `/node_modules/.vite/deps/@react-three_fiber.js`).
+
 ## ⭐ Oct 25: Live Simulation is one screen (on `integrate/ashirwad-suyog`)
 - From tablet width up (≥768 px) the Live tab fills exactly the window below the top bar (`--topbar-h`, set by `TopBar`
   in `App.tsx`); nothing scrolls. Phones keep the scrolling layout.

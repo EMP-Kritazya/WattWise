@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
-import { Bloom, EffectComposer, ToneMapping } from "@react-three/postprocessing";
+import { ContactShadows, OrbitControls, PerspectiveCamera } from "@react-three/drei";
+// No N8AO: with the composer's multisampling it blanked the whole frame on a fresh load (Oct 25). The contact shadow
+// under the slab and the key light's soft shadows do the grounding instead.
+import { Bloom, EffectComposer, TiltShift2, ToneMapping } from "@react-three/postprocessing";
 import { ToneMappingMode } from "postprocessing";
-import { Box3, Vector3, type Group, type OrthographicCamera } from "three";
+import { Box3, Vector3, type Group, type Mesh, type OrthographicCamera } from "three";
 import type { OrbitControls as OrbitControlsImpl } from "three-stdlib";
 import { Box, Crosshair, Eye, Focus, List, Map as MapIcon, Maximize2, Store, Tags, type LucideIcon } from "lucide-react";
 import { SavingsPanel } from "@/components/live/SavingsPanel";
@@ -17,9 +19,10 @@ import { cn } from "@/lib/utils";
 import { requestSurge, useDashboardStore as useSim } from "@/data";
 import { transport } from "@/transport";
 import { DemoBar, newestDecision } from "./Hud";
-import { BACKGROUND, STATE_HEX } from "./palette";
+import { BACKGROUND, INK, STATE_HEX } from "./palette";
 import { placeDevices, type Placement } from "./plan";
 import { Restaurant } from "./Restaurant";
+import { STAGE } from "./Scenery";
 import type { DecisionSpotlight } from "./Device3D";
 import { OperationsPanel } from "./OperationsPanel";
 import { ToyBoxRail } from "./ToyBoxRail";
@@ -45,7 +48,8 @@ interface Limits {
 
 /** Orthographic views: direction from the target toward the camera, and how far the viewer may orbit. */
 const ORTHO_VIEWS: Record<"iso" | "top", { dir: Vector3; limits: Limits }> = {
-  iso: { dir: new Vector3(34, 30, 36).normalize(), limits: { minPolar: 0.55, maxPolar: 1.2, minAzimuth: 0.25, maxAzimuth: 1.35 } },
+  // A 3/4 view turned toward the dining room (azimuth ≈ 27°, elevation ≈ 31°): its ~1.9:1 silhouette suits the wide stage.
+  iso: { dir: new Vector3(20, 28, 40).normalize(), limits: { minPolar: 0.55, maxPolar: 1.2, minAzimuth: 0.25, maxAzimuth: 1.35 } },
   // Straight down, back wall at the top of the screen (the tiny z keeps the orientation defined).
   top: {
     dir: new Vector3(0, 1, 0.0005).normalize(),
@@ -139,9 +143,9 @@ export function LiveFloor({ demo, onDemoChange, className }: { demo: boolean; on
     if (!follow || mode !== "with") setAutoFocus(null);
   }, [follow, mode]);
 
-  // Reserve a small inset for labels; operational information lives outside the canvas.
-  // With labels on, leave headroom above the building for the stacked appliance labels; the legend sits at the bottom.
-  const padding = useMemo(() => ({ top: labels && mode !== "compare" ? 90 : 20, bottom: 44, left: 16, right: 16 }), [labels, mode]);
+  // Small insets only: headroom above the building for the stacked appliance labels; the legend overlays a bottom corner.
+  const padding = useMemo(() => ({ top: labels && mode !== "compare" ? 64 : 16, bottom: 14, left: 12, right: 12 }), [labels, mode]);
+  const stage = useRef<Group>(null);
   const container = useRef<HTMLDivElement>(null);
   const [wide, setWide] = useState(false);
   useEffect(() => {
@@ -157,12 +161,14 @@ export function LiveFloor({ demo, onDemoChange, className }: { demo: boolean; on
   const compare = COMPARE_LAYOUT[wide ? "row" : "column"];
 
   const focusId = mode === "compare" || perspective ? null : autoFocus;
+  // A followed decision frames its device; otherwise the camera frames what the stage actually draws (`null`).
+  // `fitKey` asks for a re-fit when the stage's contents move (one lane ↔ side by side).
   const frames = useMemo(() => {
     const focus = focusId ? focusBoxFor(placement, focusId) : null;
-    if (focus) return [focus];
-    if (mode !== "compare") return [SINGLE_BOX];
-    return [compare.without, compare.with].map((o) => SINGLE_BOX.clone().translate(new Vector3(...o)));
-  }, [placement, focusId, mode, compare]);
+    return focus ? [focus] : null;
+  }, [placement, focusId]);
+  const fitKey = mode === "compare" ? `compare:${wide ? "row" : "column"}` : "single";
+  const shadowAt: Vec3[] = mode === "compare" ? [compare.without, compare.with] : [[0, 0, 0]];
 
   useDemoKeys(demo, {
     compare: () => setMode((m) => (m === "compare" ? "with" : "compare")),
@@ -315,27 +321,44 @@ export function LiveFloor({ demo, onDemoChange, className }: { demo: boolean; on
               <orthographicCamera attach="shadow-camera" args={[-45, 45, 45, -45, 1, 160]} />
             </directionalLight>
 
-            {mode === "compare" ? (
-              <>
-                <Restaurant lane="without" tick={withoutTick} detail="compact" position={compare.without} spotlight={null} {...shared} />
-                <Restaurant lane="with" tick={withTick} detail="compact" position={compare.with} spotlight={spotlight} {...shared} />
-              </>
-            ) : (
-              <Restaurant
-                lane={mode}
-                tick={mode === "with" ? withTick : withoutTick}
-                detail="full"
-                spotlight={mode === "with" ? spotlight : null}
-                {...shared}
+            {/* The stage: everything the camera frames (the contact shadows below it are left out). */}
+            <group ref={stage}>
+              {mode === "compare" ? (
+                <>
+                  <Restaurant lane="without" tick={withoutTick} detail="compact" position={compare.without} spotlight={null} {...shared} />
+                  <Restaurant lane="with" tick={withTick} detail="compact" position={compare.with} spotlight={spotlight} {...shared} />
+                </>
+              ) : (
+                <Restaurant
+                  lane={mode}
+                  tick={mode === "with" ? withTick : withoutTick}
+                  detail="full"
+                  spotlight={mode === "with" ? spotlight : null}
+                  {...shared}
+                />
+              )}
+            </group>
+            {/* A soft shadow under each slab, so the toy sits on the table instead of floating. Static: drawn once. */}
+            {shadowAt.map(([x, y, z]) => (
+              <ContactShadows
+                key={`${fitKey}:${x},${z}`}
+                position={[x + (STAGE.x0 + STAGE.x1) / 2, y - 0.03 - STAGE.depth - 0.02, z + (STAGE.y0 + STAGE.y1) / 2]}
+                scale={[STAGE.x1 - STAGE.x0 + 3, STAGE.y1 - STAGE.y0 + 3]}
+                far={1.2}
+                blur={2.6}
+                opacity={0.45}
+                resolution={512}
+                color={INK}
+                frames={1}
               />
-            )}
+            ))}
             {perspective ? (
               <>
                 <PerspectiveCamera makeDefault fov={POSES[view].fov} near={0.05} far={500} position={POSES[view].from} />
                 <PerspectiveRig pose={POSES[view]} />
               </>
             ) : (
-              <CameraRig frames={frames} padding={padding} margin={focusId ? 1.15 : 1.03} view={ORTHO_VIEWS[view]} />
+              <CameraRig stage={stage} fitKey={fitKey} frames={frames} padding={padding} margin={focusId ? 1.15 : 1.02} view={ORTHO_VIEWS[view]} />
             )}
 
             {/* Rotation limits are set by the rigs, per view, once the camera arrives. */}
@@ -345,16 +368,19 @@ export function LiveFloor({ demo, onDemoChange, className }: { demo: boolean; on
               {/* High threshold: only status lights, status pads and working heat elements glow, nothing else. */}
               <Bloom mipmapBlur intensity={0.7} luminanceThreshold={1} luminanceSmoothing={0.2} radius={0.6} />
               <ToneMapping mode={ToneMappingMode.NEUTRAL} />
+              {/* A light miniature (tilt-shift) blur toward the top and bottom edges; the labels are HTML and stay sharp. */}
+              <TiltShift2 blur={0.06} taper={0.6} />
             </EffectComposer>
           </Canvas>
 
           {/* Below dialogs (z-50) so it never covers Approve / Decline. */}
-          <div className="pointer-events-none absolute bottom-3 left-3 z-[45] flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md bg-slate-950/85 px-3 py-2 text-xs text-slate-300">
+          {/* Top right: in the 3/4 view the building leaves that corner empty, so the legend never covers the stage. */}
+          <div className="pointer-events-none absolute top-2.5 right-2.5 z-[45] grid grid-cols-2 gap-x-3 gap-y-0.5 rounded-xl border-2 border-[#22223B] bg-white/90 px-2.5 py-1.5 text-[10px] font-semibold text-[#22223B] shadow-[0_2px_0_#22223B]">
             {(
               [
                 ["on", "Running"],
-                ["reduced", "Reduced by WattWise"],
-                ["waiting", "Waiting (delayed)"],
+                ["reduced", "Reduced"],
+                ["waiting", "Delayed"],
                 ["off", "Off"],
               ] as const
             ).map(([state, label]) => (
@@ -363,7 +389,7 @@ export function LiveFloor({ demo, onDemoChange, className }: { demo: boolean; on
                 {label}
               </span>
             ))}
-            <span className="text-slate-500">· {mode === "compare" ? "same customers in both" : "click an appliance for details"} · simulated</span>
+            <span className="col-span-2 text-[10px] font-normal text-[#6B687B]">{mode === "compare" ? "Same customers in both" : "Click an appliance"} · simulated</span>
           </div>
         </div>
         {demo ? (
@@ -384,9 +410,6 @@ export function LiveFloor({ demo, onDemoChange, className }: { demo: boolean; on
     </section>
   );
 }
-
-/** The building, roof pad and the front sidewalk with its lamps (the diorama's earth edge may bleed off-frame). */
-const SINGLE_BOX = new Box3(new Vector3(-1.2, -0.3, -1.2), new Vector3(25.4, 3.2, 16.2));
 
 interface Padding {
   top: number;
@@ -418,13 +441,42 @@ function lockZoom(controls: OrbitControlsImpl, zoom?: number) {
   controls.maxZoom = zoom ? zoom * MAX_ZOOM_IN : Infinity;
 }
 
+/** Corners of every box in `frames`. */
+function boxCorners(frames: Box3[]): Vector3[] {
+  const out: Vector3[] = [];
+  for (const b of frames)
+    for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) out.push(new Vector3(x, y, z));
+  return out;
+}
+
+/** World-space bounding-box corners of every visible mesh on the stage: what it actually draws, not a guessed box. */
+function stagePoints(stage: Group | null): Vector3[] {
+  const out: Vector3[] = [];
+  if (!stage) return out;
+  stage.updateWorldMatrix(true, true);
+  stage.traverseVisible((o) => {
+    const mesh = o as Mesh;
+    if (!mesh.isMesh || !mesh.geometry) return;
+    if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+    const b = mesh.geometry.boundingBox;
+    if (!b || b.isEmpty() || !Number.isFinite(b.min.x)) return;
+    for (const p of boxCorners([b])) out.push(p.applyMatrix4(mesh.matrixWorld));
+  });
+  return out;
+}
+
 function CameraRig({
+  stage,
+  fitKey,
   frames,
   padding,
   margin,
   view,
 }: {
-  frames: Box3[];
+  stage: RefObject<Group | null>;
+  fitKey: string;
+  /** Boxes to frame instead of the stage (a followed decision's device). */
+  frames: Box3[] | null;
   padding: Padding;
   margin: number;
   view: { dir: Vector3; limits: Limits };
@@ -437,7 +489,7 @@ function CameraRig({
 
   useEffect(() => {
     request.current = { frames, padding, margin, view, version: request.current.version + 1 };
-  }, [frames, padding, margin, view]);
+  }, [frames, padding, margin, view, fitKey]);
 
   useFrame(({ size }, dt) => {
     if (!controls) return;
@@ -445,11 +497,13 @@ function CameraRig({
     const req = request.current;
     const done = computedFor.current;
     if (done.version !== req.version || done.width !== size.width || done.height !== size.height) {
+      const points = req.frames ? boxCorners(req.frames) : stagePoints(stage.current);
+      if (!points.length) return; // the stage has not mounted yet: try again next frame
       // Keep the viewer's own orbit angle in the isometric view; snap to the view's direction otherwise.
       const current = camera.position.clone().sub(controls.target).normalize();
       const keepAngle = req.view.limits.maxPolar > 0.01 && current.y > 0.3 && current.y < 0.95;
       const dir = keepAngle && done.version >= 0 && goal.current === null ? current : req.view.dir;
-      goal.current = { ...fitGoal(dir, req.frames, req.padding, req.margin, size.width, size.height), dir };
+      goal.current = { ...fitGoal(dir, points, req.padding, req.margin, size.width, size.height), dir };
       computedFor.current = { version: req.version, width: size.width, height: size.height };
       applyLimits(controls, FREE); // let the camera travel; the view's limits apply on arrival
       lockZoom(controls);
@@ -516,9 +570,9 @@ function PerspectiveRig({ pose }: { pose: { pos: Vec3; target: Vec3 } }) {
   return null;
 }
 
-/** Target and zoom that show `frames` as large as possible inside the canvas area the HUD leaves free. */
-function fitGoal(dir: Vector3, frames: Box3[], padding: Padding, margin: number, width: number, height: number) {
-  // Screen axes for this viewing direction (as three's lookAt builds them); project every box corner onto them.
+/** Target and zoom that show `points` as large as possible inside the canvas area the HUD leaves free. */
+function fitGoal(dir: Vector3, points: Vector3[], padding: Padding, margin: number, width: number, height: number) {
+  // Screen axes for this viewing direction (as three's lookAt builds them); project every point onto them.
   const forward = dir.clone().normalize();
   const right = new Vector3(0, 1, 0).cross(forward).normalize();
   const up = forward.clone().cross(right);
@@ -526,16 +580,16 @@ function fitGoal(dir: Vector3, frames: Box3[], padding: Padding, margin: number,
   let maxX = -Infinity;
   let minY = Infinity;
   let maxY = -Infinity;
-  for (const b of frames)
-    for (const x of [b.min.x, b.max.x])
-      for (const y of [b.min.y, b.max.y])
-        for (const z of [b.min.z, b.max.z]) {
-          const v = new Vector3(x, y, z);
-          minX = Math.min(minX, v.dot(right));
-          maxX = Math.max(maxX, v.dot(right));
-          minY = Math.min(minY, v.dot(up));
-          maxY = Math.max(maxY, v.dot(up));
-        }
+  let minF = Infinity;
+  let maxF = -Infinity;
+  for (const v of points) {
+    minX = Math.min(minX, v.dot(right));
+    maxX = Math.max(maxX, v.dot(right));
+    minY = Math.min(minY, v.dot(up));
+    maxY = Math.max(maxY, v.dot(up));
+    minF = Math.min(minF, v.dot(forward));
+    maxF = Math.max(maxF, v.dot(forward));
+  }
   const freeW = Math.max(100, width - padding.left - padding.right);
   const freeH = Math.max(100, height - padding.top - padding.bottom);
   const zoom = Math.min(freeW / (maxX - minX), freeH / (maxY - minY)) / margin;
@@ -546,7 +600,7 @@ function fitGoal(dir: Vector3, frames: Box3[], padding: Padding, margin: number,
     .addScaledVector(right, (minX + maxX) / 2 - shiftX / zoom)
     .addScaledVector(up, (minY + maxY) / 2 + shiftY / zoom)
     // keep the target's depth on the content, so orbiting pivots around the building
-    .addScaledVector(forward, frames[0].getCenter(new Vector3()).dot(forward));
+    .addScaledVector(forward, (minF + maxF) / 2);
   return { target, zoom };
 }
 
