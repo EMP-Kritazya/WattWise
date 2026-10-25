@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WattWise · Pitch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@400;600;700;800&display=swap">
+<style>
+  :root {
+    --ink: #22223B; --cream: #FFF6E9; --paper: #FFFBF5; --peach: #FFF1E2; --teal: #168F84; --teal-soft: #DFF6F3;
+    --coral: #E43F62; --butter: #FFF0BA; --sage: #CDEAC0; --muted: #5B5968;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #E9E2D6; font-family: "Nunito", Arial, sans-serif; color: var(--ink); }
+  .deck { display: flex; flex-direction: column; align-items: center; gap: 32px; padding: 32px 0; }
+  .slide {
+    width: 1920px; height: 1080px; position: relative; overflow: hidden; flex: none;
+    background: var(--cream); padding: 110px 128px 150px; display: flex; flex-direction: column;
+    transform-origin: top center;
+  }
+  .kicker { font-size: 28px; font-weight: 800; letter-spacing: 5px; text-transform: uppercase; color: var(--teal); }
+  h1, h2, h3, .big { font-family: "Fredoka", Arial, sans-serif; }
+  h2 { font-size: 76px; font-weight: 700; line-height: 1.08; margin: 16px 0 44px; max-width: 1560px; }
+  p { font-size: 32px; line-height: 1.45; }
+  .muted { color: var(--muted); }
+  .card { background: #fff; border: 4px solid var(--ink); border-radius: 28px; box-shadow: 8px 8px 0 var(--ink); }
+  .two { display: grid; gap: 56px; align-items: center; }
+  .stack > p + p { margin-top: 28px; }
+  .row { display: flex; align-items: center; gap: 24px; font-size: 32px; font-weight: 800; }
+  .chip { width: 64px; height: 64px; border: 4px solid var(--ink); border-radius: 18px; flex: none; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+  .fact { padding: 26px 36px; }
+  .fact .big { font-size: 54px; font-weight: 700; color: var(--teal); line-height: 1.1; }
+  .fact p { font-size: 26px; margin-top: 6px; line-height: 1.4; }
+  sup { font-size: 20px; font-weight: 800; color: var(--teal); }
+  .steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 24px; flex: 1; align-items: start; }
+  .step { padding: 32px 28px; display: flex; flex-direction: column; gap: 16px; min-height: 520px; }
+  .num { width: 64px; height: 64px; border-radius: 50%; border: 4px solid var(--ink); background: var(--butter);
+         display: flex; align-items: center; justify-content: center; font-family: "Fredoka", Arial, sans-serif; font-size: 32px; font-weight: 700; }
+  .step h3 { font-size: 34px; font-weight: 600; line-height: 1.15; }
+  .step p { font-size: 26px; color: var(--muted); }
+  .guard { display: flex; gap: 28px; padding: 36px 40px; }
+  .guard .chip { background: var(--sage); }
+  .guard h3 { font-size: 36px; font-weight: 600; }
+  .guard p { font-size: 27px; color: var(--muted); margin-top: 8px; }
+  .footer { position: absolute; left: 128px; right: 128px; bottom: 56px; display: flex; justify-content: space-between;
+            font-size: 24px; color: var(--muted); font-weight: 700; }
+  .sources li { font-size: 28px; line-height: 1.5; margin-bottom: 22px; list-style: none; }
+  .sources a { color: var(--teal); word-break: break-all; }
+  .legend { display: flex; gap: 32px; flex-wrap: wrap; font-size: 24px; font-weight: 800; margin-top: 18px; }
+  .nav { position: fixed; right: 20px; bottom: 20px; font: 700 14px "Nunito", Arial, sans-serif; color: var(--muted);
+         background: #fff; border: 2px solid var(--ink); border-radius: 12px; padding: 8px 12px; }
+  @media screen {
+    body.present .deck { padding: 0; gap: 0; height: 100vh; justify-content: center; }
+    body.present .slide { display: none; }
+    body.present .slide.on { display: flex; }
+  }
+  @media print {
+    @page { size: 1920px 1080px; margin: 0; }
+    html, body { background: var(--cream); }
+    .deck { padding: 0; gap: 0; display: block; }
+    .slide { transform: none !important; break-after: page; page-break-after: always; }
+    .nav { display: none; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+<main class="deck">
+
+  <section class="slide">
+    <div class="kicker">WattWise</div>
+    <h2>Keep the lights on. Keep the peak down.</h2>
+    <div class="two" style="grid-template-columns: 1.2fr 1fr;">
+      <div class="stack">
+        <p>WattWise watches every appliance in a restaurant and gently shifts the ones that can wait, so the electricity peak stays under a limit the owner picks. Service never stops.</p>
+        <p class="muted">Built at Cal Hacks 13.0 by Kritazya, Suyog and Ashirwad, with Fetch.ai agents, Claude, SpacetimeDB, Convex and Microsoft Azure.</p>
+      </div>
+      <div class="card" style="background: var(--peach); padding: 44px; display: flex; flex-direction: column; gap: 32px;">
+        <div class="row"><span class="chip" style="background:#FFB4A2"></span>The fryer, grill and oven keep cooking</div>
+        <div class="row"><span class="chip" style="background:#A9D6F5"></span>Fridges never drop below a safe level</div>
+        <div class="row"><span class="chip" style="background:#2EC4B6"></span>The dishwasher waits a few minutes when it helps</div>
+      </div>
+    </div>
+    <div class="footer"><span>WattWise</span><span>1 / 6</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">The problem</div>
+    <h2>One busy 15 minutes can set the whole month’s bill.</h2>
+    <div class="two" style="grid-template-columns: 1fr 1.1fr;">
+      <div class="stack">
+        <p>Many businesses pay for electricity twice. Once for the energy they use, and again for their <b>demand</b>: the highest 15 minute average power anywhere in the month.</p>
+        <p>In a restaurant that moment is usually the Friday dinner rush, when the fryer, oven, dishwasher and air conditioning all pull hard at once. Nobody sees it happen. It shows up weeks later on the bill, and that one moment sets the demand charge for the entire month.</p>
+      </div>
+      <figure class="card" style="padding: 36px;">
+        <svg viewBox="0 0 320 180" width="100%" style="display:block; max-height: 360px;" role="img" aria-label="Sketch: a short spike crosses the cap without WattWise; with WattWise the same work spreads out under it">
+          <line x1="16" y1="70" x2="304" y2="70" stroke="#22223B" stroke-width="2" stroke-dasharray="6 6"/>
+          <text x="304" y="62" text-anchor="end" font-size="11" font-weight="800" fill="#22223B" font-family="Nunito, Arial, sans-serif">owner’s cap</text>
+          <path d="M16 140 C60 135 80 120 110 112 C130 106 140 40 160 32 C178 40 186 100 205 108 C240 118 270 128 304 134" fill="none" stroke="#E43F62" stroke-width="4" stroke-linecap="round"/>
+          <path d="M16 140 C60 135 80 120 110 112 C135 98 150 84 175 82 C205 82 230 96 250 108 C270 118 285 126 304 134" fill="none" stroke="#168F84" stroke-width="4" stroke-linecap="round"/>
+          <line x1="16" y1="160" x2="304" y2="160" stroke="#22223B" stroke-width="2"/>
+          <text x="16" y="176" font-size="11" fill="#6B687B" font-family="Nunito, Arial, sans-serif">5 PM</text>
+          <text x="304" y="176" text-anchor="end" font-size="11" fill="#6B687B" font-family="Nunito, Arial, sans-serif">9 PM</text>
+        </svg>
+        <figcaption class="legend">
+          <span style="color:#E43F62">Without control: one rush sets the bill</span>
+          <span style="color:#168F84">With WattWise: same work, spread out</span>
+          <span class="muted">Sketch, not data</span>
+        </figcaption>
+      </figure>
+    </div>
+    <div class="footer"><span>WattWise</span><span>2 / 6</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Background research</div>
+    <h2>Restaurants are hungry for power and short on margin.</h2>
+    <div class="grid2">
+      <div class="card fact"><div class="big">5 to 7×</div><p>more energy per square foot than other commercial buildings, and up to 10× for busy quick service spots.<sup>[1]</sup></p></div>
+      <div class="card fact"><div class="big">~5 million</div><p>US commercial customers could sign up for rates with demand charges above $15 per kW, out of about 18 million.<sup>[2]</sup></p></div>
+      <div class="card fact"><div class="big">30% to 70%</div><p>of a commercial electricity bill can come from demand charges, according to reporting on NREL’s survey.<sup>[3]</sup></p></div>
+      <div class="card fact"><div class="big">A few cents</div><p>on the dollar is what many restaurants keep. National Restaurant Association data put casual dining near 3% operating margin.<sup>[4]</sup></p></div>
+    </div>
+    <p class="muted" style="font-size:26px; margin-top: 28px;">What we noticed: a lot of the peak comes from equipment that could wait a few minutes without anyone noticing, like a dish cycle, an ice batch or a degree of cooling.</p>
+    <div class="footer"><span>Sources on the last slide</span><span>3 / 6</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">How we solve it</div>
+    <h2>Sense, decide, act. Every minute.</h2>
+    <div class="steps">
+      <div class="card step"><div class="num">1</div><h3>Owner sets the rules</h3><p>Each appliance is always on, flexible or deferrable, with limits. The owner picks a peak cap.</p></div>
+      <div class="card step"><div class="num">2</div><h3>Agents bring context</h3><p>Fetch.ai agents fetch weather, grid prices and nearby events, like a Giants game down the street.</p></div>
+      <div class="card step"><div class="num">3</div><h3>One hub reports</h3><p>Every appliance reports to one ESP32 style hub each minute. Commands go back the same way.</p></div>
+      <div class="card step"><div class="num">4</div><h3>The engine plans</h3><p>It forecasts the next blocks and moves flexible load: hold the dishwasher, trim the HVAC a little.</p></div>
+      <div class="card step"><div class="num">5</div><h3>Claude handles the hard calls</h3><p>When no move inside the rules is enough, Claude picks one of the engine’s options within the owner’s authority.</p></div>
+    </div>
+    <div class="footer"><span>WattWise</span><span>4 / 6</span></div>
+  </section>
+
+  <section class="slide">
+    <div class="kicker">Why owners can trust it</div>
+    <h2>The owner holds the keys.</h2>
+    <div class="grid2">
+      <div class="card guard"><span class="chip"></span><div><h3>Tested code computes every number</h3><p>kW, dollars and forecasts come from the engine. The AI only quotes them and never invents one.</p></div></div>
+      <div class="card guard"><span class="chip"></span><div><h3>Rules are hard limits</h3><p>Always on equipment is never touched, and refrigeration never goes below 50%, not even in an emergency.</p></div></div>
+      <div class="card guard"><span class="chip"></span><div><h3>Energy is moved, not cut</h3><p>Anything held back is caught up the same day. The owner can undo any decision.</p></div></div>
+      <div class="card guard"><span class="chip"></span><div><h3>It works without the AI</h3><p>Switch Claude and every agent off and the kitchen runs the same, with safe defaults.</p></div></div>
+    </div>
+    <div class="footer"><span>WattWise</span><span>5 / 6</span></div>
+  </section>
+
+  <section class="slide" style="background: var(--paper);">
+    <div class="kicker">Sources</div>
+    <h2>Background research sources</h2>
+    <ol class="sources">
+      <li>[1] ENERGY STAR for Small Business: Restaurants. <a href="https://www.energystar.gov/buildings/resources-audience/small-biz/restaurants">energystar.gov/buildings/resources-audience/small-biz/restaurants</a></li>
+      <li>[2] NREL (McLaren et al., 2017), A Survey of U.S. Demand Charges. <a href="https://www.nrel.gov/docs/fy17osti/68963.pdf">nrel.gov/docs/fy17osti/68963.pdf</a></li>
+      <li>[3] Energy-Storage.news on the NREL demand charge survey. <a href="https://www.energy-storage.news/news/energy-storage-could-have-significant-impact-on-us-businesses-energy-costs">energy-storage.news/news/energy-storage-could-have-significant-impact-on-us-businesses-energy-costs</a></li>
+      <li>[4] Chron, Operating Margins for Restaurants (National Restaurant Association data). <a href="https://smallbusiness.chron.com/operating-margins-restaurants-21413.html">smallbusiness.chron.com/operating-margins-restaurants-21413.html</a></li>
+    </ol>
+    <div class="footer"><span>WattWise · Cal Hacks 13.0</span><span>6 / 6</span></div>
+  </section>
+
+</main>
+<div class="nav">← → to move · F to present · P to print</div>
+<script>
+  const slides = [...document.querySelectorAll(".slide")];
+  let current = 0;
+  function fit() {
+    const present = document.body.classList.contains("present");
+    const k = present ? Math.min(innerWidth / 1920, innerHeight / 1080) : Math.min(1, (innerWidth - 48) / 1920);
+    slides.forEach((s) => { s.style.transform = `scale(${k})`; s.style.marginBottom = present ? "0" : `${-1080 * (1 - k)}px`; });
+    slides.forEach((s, i) => s.classList.toggle("on", i === current));
+  }
+  addEventListener("resize", fit);
+  addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight" || e.key === " ") current = Math.min(slides.length - 1, current + 1);
+    else if (e.key === "ArrowLeft") current = Math.max(0, current - 1);
+    else if (e.key === "f" || e.key === "F") document.body.classList.toggle("present");
+    else if (e.key === "p" || e.key === "P") return print();
+    else return;
+    e.preventDefault();
+    fit();
+    if (!document.body.classList.contains("present")) slides[current].scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  fit();
+</script>
+</body>
+</html>
